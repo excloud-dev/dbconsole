@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getAllConnections, getConnectionById, invalidateConnectionsCache, toClientMeta } from '@/lib/connections'
 import { updateUiConnection, deleteUiConnection } from '@/lib/meta-db'
+import { closePoolsForConnection } from '@/lib/pg-pool'
 
 export const runtime = 'nodejs'
 
@@ -17,9 +18,9 @@ const ConnectionUpdateSchema = z.object({
 
 export async function PUT(
     req: Request,
-    { params }: { params: { id: string } },
+    context: { params: Promise<{ id: string }> },
 ) {
-    const id = params.id
+    const { id } = await context.params
 
     // Only UI connections can be updated.
     const existing = getAllConnections().find((c) => c.id === id)
@@ -55,6 +56,8 @@ export async function PUT(
             return NextResponse.json({ error: 'Connection updated but could not be loaded' }, { status: 500 })
         }
 
+        await closePoolsForConnection(updated.id)
+
         return NextResponse.json(toClientMeta(serverConn))
     } catch (err) {
         if (err instanceof z.ZodError) {
@@ -67,9 +70,9 @@ export async function PUT(
 
 export async function DELETE(
     _req: Request,
-    { params }: { params: { id: string } },
+    context: { params: Promise<{ id: string }> },
 ) {
-    const id = params.id
+    const { id } = await context.params
 
     const existing = getAllConnections().find((c) => c.id === id)
     if (!existing) {
@@ -81,6 +84,7 @@ export async function DELETE(
 
     deleteUiConnection(id)
     invalidateConnectionsCache()
+    await closePoolsForConnection(id)
 
     return NextResponse.json({ success: true })
 }

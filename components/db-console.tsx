@@ -16,6 +16,39 @@ import type { ClientConnectionMeta } from "@/lib/connections"
 import type { SchemaGraph } from "@/lib/schema-introspection"
 import { isReadOnlySql } from "@/lib/sql/safety"
 
+type PoolMode = "single" | "shared" | "per-scope"
+
+const cleanPositionalPlaceholders = (sql: string): string =>
+  sql.replace(/(['"])\$(\d+)\1/g, (_m, _quote, num) => `$${num}`)
+
+const deriveParamLabels = (sql: string, maxIndex: number): string[] => {
+  const labels: string[] = Array.from({ length: maxIndex }, () => "")
+  const regex = /([\w."`.]+)\s*(?:=|<>|!=|<|>|<=|>=|LIKE|ILIKE|IN)\s*\$(\d+)/gi
+  let match: RegExpExecArray | null
+  while ((match = regex.exec(sql))) {
+    const column = match[1]?.replace(/["`]/g, "")
+    const idx = Number(match[2]) - 1
+    if (idx >= 0 && idx < maxIndex && column) {
+      labels[idx] = column
+    }
+  }
+  return labels
+}
+
+const toSqlLiteral = (v: unknown): string => {
+  if (v === null || v === undefined) return "NULL"
+  if (typeof v === "number" || typeof v === "bigint") return String(v)
+  if (typeof v === "boolean") return v ? "TRUE" : "FALSE"
+  const s = String(v).replace(/'/g, "''")
+  return `'${s}'`
+}
+
+const renderSqlWithParams = (sql: string, params: unknown[]): string =>
+  sql.replace(/\$(\d+)/g, (_m, idx) => {
+    const i = Number(idx) - 1
+    return toSqlLiteral(params[i] ?? null)
+  })
+
 interface JoinConfig {
   table: string
   leftTable?: string
@@ -36,6 +69,11 @@ export function DbConsole() {
   const [tabs, setTabs] = useState<Tab[]>([
     { id: "query-1", name: "Query 1", query: "", pagination: { limit: 100, offset: 0 } }
   ])
+  const [poolMode, setPoolMode] = useState<PoolMode>(() => {
+    if (typeof window === "undefined") return "shared"
+    const stored = localStorage.getItem("db-console-pool-mode") as PoolMode | null
+    return stored ?? "shared"
+  })
 
   // Persistence: Restore tabs on mount
   useEffect(() => {
@@ -53,15 +91,16 @@ export function DbConsole() {
     }
   }, [])
 
-  // Persistence: Save tabs on change
+  // Persistence: Save tabs and pool mode on change
   useEffect(() => {
     try {
       localStorage.setItem("db-console-tabs-v1", JSON.stringify(tabs))
       localStorage.setItem("db-console-active-tab-v1", activeTab)
+      localStorage.setItem("db-console-pool-mode", poolMode)
     } catch (e) {
       console.error("Failed to save tabs", e)
     }
-  }, [tabs, activeTab])
+  }, [tabs, activeTab, poolMode])
 
   const [connections, setConnections] = useState<ConnectionWithStatus[]>([])
   const [activeConnection, setActiveConnection] = useState<string | null>(null)
@@ -71,7 +110,7 @@ export function DbConsole() {
   const [showSaveNamedDialog, setShowSaveNamedDialog] = useState(false)
 
   const [resultsByTab, setResultsByTab] = useState<{
-    [tabId: string]: { columns: string[]; rows: Record<string, unknown>[]; durationMs: number } | undefined
+    [tabId: string]: { columns: string[]; rows: Record<string, unknown>[]; durationMs: number; sqlDisplay?: string } | undefined
   }>({})
   const [schema, setSchema] = useState<SchemaGraph | null>(null)
   const [isRunning, setIsRunning] = useState(false)
@@ -154,21 +193,52 @@ export function DbConsole() {
 
   const addTab = () => {
     const newId = `query-${Date.now()}`
-    setTabs([...tabs, { id: newId, name: `Query ${tabs.length + 1}`, query: "" }])
+    setTabs([...tabs, { id: newId, name: `Query ${tabs.length + 1}`, query: "", connectionId: activeConnection ?? undefined }])
     setActiveTab(newId)
   }
 
   const closeTab = (id: string) => {
     if (tabs.length === 1) return
+    const closingTab = tabs.find((t) => t.id === id)
     const newTabs = tabs.filter((t) => t.id !== id)
     setTabs(newTabs)
+    // If we are using per-tab pools, release the tab-specific pool on close.
+    if (poolMode === "per-scope" && closingTab?.connectionId) {
+      void fetch("/api/connections/release", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          connectionId: closingTab.connectionId,
+          poolMode,
+          scopeKey: id,
+        }),
+      }).catch(() => {})
+    }
     if (activeTab === id) {
       setActiveTab(newTabs[0].id)
     }
   }
 
   const updateQuery = (id: string, query: string) => {
-    setTabs(tabs.map((t) => (t.id === id ? { ...t, query } : t)))
+    setTabs(tabs.map((t) => {
+      if (t.id !== id) return t
+      // auto-grow params array to match highest $n placeholder found
+      const match = [...query.matchAll(/\$([1-9]\d*)/g)]
+      const maxIndex = match.length > 0 ? Math.max(...match.map(m => Number(m[1]) || 0)) : 0
+      const existingParams = t.params ?? []
+      let params = existingParams
+      if (maxIndex > existingParams.length) {
+        const extra = Array.from({ length: maxIndex - existingParams.length }, () => ({ type: "string" as const, value: "" }))
+        params = [...existingParams, ...extra]
+      } else if (maxIndex < existingParams.length) {
+        params = existingParams.slice(0, maxIndex)
+      }
+      return { ...t, query, params }
+    }))
+  }
+
+  const updateParams = (id: string, params: Tab["params"]) => {
+    setTabs(tabs.map((t) => (t.id === id ? { ...t, params } : t)))
   }
 
   const handleSaveAsNamed = async (namedQuery: Omit<NamedQuery, "id">) => {
@@ -231,7 +301,7 @@ export function DbConsole() {
     }
 
     const newId = `nq-tab-${Date.now()}`
-    setTabs([...tabs, { id: newId, name: nq.name, query: nq.query, isNamedQuery: true, namedQueryId: nq.id }])
+    setTabs([...tabs, { id: newId, name: nq.name, query: nq.query, isNamedQuery: true, namedQueryId: nq.id, connectionId: activeConnection ?? undefined }])
     setActiveTab(newId)
   }
 
@@ -249,7 +319,7 @@ ${joinClauses}`
 
     const joinNames = joins.map((j) => j.table).join(", ")
     const newId = `query-${Date.now()}`
-    const newTab = { id: newId, name: `${baseTable} ⋈ ${joins.length > 1 ? `(${joins.length})` : joinNames}`, query: joinQuery }
+    const newTab = { id: newId, name: `${baseTable} ⋈ ${joins.length > 1 ? `(${joins.length})` : joinNames}`, query: joinQuery, connectionId: activeConnection ?? undefined }
     setTabs([...tabs, newTab])
     setActiveTab(newId)
 
@@ -271,7 +341,7 @@ ${joinClauses}`
 
     const query = `SELECT * FROM ${tableName}${orderByClause}`
     const newId = `view-${Date.now()}`
-    const newTab = { id: newId, name: `${tableName} (Top 100)`, query, pagination: { limit: 100, offset: 0 } }
+    const newTab = { id: newId, name: `${tableName} (Top 100)`, query, pagination: { limit: 100, offset: 0 }, connectionId: activeConnection ?? undefined }
     setTabs([...tabs, newTab])
     setActiveTab(newId)
 
@@ -284,6 +354,7 @@ ${joinClauses}`
 
 
   const handleConnectionChange = (id: string) => {
+    const previous = activeConnection
     // Set previous active to disconnected, new one to connected
     setConnections((prev) =>
       prev.map((c) => ({
@@ -292,6 +363,14 @@ ${joinClauses}`
       })),
     )
     setActiveConnection(id)
+    // Release pools tied to the previous connection to avoid leaks when switching targets.
+    if (previous && previous !== id) {
+      void fetch("/api/connections/release", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ connectionId: previous }),
+      }).catch(() => {})
+    }
     void loadSchema(id)
   }
 
@@ -301,31 +380,38 @@ ${joinClauses}`
     : null
 
   const currentResult = currentTab ? resultsByTab[currentTab.id] : undefined
+  const currentParamLabels = currentTab?.query && currentTab.params ? deriveParamLabels(currentTab.query, currentTab.params.length) : []
 
   // loadSchema defined above with useCallback
 
   async function executeRawQuery(sqlArg?: string, tabIdArg?: string, connectionIdArg?: string, newOffset: number = 0, newLimit?: number) {
     const targetTabId = tabIdArg || activeTab
-    const targetConnectionId = connectionIdArg || activeConnection
+    const targetTab = tabs.find(t => t.id === targetTabId)
+    const targetConnectionId = connectionIdArg || targetTab?.connectionId || activeConnection
 
     if (!targetConnectionId) return
 
-    // Find tab to get current pagination state
-    const tab = tabs.find(t => t.id === targetTabId)
     // Use provided limit/offset or fallback to current tab state or defaults
-    const limit = newLimit ?? tab?.pagination?.limit ?? 100
+    const limit = newLimit ?? targetTab?.pagination?.limit ?? 100
     const offset = newOffset
+    const paramValues = (targetTab?.params ?? []).map((p) => {
+      if (p.type === "number") return Number(p.value)
+      if (p.type === "boolean") return p.value === "true"
+      return p.value
+    })
 
     // Resolve SQL: Argument -> Current Tab -> Empty
     let sql = sqlArg
     if (!sql) {
-      sql = tab?.query || ""
+      sql = targetTab?.query || ""
     }
+    // Support users who wrap $n in quotes; strip the quotes for execution while keeping param order.
+    const sqlToRun = cleanPositionalPlaceholders(sql)
 
-    if (!sql.trim()) return
+    if (!sqlToRun.trim()) return
 
     // Strict Read-Only Check
-    if (!isReadOnlySql(sql)) {
+    if (!isReadOnlySql(sqlToRun)) {
       toast({
         variant: "destructive",
         title: "Query Rejected",
@@ -339,59 +425,46 @@ ${joinClauses}`
 
     try {
       // Clean SQL for wrapping (remove trailing semicolon)
-      const cleanSql = sql.trim().replace(/;+$/, "")
+      const cleanSql = sqlToRun.trim().replace(/;+$/, "")
 
-      // 1. If this is a new query (offset 0) or explicit run, fetch TOTAL COUNT first
-      // We only fetch count if we don't have it or if we are resetting to page 1
-      let totalRows = tab?.pagination?.total
-      const shouldFetchCount = offset === 0 || totalRows === undefined
-
-      if (shouldFetchCount) {
-        // Basic regex check to see if it's a SELECT query (simple heuristic)
-        if (/^\s*SELECT/i.test(cleanSql)) {
-          const countQuery = `SELECT COUNT(*) as count FROM (${cleanSql}) as q`
-          const countRes = await fetch("/api/query/run", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ kind: "raw", sql: countQuery, connectionId: targetConnectionId }),
-          })
-
-          if (countRes.ok) {
-            const countData = await countRes.json()
-            if (countData.rows && countData.rows.length > 0) {
-              totalRows = Number(countData.rows[0].count)
-            }
-          }
-        }
-      }
-
-      // 2. Run paginated query
-      // Wrap query with LIMIT/OFFSET
-      const paginatedQuery = `SELECT * FROM (${cleanSql}) as q LIMIT ${limit} OFFSET ${offset}`
+      const shouldIncludeCount = offset === 0 || targetTab?.pagination?.total === undefined
 
       const res = await fetch("/api/query/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: "raw", sql: paginatedQuery, connectionId: targetConnectionId }),
+        body: JSON.stringify({
+          kind: "raw",
+          sql: cleanSql,
+          originalSql: cleanSql,
+          connectionId: targetConnectionId,
+          poolMode,
+          scopeKey: poolMode === "per-scope" ? targetTabId : undefined,
+          params: paramValues,
+          limit,
+          offset,
+          includeCount: shouldIncludeCount,
+        }),
       })
 
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string }
         throw new Error(body.error || "Query failed")
       }
-      const data = (await res.json()) as { columns: string[]; rows: Record<string, unknown>[]; durationMs: number }
+      const data = (await res.json()) as { columns: string[]; rows: Record<string, unknown>[]; durationMs: number; totalCount?: number }
 
-      setResultsByTab((prev) => ({ ...prev, [targetTabId]: data }))
+      const sqlDisplay = renderSqlWithParams(cleanSql, paramValues)
+      setResultsByTab((prev) => ({ ...prev, [targetTabId]: { ...data, sqlDisplay } }))
 
       // Update tab pagination state
       setTabs(prev => prev.map(t => {
         if (t.id === targetTabId) {
           return {
             ...t,
+            connectionId: targetConnectionId,
             pagination: {
               limit,
               offset,
-              total: totalRows
+              total: data.totalCount ?? t.pagination?.total ?? data.rows?.length
             }
           }
         }
@@ -413,76 +486,75 @@ ${joinClauses}`
 
 
 
-  async function executeNamedQuery(query: NamedQuery, params: Record<string, string>) {
+  async function executeNamedQuery(query: NamedQuery, params: Record<string, string>, newOffset: number = 0, newLimit?: number) {
     if (!activeConnection) return
+    const targetTab = currentTab
+    const limit = newLimit ?? targetTab?.pagination?.limit ?? 100
+    const offset = newOffset
+    setIsRunning(true)
+    setError(null)
 
-    // Client-side parameter substitution
-    let sql = query.query
+    try {
+      const shouldIncludeCount = offset === 0 || targetTab?.pagination?.total === undefined
 
-    // 1. First Pass: Handle "Optional" parameters (handled in UI, but good to have backup or if passed from elsewhere)
-    // Actually UI handles the "1=1" substitution for empty params. We assume 'query.query' might already have that if passed from UI?
-    // Wait, the UI passed a modified NamedQuery object. Yes.
+      const res = await fetch("/api/query/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "named",
+          queryId: query.id,
+          params,
+          connectionId: activeConnection,
+          poolMode,
+          scopeKey: poolMode === "per-scope" ? currentTab?.id : undefined,
+          limit,
+          offset,
+          originalSql: query.query,
+          includeCount: shouldIncludeCount,
+        }),
+      })
 
-    // 2. Second Pass: Substitute values
-    // We need to be careful about SQL injection here since we are doing client-side substitution
-    // But this is a dev tool, and these are parameters.
-    // We will just do simple string replacement for now, wrapping strings in single quotes.
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string }
+        throw new Error(body.error || "Query failed")
+      }
 
-    Object.entries(params).forEach(([key, value]) => {
-      // Determine type from query definition if possible, but params are string from UI.
-      // We'll treat everything as string for substitution unless it looks numeric?
-      // Safer to look at the NamedQuery definition.
-      const paramDef = query.parameters.find(p => p.name === key)
-      const isNumber = paramDef?.type === "number"
+      const data = (await res.json()) as { columns: string[]; rows: Record<string, unknown>[]; durationMs: number; totalCount?: number }
 
-      const replacement = isNumber ? value : `'${value.replace(/'/g, "''")}'`
-
-      // Use regex to replace all occurrences of :key with value
-      // We use word boundaries to avoid replacing :id in :id_val
-      sql = sql.replace(new RegExp(`:${key}\\b`, "g"), replacement)
-    })
-
-    // 3. Delegate to executeRawQuery for pagination/limit handling
-    // We treat this as a raw query now.
-    // We need to update the Current Tab to reflect this SQL so pagination works on subsequent requests (Next Page)
-    // But wait, executeRawQuery uses 'tab.query' or 'sqlArg'.
-    // If we pass 'sqlArg', it uses that.
-    // If user clicks "Next Page", executeRawQuery is called with undefined sqlArg.
-    // It looks up tab.query.
-    // So we MUST update the tab's query with the substituted SQL!
-
-    if (currentTab) {
-      // Update the tab with the RESOLVED SQL so that pagination works
-      // But we might want to keep the original template?
-      // If we overwrite tab.query, the NamedQueryEditor will show the resolved SQL?
-      // NamedQueryEditor shows 'namedQuery.query' (from props) not 'tab.query'.
-      // So updateTab(currentTab.id, { query: sql }) is safe for the "run" context, 
-      // BUT the UI might get confused if it switches back to Raw view?
-      // Actually, Named Query tabs are special.
-      // Let's see how they are rendered. 
-      // Logic: if (currentTab?.isNamedQuery) -> Render NamedQueryEditor.
-      // So modifying 'tab.query' (which is state) is fine, it won't affect the definition in Sidebar.
-      // AND it allows executeRawQuery to work for pagination.
-
-      const updatedTabs = tabs.map(t => {
-        if (t.id === currentTab.id) {
-          return {
-            ...t,
-            query: sql,
-            pagination: {
-              limit: t.pagination?.limit || 100,
-              offset: 0,
-              total: t.pagination?.total
+      if (currentTab) {
+        // For display, substitute :param occurrences with literals in the template
+        const sqlDisplay = Object.entries(params).reduce((acc, [key, value]) => {
+          const literal = toSqlLiteral(value)
+          return acc.replace(new RegExp(`:${key}\\b`, "g"), literal)
+        }, query.query)
+        setResultsByTab((prev) => ({ ...prev, [currentTab.id]: { ...data, sqlDisplay } }))
+        setTabs(prev => prev.map(t => {
+          if (t.id === currentTab.id) {
+            return {
+              ...t,
+              connectionId: activeConnection,
+              namedParams: params,
+              pagination: {
+                limit,
+                offset,
+                total: data.totalCount ?? t.pagination?.total ?? data.rows?.length
+              }
             }
           }
-        }
-        return t
+          return t
+        }))
+      }
+    } catch (e: any) {
+      console.error("Failed to run named query", e)
+      setError(e?.message || "Failed to run named query")
+      toast({
+        variant: "destructive",
+        title: "Query failed",
+        description: e?.message || "Failed to run query",
       })
-      setTabs(updatedTabs)
+    } finally {
+      setIsRunning(false)
     }
-
-    // Call executeRawQuery with the resolved SQL and reset pagination
-    await executeRawQuery(sql, currentTab?.id, activeConnection, 0)
   }
 
   return (
@@ -573,31 +645,47 @@ ${joinClauses}`
                   {currentTab?.isNamedQuery && currentNamedQuery ? (
                     <NamedQueryEditor namedQuery={currentNamedQuery} onExecute={executeNamedQuery} />
                   ) : (
-                    <QueryEditor
-                      query={currentTab?.query || ""}
-                      onChange={(q) => currentTab && updateQuery(currentTab.id, q)}
-                      onRun={() => executeRawQuery(undefined, undefined, undefined, 0)}
-                      onSaveAsNamed={() => setShowSaveNamedDialog(true)}
-                      schema={schema}
-                    />
-                  )}
+                  <QueryEditor
+                    query={currentTab?.query || ""}
+                    onChange={(q) => currentTab && updateQuery(currentTab.id, q)}
+                    onRun={() => executeRawQuery(undefined, undefined, undefined, 0)}
+                    onSaveAsNamed={() => setShowSaveNamedDialog(true)}
+                    schema={schema}
+                    params={currentTab?.params}
+                    paramLabels={currentParamLabels}
+                    onParamsChange={(p) => currentTab && updateParams(currentTab.id, p)}
+                  />
+                )}
                 </div>
 
                 {/* Data grid section */}
                 <div className="flex-1 rounded-lg border border-stone-200 bg-white shadow-sm overflow-hidden">
-                  {currentResult ? (
-                    currentTab && (
-                      <DataGrid
-                        columns={currentResult?.columns || []}
-                        data={currentResult?.rows || []}
-                        loading={isRunning}
-                        error={error}
-                        pagination={currentTab.pagination}
-                        onPageChange={(newOffset) => executeRawQuery(undefined, currentTab.id, undefined, newOffset)}
-                        onLimitChange={(newLimit) => executeRawQuery(undefined, currentTab.id, undefined, 0, newLimit)}
-                      />
-                    )
-                  ) : (
+            {currentResult ? (
+              currentTab && (
+                <DataGrid
+                  columns={currentResult?.columns || []}
+                  data={currentResult?.rows || []}
+                  loading={isRunning}
+                  error={error}
+                  executedSql={currentResult?.sqlDisplay}
+                  pagination={currentTab.pagination}
+                  onPageChange={(newOffset) => {
+                    if (currentTab.isNamedQuery && currentNamedQuery) {
+                      executeNamedQuery(currentNamedQuery, currentTab.namedParams ?? {}, newOffset)
+                    } else {
+                      executeRawQuery(undefined, currentTab.id, currentTab.connectionId ?? activeConnection ?? undefined, newOffset)
+                    }
+                  }}
+                  onLimitChange={(newLimit) => {
+                    if (currentTab.isNamedQuery && currentNamedQuery) {
+                      executeNamedQuery(currentNamedQuery, currentTab.namedParams ?? {}, 0, newLimit)
+                    } else {
+                      executeRawQuery(undefined, currentTab.id, currentTab.connectionId ?? activeConnection ?? undefined, 0, newLimit)
+                    }
+                  }}
+                />
+              )
+            ) : (
                     <div className="flex h-full items-center justify-center text-stone-400 text-sm">
                       {isRunning ? "Running query..." : "Run a query to see results"}
                     </div>
@@ -614,6 +702,7 @@ ${joinClauses}`
         onOpenChange={setShowConnectionDialog}
         connections={connections}
         activeConnection={activeConnection}
+        poolMode={poolMode}
         onConnectionsChange={(updated) => {
           setConnections((prev) => {
             const statusById = new Map(prev.map((c) => [c.id, c.status]))
@@ -626,6 +715,7 @@ ${joinClauses}`
         onConnect={(id) => {
           handleConnectionChange(id)
         }}
+        onPoolModeChange={(mode) => setPoolMode(mode)}
       />
 
       <SaveNamedQueryDialog

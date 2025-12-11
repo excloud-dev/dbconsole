@@ -97,7 +97,7 @@ describe('API /api/connections', () => {
             label: 'Updated Label',
         })
 
-        const updateRes = await connectionPUT(updateReq, { params: { id: created.id } })
+        const updateRes = await connectionPUT(updateReq, { params: Promise.resolve({ id: created.id }) })
         expect(updateRes.status).toBe(200)
         const updated = (await updateRes.json()) as { id: string; label: string }
         expect(updated.id).toBe(created.id)
@@ -122,7 +122,7 @@ describe('API /api/connections', () => {
             method: 'DELETE',
         })
 
-        const deleteRes = await connectionDELETE(deleteReq, { params: { id: created.id } })
+        const deleteRes = await connectionDELETE(deleteReq, { params: Promise.resolve({ id: created.id }) })
         expect(deleteRes.status).toBe(200)
         const body = (await deleteRes.json()) as { success?: boolean }
         expect(body.success).toBe(true)

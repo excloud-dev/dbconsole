@@ -4,12 +4,20 @@ import { Plus, X, Bookmark } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
+export type RawParam = {
+  type: 'string' | 'number' | 'boolean'
+  value: string
+}
+
 export interface Tab {
   id: string
   name: string
   query: string
   isNamedQuery?: boolean
   namedQueryId?: string
+  connectionId?: string
+  params?: RawParam[]
+  namedParams?: Record<string, string>
   pagination?: {
     limit: number
     offset: number

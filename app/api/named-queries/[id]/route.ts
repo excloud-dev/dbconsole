@@ -6,9 +6,10 @@ export const runtime = 'nodejs'
 
 export async function GET(
     _req: Request,
-    { params }: { params: { id: string } },
+    context: { params: Promise<{ id: string }> },
 ) {
-    const nq = getNamedQuery(params.id)
+    const { id } = await context.params
+    const nq = getNamedQuery(id)
     if (!nq) {
         return NextResponse.json({ error: 'Named query not found' }, { status: 404 })
     }
@@ -41,9 +42,10 @@ const UpdateNamedQuerySchema = z.object({
 
 export async function PUT(
     req: Request,
-    { params }: { params: { id: string } },
+    context: { params: Promise<{ id: string }> },
 ) {
-    const existing = getNamedQuery(params.id)
+    const { id } = await context.params
+    const existing = getNamedQuery(id)
     if (!existing) {
         return NextResponse.json({ error: 'Named query not found' }, { status: 404 })
     }
@@ -80,13 +82,14 @@ export async function PUT(
 
 export async function DELETE(
     _req: Request,
-    { params }: { params: { id: string } },
+    context: { params: Promise<{ id: string }> },
 ) {
-    const existing = getNamedQuery(params.id)
+    const { id } = await context.params
+    const existing = getNamedQuery(id)
     if (!existing) {
         return NextResponse.json({ error: 'Named query not found' }, { status: 404 })
     }
 
-    deleteNamedQuery(params.id)
+    deleteNamedQuery(id)
     return NextResponse.json({ success: true })
 }

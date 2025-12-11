@@ -5,11 +5,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Database, Plus, Trash2, TestTube, Check, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ClientConnectionMeta } from "@/lib/connections"
 import { useToast } from "@/hooks/use-toast"
+
+type PoolMode = "single" | "shared" | "per-scope"
 
 export interface ConnectionDraft {
   id?: string
@@ -20,6 +21,7 @@ export interface ConnectionDraft {
   username: string
   password: string
   readOnly: boolean
+  from: "env" | "ui"
 }
 
 interface ConnectionDialogProps {
@@ -29,6 +31,8 @@ interface ConnectionDialogProps {
   activeConnection: string | null
   onConnectionsChange: (connections: ClientConnectionMeta[]) => void
   onConnect: (id: string) => void
+  poolMode: PoolMode
+  onPoolModeChange: (mode: PoolMode) => void
 }
 
 export function ConnectionDialog({
@@ -38,6 +42,8 @@ export function ConnectionDialog({
   activeConnection,
   onConnectionsChange,
   onConnect,
+  poolMode,
+  onPoolModeChange,
 }: ConnectionDialogProps) {
   const { toast } = useToast()
   const [editingConnection, setEditingConnection] = useState<ConnectionDraft | null>(null)
@@ -51,6 +57,7 @@ export function ConnectionDialog({
     username: "",
     password: "",
     readOnly: true,
+    from: "ui",
   })
 
   const handleAddConnection = () => {
@@ -58,10 +65,35 @@ export function ConnectionDialog({
     setEditingConnection(newConn)
   }
 
-  const handleDeleteConnection = (id?: string) => {
-    onConnectionsChange(connections.filter((c) => c.id !== id))
-    if (editingConnection?.id === id) {
-      setEditingConnection(null)
+  const handleDeleteConnection = async (id?: string) => {
+    if (!id) return
+    if (editingConnection?.from === "env") {
+      toast({
+        variant: "destructive",
+        title: "Env connections are read-only",
+        description: "You can only delete connections created in the UI.",
+      })
+      return
+    }
+    try {
+      const res = await fetch(`/api/connections/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      })
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string }
+        throw new Error(body.error || "Failed to delete connection")
+      }
+      onConnectionsChange(connections.filter((c) => c.id !== id))
+      if (editingConnection?.id === id) {
+        setEditingConnection(null)
+      }
+      toast({ title: "Connection deleted" })
+    } catch (e: any) {
+      toast({
+        variant: "destructive",
+        title: "Delete failed",
+        description: e?.message || "Could not delete connection",
+      })
     }
   }
 
@@ -151,6 +183,7 @@ export function ConnectionDialog({
                           username: conn.username ?? "",
                           password: "",
                           readOnly: conn.readOnly,
+                          from: conn.from,
                         })
                       }
                       className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm text-left transition-colors ${editingConnection?.id === conn.id
@@ -183,8 +216,9 @@ export function ConnectionDialog({
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-7 px-2 text-stone-500 hover:text-red-600 hover:bg-red-50"
+                          className="h-7 px-2 text-stone-500 hover:text-red-600 hover:bg-red-50 disabled:opacity-50"
                           onClick={() => handleDeleteConnection(editingConnection.id)}
+                          disabled={editingConnection.from === "env"}
                         >
                           <Trash2 className="h-3.5 w-3.5 mr-1" />
                           Delete
@@ -306,6 +340,34 @@ export function ConnectionDialog({
                                 : "Test Connection"}
                         </Button>
                       </div>
+
+                      <div className="pt-3">
+                        <div className="text-xs font-medium text-stone-600 mb-1">Connection usage</div>
+                        <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { key: "single", label: "Single" },
+                            { key: "shared", label: "Shared Pool" },
+                            { key: "per-scope", label: "Per Tab" },
+                          ].map((opt) => (
+                            <Button
+                              key={opt.key}
+                              variant={poolMode === opt.key ? "default" : "outline"}
+                              size="sm"
+                              className={cn(
+                                "h-8 text-xs",
+                                poolMode === opt.key ? "bg-stone-800 hover:bg-stone-900 text-white" : "text-stone-700"
+                              )}
+                              onClick={() => onPoolModeChange(opt.key as PoolMode)}
+                              type="button"
+                            >
+                              {opt.label}
+                            </Button>
+                          ))}
+                        </div>
+                        <p className="text-[11px] text-stone-500 mt-1">
+                          Single = 1 connection total; Shared = pool re-used across tabs; Per Tab = dedicated connection per tab.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -328,49 +390,60 @@ export function ConnectionDialog({
             <Button
               onClick={async () => {
                 if (editingConnection) {
-                  // Persist the connection if it's a new draft
-                  if (!editingConnection.id) {
-                    try {
-                      const res = await fetch("/api/connections", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          label: editingConnection.label,
-                          host: editingConnection.host,
-                          port: editingConnection.port,
-                          database: editingConnection.database,
-                          username: editingConnection.username,
-                          password: editingConnection.password,
-                          readOnly: editingConnection.readOnly,
-                        }),
-                      })
-
-                      if (!res.ok) {
-                        const body = (await res.json().catch(() => ({}))) as { error?: string }
-                        throw new Error(body.error || "Failed to save connection")
-                      }
-
-                      const created = (await res.json()) as ClientConnectionMeta
-                      onConnectionsChange([...connections, created])
-                      onConnect(created.id)
-                      toast({
-                        title: "Connection saved",
-                        description: `Saved and connected to ${created.label || created.id}`,
-                      })
-                    } catch (e: any) {
-                      toast({
-                        variant: "destructive",
-                        title: "Failed to save connection",
-                        description: e?.message || "Could not save the connection.",
-                      })
-                      return
-                    }
-                  } else {
-                    onConnect(editingConnection.id)
+                  if (editingConnection.from === "env") {
                     toast({
-                      title: "Connection selected",
-                      description: `Switched to ${editingConnection.label}`,
+                      variant: "destructive",
+                      title: "Env connections are read-only",
+                      description: "You can only edit connections created in the UI.",
                     })
+                    return
+                  }
+                  const payload = {
+                    label: editingConnection.label,
+                    host: editingConnection.host,
+                    port: editingConnection.port,
+                    database: editingConnection.database,
+                    username: editingConnection.username,
+                    readOnly: editingConnection.readOnly,
+                    ...(editingConnection.password ? { password: editingConnection.password } : {}),
+                  }
+
+                  const isNew = !editingConnection.id
+                  const url = isNew
+                    ? "/api/connections"
+                    : `/api/connections/${encodeURIComponent(editingConnection.id!)}`
+                  const method = isNew ? "POST" : "PUT"
+
+                  try {
+                    const res = await fetch(url, {
+                      method,
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(payload),
+                    })
+
+                    if (!res.ok) {
+                      const body = (await res.json().catch(() => ({}))) as { error?: string }
+                      throw new Error(body.error || "Failed to save connection")
+                    }
+
+                    const saved = (await res.json()) as ClientConnectionMeta
+                    if (isNew) {
+                      onConnectionsChange([...connections, saved])
+                    } else {
+                      onConnectionsChange(connections.map((c) => (c.id === saved.id ? saved : c)))
+                    }
+                    onConnect(saved.id)
+                    toast({
+                      title: isNew ? "Connection saved" : "Connection updated",
+                      description: `${saved.label || saved.id}`,
+                    })
+                  } catch (e: any) {
+                    toast({
+                      variant: "destructive",
+                      title: "Failed to save connection",
+                      description: e?.message || "Could not save the connection.",
+                    })
+                    return
                   }
                   onOpenChange(false)
                 }

@@ -44,6 +44,7 @@ export async function POST(req: Request) {
         connectionTimeoutMillis: 5_000,
         statement_timeout: 5_000,
         query_timeout: 5_000,
+        application_name: 'dbconsole',
     })
 
     try {

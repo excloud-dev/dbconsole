@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils"
 import { CellDetailDialog } from "./cell-detail-dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 
-import { ChevronLeft, ChevronRight, Loader2, Copy, FileDown, EyeOff, Columns, Check, Eye, SlidersHorizontal, Maximize2, Minimize2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Loader2, Copy, FileDown, EyeOff, Columns, Check, Eye, SlidersHorizontal, Maximize2, Minimize2, Info } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,6 +34,7 @@ interface DataGridProps {
   data: Record<string, unknown>[]
   loading?: boolean
   error?: string | null
+  executedSql?: string
   pagination?: {
     limit: number
     offset: number
@@ -91,12 +92,12 @@ function calculateColumnWidths(columns: string[], data: Record<string, unknown>[
   return sizing
 }
 
-export function DataGrid({ columns: rawColumns, data, loading, error, pagination, onPageChange, onLimitChange }: DataGridProps) {
+export function DataGrid({ columns: rawColumns, data, loading, error, executedSql, pagination, onPageChange, onLimitChange }: DataGridProps) {
   const [sorting, setSorting] = useState<SortingState>([])
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({})
   const [columnSizing, setColumnSizing] = useState<Record<string, number>>({})
-  const [detailCell, setDetailCell] = useState<{ content: unknown; column: string } | null>(null)
+  const [detailCell, setDetailCell] = useState<{ content: unknown; column: string; executedSql?: string } | null>(null)
 
   // Selection State
   type Point = { r: number; c: number }
@@ -232,15 +233,16 @@ export function DataGrid({ columns: rawColumns, data, loading, error, pagination
   const columns = useMemo<ColumnDef<Record<string, unknown>>[]>(
     () =>
       rawColumns.map((col, index) => ({
-        accessorKey: col,
         id: `${col}-${index}`,
         header: col,
         size: 100,
         minSize: 70,
         maxSize: 600,
+        accessorFn: (row) => row[col],
         cell: (info) => formatCellValue(info.getValue()),
+        meta: { executedSql },
       })),
-    [rawColumns],
+    [rawColumns, executedSql],
   )
 
   const table = useReactTable({
@@ -377,6 +379,18 @@ export function DataGrid({ columns: rawColumns, data, loading, error, pagination
             </Button>
 
             <div className="h-4 w-px bg-stone-200 mx-1" />
+
+            {executedSql && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-stone-500 hover:text-stone-700"
+                title="Show executed SQL"
+                onClick={() => executedSql && setDetailCell({ content: executedSql, column: "Executed SQL", executedSql })}
+              >
+                <Info className="h-4 w-4" />
+              </Button>
+            )}
 
             <Button
               variant="ghost"
@@ -630,13 +644,14 @@ export function DataGrid({ columns: rawColumns, data, loading, error, pagination
                         )}
                         onMouseDown={(e) => handleMouseDown(rowIdx, colIdx, e)}
                         onMouseEnter={() => handleMouseEnter(rowIdx, colIdx)}
-                        onDoubleClick={() => {
-                          setDetailCell({
-                            content: cell.getValue(),
-                            column: cell.column.columnDef.header as string
+                       onDoubleClick={() => {
+                         setDetailCell({
+                           content: cell.getValue(),
+                            column: cell.column.columnDef.header as string,
+                            executedSql
                           })
-                        }}
-                      >
+                       }}
+                     >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     )

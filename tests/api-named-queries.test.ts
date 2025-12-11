@@ -57,7 +57,7 @@ describe('API /api/named-queries', () => {
 
         // GET by id
         const getRes = await namedQueryGET(new Request(`http://localhost/api/named-queries/${created.id}`), {
-            params: { id: created.id },
+            params: Promise.resolve({ id: created.id }),
         })
         expect(getRes.status).toBe(200)
         const fetched = (await getRes.json()) as typeof created
@@ -68,7 +68,7 @@ describe('API /api/named-queries', () => {
         const updateReq = makeJsonRequest(`http://localhost/api/named-queries/${created.id}`, 'PUT', {
             description: 'Updated description',
         })
-        const updateRes = await namedQueryPUT(updateReq, { params: { id: created.id } })
+        const updateRes = await namedQueryPUT(updateReq, { params: Promise.resolve({ id: created.id }) })
         expect(updateRes.status).toBe(200)
         const updated = (await updateRes.json()) as typeof created
         expect(updated.description).toBe('Updated description')
@@ -76,7 +76,7 @@ describe('API /api/named-queries', () => {
         // DELETE
         const deleteRes = await namedQueryDELETE(
             new Request(`http://localhost/api/named-queries/${created.id}`, { method: 'DELETE' }),
-            { params: { id: created.id } },
+            { params: Promise.resolve({ id: created.id }) },
         )
         expect(deleteRes.status).toBe(200)
         const deleteBody = (await deleteRes.json()) as { success?: boolean }
@@ -85,7 +85,7 @@ describe('API /api/named-queries', () => {
         // Subsequent GET should 404
         const getAfterDelete = await namedQueryGET(
             new Request(`http://localhost/api/named-queries/${created.id}`),
-            { params: { id: created.id } },
+            { params: Promise.resolve({ id: created.id }) },
         )
         expect(getAfterDelete.status).toBe(404)
     })

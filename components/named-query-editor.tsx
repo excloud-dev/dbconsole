@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Play, Bookmark, Code2, ChevronDown, ChevronUp } from "lucide-react"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 
 export interface NamedQueryParameter {
   name: string
@@ -36,6 +37,7 @@ export function NamedQueryEditor({ namedQuery, onExecute }: NamedQueryEditorProp
 
   const [paramValues, setParamValues] = useState<{ [key: string]: string }>(defaultParamValues)
   const [showQuery, setShowQuery] = useState(false)
+  const [queryView, setQueryView] = useState<"template" | "rendered">("template")
 
   // Reset params when the named query changes
   useEffect(() => {
@@ -43,32 +45,7 @@ export function NamedQueryEditor({ namedQuery, onExecute }: NamedQueryEditorProp
   }, [defaultParamValues])
 
   const handleExecute = () => {
-    // Process optional parameters
-    // If a parameter is empty, we try to neutralize its condition
-    // Strategy: Look for "col = :param" (ignoring whitespace) and replace with "1=1"
-    let processedQuery = namedQuery
-    const processedParams = { ...paramValues }
-
-    namedQuery.parameters.forEach((p) => {
-      const val = paramValues[p.name]
-      if (!val || val.trim() === "") {
-        // Parameter is empty. Try to neutralize.
-        // Regex matches: word characters (column), optional space, =, optional space, :paramName
-        // Case insensitive
-        // Regex matches: anything that looks like "col = :param"
-        // [^=]+ match column (greedy until =), \s*=\s*, :paramName
-        // We use a slightly more permissive regex for the column part to catch "table.col"
-        const regex = new RegExp(`[\\w.]+\\s*=\\s*:${p.name}\\b`, "gi")
-        if (regex.test(processedQuery.query)) {
-          console.log(`Neutralizing empty parameter: ${p.name}`)
-          // Replace with 1=1 to make the condition always true (ignoring the filter)
-          const newQueryString = processedQuery.query.replace(regex, "1=1")
-          processedQuery = { ...processedQuery, query: newQueryString }
-        }
-      }
-    })
-
-    onExecute(processedQuery, processedParams)
+    onExecute(namedQuery, { ...paramValues })
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -132,10 +109,57 @@ export function NamedQueryEditor({ namedQuery, onExecute }: NamedQueryEditorProp
         </button>
         {showQuery && (
           <div className="px-3 pb-3">
-            <pre className="text-xs font-mono text-stone-600 whitespace-pre-wrap">{namedQuery.query}</pre>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] text-stone-500">Preview</span>
+              <ToggleGroup
+                type="single"
+                value={queryView}
+                onValueChange={(v) => v && setQueryView(v as "template" | "rendered")}
+                className="h-7"
+              >
+                <ToggleGroupItem value="template" className="text-[11px] px-2 h-7">
+                  Template
+                </ToggleGroupItem>
+                <ToggleGroupItem value="rendered" className="text-[11px] px-2 h-7">
+                  Rendered
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+            <pre className="text-xs font-mono text-stone-700 whitespace-pre-wrap bg-white border border-stone-200 rounded p-2">
+              {queryView === "template" ? namedQuery.query : renderPreview(namedQuery.query, paramValues)}
+            </pre>
           </div>
         )}
       </div>
     </div>
   )
+}
+
+// Local preview renderer mirrors server behavior for optional params and literal substitution.
+function renderPreview(template: string, params: Record<string, string>): string {
+  let sql = template
+  for (const [name, val] of Object.entries(params)) {
+    if (val === undefined || val === null || val.trim() === "") {
+      const escaped = name.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")
+      const patterns = [
+        new RegExp(`([\\w."\\\`]+)\\s*=\\s*:${escaped}(::[\\w]+)?`, "gi"),
+        new RegExp(`:${escaped}\\s*=\\s*([\\w."\\\`]+)`, "gi"),
+        new RegExp(`([\\w."\\\`]+)\\s+(?:ILIKE|LIKE)\\s*:${escaped}`, "gi"),
+        new RegExp(`([\\w."\\\`]+)\\s+IN\\s*\\(\\s*:${escaped}\\s*\\)`, "gi"),
+      ]
+      for (const pat of patterns) {
+        sql = sql.replace(pat, "1=1")
+      }
+    }
+  }
+
+  return sql.replace(/:([a-zA-Z_][a-zA-Z0-9_]*)/g, (_m, key) => toSqlLiteral(params[key] ?? null))
+}
+
+function toSqlLiteral(v: unknown): string {
+  if (v === null || v === undefined || (typeof v === "string" && v.trim() === "")) return "NULL"
+  if (typeof v === "number" || typeof v === "bigint") return String(v)
+  if (typeof v === "boolean") return v ? "TRUE" : "FALSE"
+  const s = String(v).replace(/'/g, "''")
+  return `'${s}'`
 }

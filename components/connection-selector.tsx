@@ -9,10 +9,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import type { Connection } from "./connection-dialog"
+import type { ClientConnectionMeta } from "@/lib/connections"
 
 interface ConnectionSelectorProps {
-  connections: Connection[]
+  connections: ClientConnectionMeta[]
   activeConnection: string | null
   onSelect: (id: string) => void
   onManage: () => void
@@ -26,7 +26,7 @@ export function ConnectionSelector({ connections, activeConnection, onSelect, on
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm" className="h-8 gap-2 border-stone-200 text-stone-600 bg-transparent">
           <Database className={`h-3.5 w-3.5 ${current ? "text-green-600" : "text-stone-400"}`} />
-          <span className="max-w-32 truncate">{current?.name || "No connection"}</span>
+          <span className="max-w-32 truncate">{current?.label || "No connection"}</span>
           <ChevronDown className="h-3 w-3" />
         </Button>
       </DropdownMenuTrigger>
@@ -40,7 +40,7 @@ export function ConnectionSelector({ connections, activeConnection, onSelect, on
             <Database
               className={`h-3.5 w-3.5 mr-2 ${activeConnection === conn.id ? "text-green-600" : "text-stone-400"}`}
             />
-            <span className="truncate">{conn.name}</span>
+            <span className="truncate">{conn.label}</span>
           </DropdownMenuItem>
         ))}
         {connections.length > 0 && <DropdownMenuSeparator />}

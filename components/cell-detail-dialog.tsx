@@ -11,6 +11,7 @@ interface CellDetailDialogProps {
     onOpenChange: (open: boolean) => void
     content: unknown
     columnName: string
+    executedSql?: string
 }
 
 // Improved tokenizer for highlighting
@@ -63,17 +64,71 @@ export function CellDetailDialog({ open, onOpenChange, content, columnName }: Ce
     const [isCopied, setIsCopied] = useState(false)
     const [formattedContent, setFormattedContent] = useState<React.ReactNode>("")
     const [isJson, setIsJson] = useState(false)
+    const [isSql, setIsSql] = useState(false)
+    const [rawText, setRawText] = useState<string>("")
+
+    // Simple SQL highlighter
+    const highlightSql = (sql: string) => {
+        const keywords = /\b(SELECT|FROM|WHERE|JOIN|LEFT|RIGHT|FULL|INNER|OUTER|ON|AND|OR|NOT|IN|LIKE|ILIKE|GROUP|BY|ORDER|LIMIT|OFFSET|UNION|ALL|AS|CASE|WHEN|THEN|END|DISTINCT|WITH|INSERT|UPDATE|DELETE|VALUES|RETURNING|HAVING)\b/gi
+        const strings = /'([^']|'')*'/g
+        const numbers = /\b\d+(?:\.\d+)?\b/g
+        const identifiers = /"[^\"]*"|`[^`]*`/g
+
+        const tokens: { regex: RegExp; className: string }[] = [
+            { regex: strings, className: "text-emerald-600" },
+            { regex: identifiers, className: "text-blue-600" },
+            { regex: keywords, className: "text-purple-700 font-semibold" },
+            { regex: numbers, className: "text-orange-600" },
+        ]
+
+        let output: React.ReactNode[] = []
+        let remaining = sql
+        let offset = 0
+
+        while (remaining.length > 0) {
+            let nextMatch: { start: number; end: number; text: string; className: string } | null = null
+            for (const { regex, className } of tokens) {
+                regex.lastIndex = 0
+                const m = regex.exec(remaining)
+                if (m) {
+                    const start = m.index
+                    const end = m.index + m[0].length
+                    if (!nextMatch || start < nextMatch.start) {
+                        nextMatch = { start, end, text: m[0], className }
+                    }
+                }
+            }
+
+            if (!nextMatch) {
+                output.push(remaining)
+                break
+            }
+
+            if (nextMatch.start > 0) {
+                output.push(remaining.slice(0, nextMatch.start))
+            }
+            output.push(<span key={offset + nextMatch.start} className={nextMatch.className}>{nextMatch.text}</span>)
+            remaining = remaining.slice(nextMatch.end)
+            offset += nextMatch.end
+        }
+
+        return output
+    }
 
     useEffect(() => {
         if (content === null) {
             setFormattedContent(<span className="text-stone-400 italic">NULL</span>)
+            setRawText("NULL")
             setIsJson(false)
+            setIsSql(false)
             return
         }
 
         if (content === undefined) {
             setFormattedContent("")
+            setRawText("")
             setIsJson(false)
+            setIsSql(false)
             return
         }
 
@@ -97,15 +152,25 @@ export function CellDetailDialog({ open, onOpenChange, content, columnName }: Ce
 
         if (isValidJson) {
             setIsJson(true)
+            setIsSql(false)
             setFormattedContent(highlightJson(jsonString))
-        } else {
+            setRawText(jsonString)
+        } else if (typeof content === "string" && columnName.toLowerCase().includes("sql")) {
             setIsJson(false)
-            setFormattedContent(String(content))
+            setIsSql(true)
+            setFormattedContent(highlightSql(content))
+            setRawText(content)
+        } else {
+            const plain = String(content)
+            setIsJson(false)
+            setIsSql(false)
+            setFormattedContent(plain)
+            setRawText(plain)
         }
-    }, [content])
+    }, [content, columnName])
 
     const handleCopy = () => {
-        const textToCopy = typeof content === 'object' ? JSON.stringify(content, null, 2) : String(content)
+        const textToCopy = rawText
         navigator.clipboard.writeText(textToCopy)
         setIsCopied(true)
         setTimeout(() => setIsCopied(false), 2000)
@@ -122,9 +187,11 @@ export function CellDetailDialog({ open, onOpenChange, content, columnName }: Ce
                     </DialogTitle>
                 </DialogHeader>
 
-                <ScrollArea className="flex-1 p-4 bg-white/50">
-                    <div className="font-mono text-xs leading-relaxed whitespace-pre-wrap break-all text-stone-800">
-                        {formattedContent}
+                <ScrollArea className="flex-1 p-4">
+                    <div className="rounded-md border border-stone-200 bg-stone-50/80 shadow-inner px-3 py-2">
+                        <div className="font-mono text-xs leading-relaxed whitespace-pre-wrap break-words text-stone-800">
+                            {formattedContent}
+                        </div>
                     </div>
                 </ScrollArea>
 
