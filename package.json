@@ -6,7 +6,7 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "eslint .",
-    "start": "next start -H ${HOSTNAME:-0.0.0.0}",
+    "start": "next start -H ${BIND_HOST:-0.0.0.0}",
     "test": "vitest"
   },
   "dependencies": {

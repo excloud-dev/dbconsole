@@ -283,13 +283,24 @@ setup_env_file() {
             echo "PORT=$CUSTOM_PORT" >> "$ENV_FILE"
             log_info "Added PORT=$CUSTOM_PORT to existing .env file"
         fi
+
+        # Update the BIND_HOST in existing .env file
+        if grep -q "^BIND_HOST=" "$ENV_FILE"; then
+            sed -i "s/^BIND_HOST=.*/BIND_HOST=$CUSTOM_HOST/" "$ENV_FILE"
+            log_info "Updated BIND_HOST to $CUSTOM_HOST in existing .env file"
+        else
+            # If HOSTNAME exists (legacy), we can keep it or append BIND_HOST. 
+            # Let's append BIND_HOST to be safe and specific.
+            echo "BIND_HOST=$CUSTOM_HOST" >> "$ENV_FILE"
+            log_info "Added BIND_HOST=$CUSTOM_HOST to existing .env file"
+        fi
     else
         # Create a basic .env file (user can customize later)
         cat > "$ENV_FILE" << EOF
 # DBConsole Environment Configuration
 NODE_ENV=production
 PORT=$CUSTOM_PORT
-HOSTNAME=$CUSTOM_HOST
+BIND_HOST=$CUSTOM_HOST
 
 # Add your database connection strings and other config here
 # DATABASE_URL=postgresql://user:password@localhost:5432/dbname
