@@ -49,6 +49,8 @@ const renderSqlWithParams = (sql: string, params: unknown[]): string =>
     return toSqlLiteral(params[i] ?? null)
   })
 
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$")
+
 // Quote a possibly-qualified identifier (schema.table or table) safely.
 // Splits on dots and quotes each part so mixed-case/reserved names work.
 const quoteIdent = (name: string) =>
@@ -72,6 +74,9 @@ interface ConnectionWithStatus extends ClientConnectionMeta {
 export function DbConsole() {
   const { toast } = useToast()
   const [sidebarOpen, setSidebarOpen] = useState(true)
+
+  const topPanelRef = useRef<ImperativePanelHandle | null>(null)
+  const verticalGroupRef = useRef<HTMLDivElement | null>(null)
 
   const [activeTab, setActiveTab] = useState("query-1")
   const [tabs, setTabs] = useState<Tab[]>([
@@ -536,7 +541,9 @@ export function DbConsole() {
         // For display, substitute :param occurrences with literals in the template
         const sqlDisplay = Object.entries(params).reduce((acc, [key, value]) => {
           const literal = toSqlLiteral(value)
-          return acc.replace(new RegExp(`:${key}\\b`, "g"), literal)
+          // Only replace real named params; avoid matching MACs/hex segments after ':'.
+          const pattern = new RegExp(`(^|[^0-9A-Za-z_]):${escapeRegex(key)}\\b`, "g")
+          return acc.replace(pattern, (_m, prefix) => `${prefix}${literal}`)
         }, query.query)
         setResultsByTab((prev) => ({ ...prev, [currentTab.id]: { ...data, sqlDisplay } }))
         setTabs(prev => prev.map(t => {
@@ -575,13 +582,6 @@ export function DbConsole() {
       // We use a small timeout to ensure the layout engine is ready if needed, 
       // though usually instant is fine. 
       editorPanelRef.current.resize(tab.editorHeight)
-    } else if (editorPanelRef.current) {
-      // Default size if no stored height
-      // editorPanelRef.current.resize(15) 
-      // actually we might want to keep current size if we switch to a new tab without pref? 
-      // No, user request implies "different heights for different tabs", so we should respect that.
-      // If undefined, maybe default to 15.
-      editorPanelRef.current.resize(15)
     }
   }, [activeTab, tabs]) // depends on tabs to find the tab, but careful not to loop if tabs update. 
   // Actually, if we update tabs on resize, this effect fires? 
@@ -609,20 +609,9 @@ export function DbConsole() {
     }
   }
 
-  const handleRequestResize = (expand: boolean) => {
-    const panel = editorPanelRef.current
-    if (!panel) return
-
-    if (expand) {
-      // Expand to show query
-      panel.resize(25)
-      setTabs(prev => prev.map(t => t.id === activeTab ? { ...t, editorHeight: 25 } : t))
-    } else {
-      // Collapse back to small
-      // Check if user had a custom large size? Maybe better to go to 15 default.
-      panel.resize(15)
-      setTabs(prev => prev.map(t => t.id === activeTab ? { ...t, editorHeight: 15 } : t))
-    }
+  const handleEnsurePanelHeight = (_neededPx: number) => {
+    // Reverted: keep default panel sizing
+    return
   }
 
   return (
@@ -717,16 +706,11 @@ export function DbConsole() {
                   {/* Query editor section */}
                   <ResizablePanel
                     ref={editorPanelRef}
-                    defaultSize={15}
+                    defaultSize={40}
                     minSize={15}
                     className="flex flex-col"
                     onResize={(size) => {
                       if (currentTab) {
-                        // Debounce or just update? updating state on every resize frame is bad.
-                        // But we need it persisted.
-                        // For now, let's just update it. React state updates might be laggy.
-                        // Better: Ref update, then commit on stop?
-                        // Simplest: Just Update.
                         setTabs(prev => prev.map(t => t.id === currentTab.id ? { ...t, editorHeight: size } : t))
                       }
                     }}
@@ -737,7 +721,6 @@ export function DbConsole() {
                           namedQuery={currentNamedQuery}
                           onExecute={executeNamedQuery}
                           onLineCountChange={handleLineCountChange}
-                          onRequestResize={handleRequestResize}
                         />
                       ) : (
                         <QueryEditor

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useLayoutEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -25,10 +25,9 @@ interface NamedQueryEditorProps {
   namedQuery: NamedQuery
   onExecute: (query: NamedQuery, params: Record<string, string>) => void
   onLineCountChange?: (lines: number) => void
-  onRequestResize?: (expand: boolean) => void
 }
 
-export function NamedQueryEditor({ namedQuery, onExecute, onLineCountChange, onRequestResize }: NamedQueryEditorProps) {
+export function NamedQueryEditor({ namedQuery, onExecute, onLineCountChange }: NamedQueryEditorProps) {
   const defaultParamValues = useMemo(() => {
     const defaults: Record<string, string> = {}
     namedQuery.parameters.forEach((p) => {
@@ -40,6 +39,8 @@ export function NamedQueryEditor({ namedQuery, onExecute, onLineCountChange, onR
   const [paramValues, setParamValues] = useState<{ [key: string]: string }>(defaultParamValues)
   const [showQuery, setShowQuery] = useState(false)
   const [queryView, setQueryView] = useState<"template" | "rendered">("template")
+  const [containerMinHeight, setContainerMinHeight] = useState<number>(160)
+  const preRef = useRef<HTMLElement | null>(null)
 
   // Reset params when the named query changes
   useEffect(() => {
@@ -60,14 +61,35 @@ export function NamedQueryEditor({ namedQuery, onExecute, onLineCountChange, onR
   const toggleQuery = () => {
     const nextState = !showQuery
     setShowQuery(nextState)
-    onRequestResize?.(nextState)
   }
+
+  // Measure once when query is shown or content changes; no observers to avoid loops.
+  useLayoutEffect(() => {
+    if (!showQuery) return
+    const el = preRef.current
+    if (!el) return
+
+    const measure = () => {
+      // Simple measured height with small buffer
+      const rectHeight = el.scrollHeight
+      const needed = Math.max(rectHeight + 24, 200)
+      setContainerMinHeight(needed)
+    }
+
+    // Next frame to ensure layout is ready
+    requestAnimationFrame(measure)
+  }, [showQuery, queryView, namedQuery.query, paramValues])
 
   return (
     <div className="flex flex-col h-full bg-white overflow-hidden relative group/editor">
       <div className="flex-1 min-h-[100px] relative flex flex-col">
         {/* Editor Area (Read-only/Visual) */}
-        <div className="flex-1 overflow-auto p-4">
+        <div
+      className="flex-1 overflow-hidden p-4 transition-[min-height] duration-200 ease-out"
+      style={{
+        minHeight: showQuery ? containerMinHeight : 160,
+      }}
+    >
           <div className="flex items-center gap-2 mb-4">
             <Bookmark className="h-5 w-5 text-accent-foreground fill-accent" />
             <div>
@@ -102,7 +124,10 @@ export function NamedQueryEditor({ namedQuery, onExecute, onLineCountChange, onR
                     <ToggleGroupItem value="rendered" className="text-[10px] px-2 h-5">Rendered</ToggleGroupItem>
                   </ToggleGroup>
                 </div>
-                <pre className="text-xs font-mono text-stone-700 whitespace-pre-wrap bg-stone-50 border border-stone-200 rounded-md p-3 max-h-60 overflow-auto">
+                <pre
+                  className="text-xs font-mono text-stone-700 whitespace-pre-wrap bg-stone-50 border border-stone-200 rounded-md p-3 max-h-60 overflow-auto"
+                  ref={preRef as any}
+                >
                   {queryView === "template" ? namedQuery.query : renderPreview(namedQuery.query, paramValues)}
                 </pre>
               </div>
@@ -154,12 +179,14 @@ export function NamedQueryEditor({ namedQuery, onExecute, onLineCountChange, onR
   )
 }
 
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")
+
 // Local preview renderer mirrors server behavior for optional params and literal substitution.
 function renderPreview(template: string, params: Record<string, string>): string {
   let sql = template
   for (const [name, val] of Object.entries(params)) {
     if (val === undefined || val === null || val.trim() === "") {
-      const escaped = name.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")
+      const escaped = escapeRegex(name)
       const patterns = [
         new RegExp(`([\\w."\\\`]+)\\s*=\\s*:${escaped}(::[\\w]+)?`, "gi"),
         new RegExp(`:${escaped}\\s*=\\s*([\\w."\\\`]+)`, "gi"),
@@ -172,7 +199,8 @@ function renderPreview(template: string, params: Record<string, string>): string
     }
   }
 
-  return sql.replace(/:([a-zA-Z_][a-zA-Z0-9_]*)/g, (_m, key) => toSqlLiteral(params[key] ?? null))
+  const placeholderRegex = /(^|[^0-9A-Za-z_]):([a-zA-Z_][a-zA-Z0-9_]*)/g
+  return sql.replace(placeholderRegex, (_m, prefix, key) => `${prefix}${toSqlLiteral(params[key] ?? null)}`)
 }
 
 function toSqlLiteral(v: unknown): string {

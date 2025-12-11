@@ -107,7 +107,7 @@ export async function runQuery(input: RawQueryInput | NamedQueryInput): Promise<
     try {
         if (input.includeCount) {
             const countRes = await pool.query({
-                text: `SELECT COUNT(*) as count FROM (${normalized}) as q`,
+                text: `SELECT COUNT(*) as count FROM (\n${normalized}\n) as q`,
                 values,
             })
             totalCount = Number(countRes.rows?.[0]?.count ?? 0)
@@ -242,17 +242,21 @@ export async function runQuery(input: RawQueryInput | NamedQueryInput): Promise<
     }
 }
 
-function applyLimitOffset(sql: string, limit?: number, offset?: number): string {
+export function applyLimitOffset(sql: string, limit?: number, offset?: number): string {
     if (limit === undefined && offset === undefined) return sql
     const safeLimit = limit !== undefined ? Math.max(0, Math.floor(limit)) : undefined
     const safeOffset = offset !== undefined ? Math.max(0, Math.floor(offset)) : 0
+
+    // Wrap with newlines so trailing single-line comments don't eat the closing paren.
+    const wrapped = `SELECT * FROM (\n${sql}\n) as q`
+
     if (safeLimit === undefined) {
-        return `SELECT * FROM (${sql}) as q OFFSET ${safeOffset}`
+        return `${wrapped} OFFSET ${safeOffset}`
     }
-    return `SELECT * FROM (${sql}) as q LIMIT ${safeLimit} OFFSET ${safeOffset}`
+    return `${wrapped} LIMIT ${safeLimit} OFFSET ${safeOffset}`
 }
 
-function applyNamedQueryParams(template: string, params: Record<string, unknown>): ParameterizedSql {
+export function applyNamedQueryParams(template: string, params: Record<string, unknown>): ParameterizedSql {
     // Optional parameter handling:
     // - If a param is missing/empty, we neutralize simple predicates that reference it
     //   (e.g., "col = :p" / "col LIKE :p" / "col IN (:p)") by replacing them with 1=1.
@@ -281,12 +285,14 @@ function applyNamedQueryParams(template: string, params: Record<string, unknown>
         delete (params as any)[name]
     }
 
-    const placeholderRegex = /:([a-zA-Z_][a-zA-Z0-9_]*)/g
+    // Match :param only when it's not part of an identifier/hex chunk (e.g., MAC 00:11:22:aa:bb:cc).
+    // We require the char before ':' to be start or a non-word char.
+    const placeholderRegex = /(^|[^0-9A-Za-z_]):([a-zA-Z_][a-zA-Z0-9_]*)/g
     const seen = new Map<string, number>()
     const values: unknown[] = []
 
     let index = 0
-    const text = workingSql.replace(placeholderRegex, (_match, name: string) => {
+    const text = workingSql.replace(placeholderRegex, (_match, prefix: string, name: string) => {
         const key = name as string
         let existing = seen.get(key)
         if (existing === undefined) {
@@ -294,7 +300,7 @@ function applyNamedQueryParams(template: string, params: Record<string, unknown>
             seen.set(key, existing)
             values.push(coerceParamValue(params[key]))
         }
-        return `$${existing}`
+        return `${prefix}$${existing}`
     })
 
     return { text, values }
