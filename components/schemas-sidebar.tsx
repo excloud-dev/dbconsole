@@ -18,7 +18,13 @@ import type { SchemaGraph } from "@/lib/schema-introspection"
 interface TableInfo {
   name: string
   schema: string
-  columns: { name: string; type: string; isFk?: boolean; references?: { table: string; column: string } }[]
+  columns: {
+    name: string;
+    type: string;
+    isFk?: boolean;
+    isPk?: boolean;
+    references?: { table: string; column: string }
+  }[]
 }
 
 interface NamedQuery {
@@ -97,10 +103,17 @@ export function SchemasSidebar({
                 fk.from.name === t.name &&
                 fk.fromColumn === c.name,
             )
+            const pk = schema.primaryKeys.find(
+              (pk) =>
+                pk.table.schema === t.schema &&
+                pk.table.name === t.name &&
+                pk.columnName === c.name,
+            )
             return {
               name: c.name,
               type: c.dataType,
               isFk: !!fk,
+              isPk: !!pk,
               references: fk
                 ? {
                   table: fk.to.name,
@@ -137,24 +150,49 @@ export function SchemasSidebar({
     <div className="flex flex-col h-full gap-3">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="flex items-center gap-2 px-2 py-1 text-xs text-stone-500 hover:text-stone-700 transition-colors rounded hover:bg-stone-100/50">
-            <span className={cn("h-2 w-2 rounded-full flex-shrink-0", getStatusColor(activeConn?.status))} />
-            <span className="truncate">{activeConn?.label || "No connection"}</span>
-            <ChevronDown className="h-3 w-3 text-stone-400 ml-auto" />
+          <button className="flex items-center gap-2 w-full px-2 py-1.5 text-xs text-stone-600 hover:text-stone-900 transition-colors rounded hover:bg-stone-100 group">
+            <span className={cn(
+              "h-2 w-2 rounded-full flex-shrink-0",
+              getStatusColor(activeConn?.status)
+            )} />
+            <span className="truncate font-medium">{activeConn?.label || "No connection"}</span>
+            <ChevronDown className="h-3 w-3 text-stone-300 ml-auto transition-transform group-hover:text-stone-500" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-48">
-          {connections.map((conn) => (
-            <DropdownMenuItem key={conn.id} onClick={() => onConnectionChange(conn.id)} className="text-xs">
-              <span className={cn("h-2 w-2 rounded-full mr-2 flex-shrink-0", getStatusColor(conn.status))} />
-              <span className="truncate">{conn.label}</span>
-            </DropdownMenuItem>
-          ))}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={onOpenSettings} className="text-xs text-stone-500">
-            <Plus className="h-3 w-3 mr-2" />
-            Manage connections...
-          </DropdownMenuItem>
+        <DropdownMenuContent align="start" className="w-52">
+          {connections.length === 0 ? (
+            <div className="px-3 py-4 text-center">
+              <div className="text-xs text-stone-500 mb-2">No connections yet</div>
+              <DropdownMenuItem onClick={onOpenSettings} className="text-xs justify-center bg-stone-100 hover:bg-stone-200">
+                <Plus className="h-3 w-3 mr-1.5" />
+                Add connection
+              </DropdownMenuItem>
+            </div>
+          ) : (
+            <>
+              {connections.map((conn) => (
+                <DropdownMenuItem
+                  key={conn.id}
+                  onClick={() => onConnectionChange(conn.id)}
+                  className={cn(
+                    "text-xs gap-2 cursor-pointer",
+                    activeConnection === conn.id && "bg-stone-100"
+                  )}
+                >
+                  <span className={cn(
+                    "h-2 w-2 rounded-full flex-shrink-0 ring-2 ring-white shadow-sm",
+                    getStatusColor(conn.status)
+                  )} />
+                  <span className="truncate font-medium">{conn.label}</span>
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onOpenSettings} className="text-xs text-stone-500">
+                <Plus className="h-3 w-3 mr-2" />
+                Manage connections...
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -181,7 +219,7 @@ export function SchemasSidebar({
         <div>
           <button
             onClick={() => setTablesExpanded(!tablesExpanded)}
-            className="w-full flex items-center gap-2 px-1 py-1.5 hover:bg-stone-100 rounded transition-colors"
+            className="w-full flex items-center gap-2 px-1 py-1.5 hover:bg-stone-100 rounded transition-colors focus:outline-none focus:ring-0"
           >
             <ChevronRight
               className={cn(
@@ -201,7 +239,7 @@ export function SchemasSidebar({
                   <div className="flex items-center group/row">
                     <button
                       onClick={() => toggleTable(table.name)}
-                      className="flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm text-stone-700 hover:bg-stone-100 transition-colors"
+                      className="flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm text-stone-700 hover:bg-stone-100 transition-colors focus:outline-none focus:ring-0"
                     >
                       <ChevronRight
                         className={cn(
@@ -215,7 +253,7 @@ export function SchemasSidebar({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 invisible group-hover/row:visible text-stone-400 hover:text-blue-600 hover:bg-blue-50 outline-none"
+                      className="h-7 w-7 invisible group-hover/row:visible text-stone-400 hover:text-blue-600 hover:bg-blue-50 focus:ring-0 focus-visible:ring-0 focus:outline-none"
                       onClick={(e) => {
                         e.stopPropagation()
                         onViewTable(table.name)
@@ -227,7 +265,7 @@ export function SchemasSidebar({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 invisible group-hover/row:visible text-stone-400 hover:text-blue-600 hover:bg-blue-50 outline-none"
+                      className="h-7 w-7 invisible group-hover/row:visible text-stone-400 hover:text-blue-600 hover:bg-blue-50 focus:ring-0 focus-visible:ring-0 focus:outline-none"
                       onClick={(e) => {
                         e.stopPropagation()
                         openJoinBuilder(table.name)
@@ -245,7 +283,17 @@ export function SchemasSidebar({
                           key={col.name}
                           className="flex flex-col px-1.5 py-0.5 text-xs text-stone-600 hover:bg-stone-50 rounded"
                         >
-                          <span className={cn("truncate", col.isFk && "text-blue-600 font-medium")}>{col.name}</span>
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className={cn(
+                              "truncate",
+                              col.isPk && "text-amber-600 font-medium",
+                              col.isFk && "text-blue-600 font-medium"
+                            )}>
+                              {col.name}
+                            </span>
+                            {col.isPk && <span className="text-[9px] bg-amber-100 text-amber-700 px-1 rounded flex-shrink-0 font-medium">PK</span>}
+                            {col.isFk && <span className="text-[9px] bg-blue-100 text-blue-700 px-1 rounded flex-shrink-0 font-medium">FK</span>}
+                          </div>
                           <span className="text-stone-400 font-mono text-[10px] truncate">{col.type}</span>
                         </div>
                       ))}

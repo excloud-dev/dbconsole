@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Play, BookmarkPlus } from "lucide-react"
 import { SqlEditor } from "@/components/sql-editor"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface SchemaInfo {
   tables: { name: string; schema: string }[]
@@ -20,73 +21,84 @@ interface QueryEditorProps {
   params?: Array<{ type: "string" | "number" | "boolean"; value: string }>
   onParamsChange?: (params: Array<{ type: "string" | "number" | "boolean"; value: string }>) => void
   paramLabels?: string[]
+  onLineCountChange?: (lines: number) => void
 }
 
-export function QueryEditor({ query, onChange, onRun, onSaveAsNamed, isNamedQuery, schema, params = [], onParamsChange, paramLabels = [] }: QueryEditorProps) {
+export function QueryEditor({ query, onChange, onRun, onSaveAsNamed, isNamedQuery, schema, params = [], onParamsChange, paramLabels = [], onLineCountChange }: QueryEditorProps) {
   const updateParam = (index: number, updates: Partial<{ type: "string" | "number" | "boolean"; value: string }>) => {
     if (!onParamsChange) return
     const next = params.map((p, i) => (i === index ? { ...p, ...updates } : p))
     onParamsChange(next)
   }
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-stone-500 uppercase tracking-wide">SQL Query</span>
-        <div className="flex items-center gap-2">
+    <div className="flex flex-col h-full bg-white overflow-hidden relative group/editor">
+      <div className="flex-1 min-h-0 relative">
+        <SqlEditor
+          value={query}
+          onChange={onChange}
+          onExecute={onRun}
+          schema={schema}
+          className="h-full w-full"
+          onLineCountChange={onLineCountChange}
+        />
+
+        {/* Floating Actions */}
+        <div className="absolute bottom-4 right-4 flex items-center gap-2 transition-opacity opacity-0 group-hover/editor:opacity-100">
           {!isNamedQuery && query.trim() && (
             <Button
               size="sm"
               variant="outline"
-              className="h-7 gap-1.5 text-stone-600 border-stone-200 hover:bg-accent/20 hover:text-accent-foreground hover:border-accent bg-transparent"
+              className="h-7 gap-1.5 text-stone-600 border-stone-200 hover:bg-white hover:text-stone-900 bg-white/90 backdrop-blur shadow-sm"
               onClick={onSaveAsNamed}
             >
-              <BookmarkPlus className="h-3 w-3" />
-              Save as Named
+              <BookmarkPlus className="h-3.5 w-3.5" />
+              Save
             </Button>
           )}
-          <Button size="sm" className="h-7 gap-1.5 bg-stone-800 hover:bg-stone-900 text-white" onClick={onRun}>
-            <Play className="h-3 w-3" />
+          <Button size="sm" className="h-7 gap-1.5 bg-stone-800 hover:bg-stone-900 text-white shadow-md transition-transform active:scale-95" onClick={onRun}>
+            <Play className="h-3.5 w-3.5" />
             Run
           </Button>
         </div>
       </div>
-      <SqlEditor
-        value={query}
-        onChange={onChange}
-        onExecute={onRun}
-        schema={schema}
-      />
 
       {!isNamedQuery && onParamsChange && params.length > 0 && (
-        <div className="rounded-md border border-stone-200 bg-stone-50 p-3 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-stone-600">Parameters (positional $1, $2 …)</span>
-          </div>
+        <div className="border-t border-stone-200 bg-stone-50/50 p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto max-h-[160px]">
           {params.map((param, idx) => (
-            <div key={idx} className="grid grid-cols-6 gap-2 items-center">
-              <div className="col-span-1 flex flex-col">
-                <span className="text-xs text-stone-500">#{idx + 1}</span>
-                {paramLabels[idx] && (
-                  <span className="text-[10px] text-stone-400 truncate" title={paramLabels[idx]}>
-                    {paramLabels[idx]}
-                  </span>
-                )}
+            <div key={idx} className="flex items-center gap-1.5 bg-white border border-stone-200 rounded-md px-2 py-1.5 shadow-sm group hover:border-stone-300 transition-colors">
+              {/* Index Chip */}
+              <div className="flex items-center justify-center h-5 w-6 rounded bg-stone-100 text-[10px] font-mono font-medium text-stone-500 border border-stone-200 shrink-0" title={`Parameter $${idx + 1}`}>
+                ${idx + 1}
               </div>
-              <select
-                className="col-span-2 h-8 rounded border border-stone-200 text-sm bg-white px-2"
-                value={param.type}
-                onChange={(e) => updateParam(idx, { type: e.target.value as any })}
-              >
-                <option value="string">string</option>
-                <option value="number">number</option>
-                <option value="boolean">boolean</option>
-              </select>
-              <Input
-                className="col-span-3 h-8"
+
+              {/* Type Select */}
+              <Select value={param.type} onValueChange={(v) => updateParam(idx, { type: v as "string" | "number" | "boolean" })}>
+                <SelectTrigger className="h-5 w-[42px] border-none bg-transparent p-0 text-[10px] text-stone-400 font-medium hover:text-stone-700 focus:ring-0 shadow-none data-[placeholder]:text-stone-400">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="string" className="text-xs">text</SelectItem>
+                  <SelectItem value="number" className="text-xs">num</SelectItem>
+                  <SelectItem value="boolean" className="text-xs">bool</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <div className="h-4 w-px bg-stone-100 shrink-0" />
+
+              {/* Value Input */}
+              <input
+                className="flex-1 bg-transparent border-none text-xs focus:ring-0 p-0 text-stone-800 placeholder:text-stone-300 min-w-0 outline-none font-mono"
                 value={param.value}
                 onChange={(e) => updateParam(idx, { value: e.target.value })}
-                placeholder={`Value for $${idx + 1}`}
+                placeholder="Value..."
               />
+
+              {/* Label Hint (if distinct from value) */}
+              {paramLabels[idx] && (
+                <span className="text-[9px] text-stone-400 truncate max-w-[60px] select-none" title={paramLabels[idx]}>
+                  {paramLabels[idx]}
+                </span>
+              )}
             </div>
           ))}
         </div>

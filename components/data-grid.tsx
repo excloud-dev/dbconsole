@@ -351,145 +351,9 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
           "flex flex-col bg-white transition-all duration-300 ease-in-out",
           isFullscreen
             ? "fixed inset-0 sm:inset-6 z-50 rounded-xl border border-stone-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-[0.98] slide-in-from-bottom-2 duration-300"
-            : "h-full rounded-lg overflow-hidden",
+            : "h-full w-full bg-white",
         )}
       >
-        <div
-          className="flex items-center justify-between px-3 py-1.5 bg-stone-50 border-b border-stone-200 select-none"
-          onDoubleClick={() => setIsFullscreen(!isFullscreen)}
-        >
-          {/* LEFT: Actions */}
-          <div className="flex items-center gap-2" onDoubleClick={(e) => e.stopPropagation()}>
-            {/* Smart Copy Button */}
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={!selection} // Only active if selected
-              className={cn(
-                "h-7 gap-1.5 transition-all duration-300 border",
-                isCopied
-                  ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-                  : "bg-emerald-50/50 text-emerald-700 hover:bg-emerald-100 border-emerald-100 hover:border-emerald-200",
-                !selection && "opacity-50 grayscale cursor-not-allowed bg-stone-100 border-stone-200 text-stone-400"
-              )}
-              onClick={handleSmartCopy}
-            >
-              {isCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-              <span className="text-xs font-medium">{isCopied ? "Copied!" : "Copy Selected"}</span>
-            </Button>
-
-            <div className="h-4 w-px bg-stone-200 mx-1" />
-
-            {executedSql && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-stone-500 hover:text-stone-700"
-                title="Show executed SQL"
-                onClick={() => executedSql && setDetailCell({ content: executedSql, column: "Executed SQL", executedSql })}
-              >
-                <Info className="h-4 w-4" />
-              </Button>
-            )}
-
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-stone-500 hover:text-stone-700 hover:bg-stone-200/50"
-              onClick={() => setIsFullscreen(!isFullscreen)}
-              title="Toggle Fullscreen"
-            >
-              {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-            </Button>
-
-            {/* View/Columns Options */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-stone-500 hover:text-stone-700 hover:bg-stone-200/50" title="View Options">
-                  <SlidersHorizontal className="h-3.5 w-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56 max-h-[300px] overflow-auto p-1">
-                <div className="px-2 py-1.5 text-xs font-semibold text-stone-500">
-                  Toggle Columns
-                </div>
-                {table.getAllLeafColumns().map(column => {
-                  return (
-                    <DropdownMenuItem
-                      key={column.id}
-                      className="text-xs gap-2 cursor-pointer focus:bg-stone-100"
-                      onSelect={(e) => {
-                        e.preventDefault()
-                        column.toggleVisibility(!column.getIsVisible())
-                      }}
-                    >
-                      <Checkbox
-                        checked={column.getIsVisible()}
-                        onCheckedChange={(val) => column.toggleVisibility(!!val)}
-                        className="data-[state=checked]:bg-emerald-100 data-[state=checked]:text-emerald-700 data-[state=checked]:border-emerald-200 border-stone-300"
-                      />
-                      <span className="truncate flex-1">{column.id}</span>
-                    </DropdownMenuItem>
-                  )
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          {/* RIGHT: Pagination */}
-          <div className="flex items-center gap-4" onDoubleClick={(e) => e.stopPropagation()}>
-            {loading && <Loader2 className="h-3.5 w-3.5 animate-spin text-stone-400" />}
-
-            {showPagination && (
-              <div className="flex items-center gap-2">
-                <div className="text-xs text-stone-500 font-medium whitespace-nowrap">
-                  {totalRows !== undefined
-                    ? `${offset + 1}-${Math.min(offset + data.length, totalRows)} of ${totalRows}`
-                    : `${data.length} rows`
-                  }
-                </div>
-
-                <div className="h-4 w-px bg-stone-200 mx-1" />
-
-                <Select value={String(limit)} onValueChange={(v) => onLimitChange?.(Number(v))}>
-                  <SelectTrigger className="h-6 w-auto gap-1.5 px-2 text-xs border-transparent bg-transparent hover:bg-stone-200/50 focus:ring-0">
-                    <span className="text-stone-400">Limit:</span>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="100">100</SelectItem>
-                    <SelectItem value="200">200</SelectItem>
-                    <SelectItem value="500">500</SelectItem>
-                    <SelectItem value="1000">1000</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <div className="flex items-center gap-0.5">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    disabled={offset === 0 || loading}
-                    onClick={() => onPageChange(Math.max(0, offset - limit))}
-                  >
-                    <ChevronLeft className="h-3.5 w-3.5" />
-                  </Button>
-                  <span className="text-xs text-stone-500 min-w-[3ch] text-center">{currentPage}</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    disabled={(totalRows !== undefined && offset + limit >= totalRows) || loading}
-                    onClick={() => onPageChange(offset + limit)}
-                  >
-                    <ChevronRight className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
         <div className="flex-1 overflow-auto relative select-none" onMouseLeave={() => setIsDragging(false)}>
           <table
             className="w-full border-collapse text-sm"
@@ -644,14 +508,14 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
                         )}
                         onMouseDown={(e) => handleMouseDown(rowIdx, colIdx, e)}
                         onMouseEnter={() => handleMouseEnter(rowIdx, colIdx)}
-                       onDoubleClick={() => {
-                         setDetailCell({
-                           content: cell.getValue(),
+                        onDoubleClick={() => {
+                          setDetailCell({
+                            content: cell.getValue(),
                             column: cell.column.columnDef.header as string,
                             executedSql
                           })
-                       }}
-                     >
+                        }}
+                      >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     )
@@ -660,6 +524,142 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
               ))}
             </tbody>
           </table>
+        </div>
+
+        <div
+          className="flex items-center justify-between px-3 py-2 bg-stone-50 border-t border-stone-200 select-none"
+          onDoubleClick={() => setIsFullscreen(!isFullscreen)}
+        >
+          {/* LEFT: Actions */}
+          <div className="flex items-center gap-2" onDoubleClick={(e) => e.stopPropagation()}>
+            {/* Smart Copy Button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={!selection} // Only active if selected
+              className={cn(
+                "h-7 gap-1.5 transition-all duration-300 border",
+                isCopied
+                  ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                  : "bg-white text-emerald-700 hover:bg-emerald-100 border-emerald-100 hover:border-emerald-200/50 shadow-sm",
+                !selection && "opacity-50 grayscale cursor-not-allowed bg-stone-100 border-stone-200 text-stone-400 shadow-none"
+              )}
+              onClick={handleSmartCopy}
+            >
+              {isCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              <span className="text-xs font-medium">{isCopied ? "Copied!" : "Copy Selected"}</span>
+            </Button>
+
+            <div className="h-4 w-px bg-stone-300/60 mx-2" />
+
+            {executedSql && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-stone-500 hover:text-stone-700"
+                title="Show executed SQL"
+                onClick={() => executedSql && setDetailCell({ content: executedSql, column: "Executed SQL", executedSql })}
+              >
+                <Info className="h-4 w-4" />
+              </Button>
+            )}
+
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-stone-500 hover:text-stone-700 hover:bg-stone-200/50"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              title="Toggle Fullscreen"
+            >
+              {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+            </Button>
+
+            {/* View/Columns Options */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-stone-500 hover:text-stone-700 hover:bg-stone-200/50" title="View Options">
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56 max-h-[300px] overflow-auto p-1">
+                <div className="px-2 py-1.5 text-xs font-semibold text-stone-500">
+                  Toggle Columns
+                </div>
+                {table.getAllLeafColumns().map(column => {
+                  return (
+                    <DropdownMenuItem
+                      key={column.id}
+                      className="text-xs gap-2 cursor-pointer focus:bg-stone-100"
+                      onSelect={(e) => {
+                        e.preventDefault()
+                        column.toggleVisibility(!column.getIsVisible())
+                      }}
+                    >
+                      <Checkbox
+                        checked={column.getIsVisible()}
+                        onCheckedChange={(val) => column.toggleVisibility(!!val)}
+                        className="data-[state=checked]:bg-emerald-100 data-[state=checked]:text-emerald-700 data-[state=checked]:border-emerald-200 border-stone-300"
+                      />
+                      <span className="truncate flex-1">{column.id}</span>
+                    </DropdownMenuItem>
+                  )
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* RIGHT: Pagination */}
+          <div className="flex items-center gap-4" onDoubleClick={(e) => e.stopPropagation()}>
+            {loading && <Loader2 className="h-3.5 w-3.5 animate-spin text-stone-400" />}
+
+            {showPagination && (
+              <div className="flex items-center gap-2">
+                <div className="text-xs text-stone-500 font-medium whitespace-nowrap">
+                  {totalRows !== undefined
+                    ? `${offset + 1}-${Math.min(offset + data.length, totalRows)} of ${totalRows}`
+                    : `${data.length} rows`
+                  }
+                </div>
+
+                <div className="h-4 w-px bg-stone-300/60 mx-2" />
+
+                <Select value={String(limit)} onValueChange={(v) => onLimitChange?.(Number(v))}>
+                  <SelectTrigger className="h-6 w-auto gap-1.5 px-2 text-xs border-transparent bg-transparent hover:bg-stone-200/50 focus:ring-0">
+                    <span className="text-stone-400">Limit:</span>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="100">100</SelectItem>
+                    <SelectItem value="200">200</SelectItem>
+                    <SelectItem value="500">500</SelectItem>
+                    <SelectItem value="1000">1000</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <div className="flex items-center gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    disabled={offset === 0 || loading}
+                    onClick={() => onPageChange(Math.max(0, offset - limit))}
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                  </Button>
+                  <span className="text-xs text-stone-500 min-w-[3ch] text-center">{currentPage}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    disabled={(totalRows !== undefined && offset + limit >= totalRows) || loading}
+                    onClick={() => onPageChange(offset + limit)}
+                  >
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {detailCell && (

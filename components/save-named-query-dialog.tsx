@@ -100,10 +100,10 @@ export function SaveNamedQueryDialog({ open, onOpenChange, query, onSave }: Save
               {query}
             </pre>
             {uniqueDetectedParams.length > 0 && (
-              <p className="text-xs text-stone-500">
-                Detected parameters: {uniqueDetectedParams.map((p) => `:${p}`).join(", ")}
-                <button onClick={autoPopulateParams} className="ml-2 text-accent-foreground hover:underline">
-                  Auto-add
+              <p className="text-xs text-stone-500 mt-2">
+                Detected parameters: {uniqueDetectedParams.map((p) => <code key={p} className="bg-stone-100 px-1 py-0.5 rounded text-stone-700 mx-0.5">:{p}</code>)}
+                <button onClick={autoPopulateParams} className="ml-2 text-xs font-medium text-stone-600 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 px-2 py-0.5 rounded transition-colors">
+                  Auto-add all
                 </button>
               </p>
             )}
@@ -173,7 +173,7 @@ export function SaveNamedQueryDialog({ open, onOpenChange, query, onSave }: Save
           <Button
             onClick={handleSave}
             disabled={!name.trim()}
-            className="bg-accent text-accent-foreground hover:bg-accent/90"
+            className="bg-stone-800 hover:bg-stone-900 text-white"
           >
             Save Query
           </Button>

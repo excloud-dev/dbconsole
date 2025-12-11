@@ -195,10 +195,18 @@ export function CellDetailDialog({ open, onOpenChange, content, columnName }: Ce
                     </div>
                 </ScrollArea>
 
-                <div className="p-2 border-t border-stone-100 flex justify-end bg-stone-50/50 rounded-b-lg">
-                    <Button variant="outline" size="sm" onClick={handleCopy} className="h-7 text-xs gap-1.5">
-                        {isCopied ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5 text-stone-500" />}
-                        {isCopied ? "Copied" : "Copy Content"}
+                <div className="p-3 border-t border-stone-100 flex justify-end bg-stone-50/50 rounded-b-lg">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCopy}
+                        className={`h-7 text-xs gap-1.5 transition-all duration-300 border ${isCopied
+                                ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                                : "bg-emerald-50/50 text-emerald-700 hover:bg-emerald-100 border-emerald-100 hover:border-emerald-200"
+                            }`}
+                    >
+                        {isCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                        {isCopied ? "Copied!" : "Copy Content"}
                     </Button>
                 </div>
             </DialogContent>

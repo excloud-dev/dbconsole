@@ -23,6 +23,7 @@ export interface Tab {
     offset: number
     total?: number
   }
+  editorHeight?: number
 }
 
 interface QueryTabsProps {
@@ -40,9 +41,9 @@ export function QueryTabs({ tabs, activeTab, onTabChange, onTabClose, onAddTab }
         <div
           key={tab.id}
           className={cn(
-            "group flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm cursor-pointer transition-colors",
+            "group flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm cursor-pointer transition-all duration-150",
             activeTab === tab.id
-              ? "bg-white text-stone-800 shadow-sm border border-stone-200"
+              ? "bg-white text-stone-900 border border-stone-200 font-medium"
               : "text-stone-500 hover:bg-stone-200/50 hover:text-stone-700",
           )}
           onClick={() => onTabChange(tab.id)}

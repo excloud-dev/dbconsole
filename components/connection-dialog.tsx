@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Database, Plus, Trash2, TestTube, Check, X } from "lucide-react"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { cn } from "@/lib/utils"
 import type { ClientConnectionMeta } from "@/lib/connections"
 import { useToast } from "@/hooks/use-toast"
@@ -163,13 +164,13 @@ export function ConnectionDialog({
             <div className="flex gap-5 min-h-[320px]">
               {/* Connection list */}
               <div className="w-56 border-r border-stone-200 pr-4 flex-shrink-0">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-medium text-stone-500 uppercase">Connections</span>
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleAddConnection}>
+                <div className="flex items-center justify-between mb-3 px-2">
+                  <span className="text-xs font-medium text-stone-500 uppercase tracking-wider">Connections</span>
+                  <Button variant="ghost" size="icon" className="h-5 w-5 text-stone-400 hover:text-stone-700" onClick={handleAddConnection}>
                     <Plus className="h-3.5 w-3.5" />
                   </Button>
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-0.5">
                   {connections.map((conn) => (
                     <button
                       key={conn.id}
@@ -186,19 +187,29 @@ export function ConnectionDialog({
                           from: conn.from,
                         })
                       }
-                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm text-left transition-colors ${editingConnection?.id === conn.id
-                        ? "bg-stone-200 text-stone-800"
-                        : "text-stone-600 hover:bg-stone-100"
-                        }`}
+                      className={cn(
+                        "w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm text-left transition-colors border border-transparent",
+                        editingConnection?.id === conn.id
+                          ? "bg-stone-100 text-stone-900 font-medium"
+                          : "text-stone-600 hover:bg-stone-50 hover:text-stone-900"
+                      )}
                     >
-                      <Database
-                        className={`h-3.5 w-3.5 ${activeConnection === conn.id ? "text-green-600" : "text-stone-400"}`}
-                      />
+                      <div className="relative flex items-center justify-center">
+                        <Database
+                          className={cn(
+                            "h-3.5 w-3.5",
+                            editingConnection?.id === conn.id ? "text-stone-700" : "text-stone-400"
+                          )}
+                        />
+                        {activeConnection === conn.id && (
+                          <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-emerald-500 rounded-full ring-1 ring-white" />
+                        )}
+                      </div>
                       <span className="truncate flex-1">{conn.label}</span>
                     </button>
                   ))}
                   {connections.length === 0 && (
-                    <p className="text-xs text-stone-400 text-center py-4">No connections yet</p>
+                    <p className="text-xs text-stone-400 text-center py-4 italic">No connections</p>
                   )}
                 </div>
               </div>
@@ -343,27 +354,26 @@ export function ConnectionDialog({
 
                       <div className="pt-3">
                         <div className="text-xs font-medium text-stone-600 mb-1">Connection usage</div>
-                        <div className="grid grid-cols-3 gap-2">
+                        <ToggleGroup
+                          type="single"
+                          value={poolMode}
+                          onValueChange={(v) => v && onPoolModeChange(v as PoolMode)}
+                          className="flex gap-1 bg-transparent p-0 border-none justify-start"
+                        >
                           {[
                             { key: "single", label: "Single" },
-                            { key: "shared", label: "Shared Pool" },
+                            { key: "shared", label: "Shared" },
                             { key: "per-scope", label: "Per Tab" },
                           ].map((opt) => (
-                            <Button
+                            <ToggleGroupItem
                               key={opt.key}
-                              variant={poolMode === opt.key ? "default" : "outline"}
-                              size="sm"
-                              className={cn(
-                                "h-8 text-xs",
-                                poolMode === opt.key ? "bg-stone-800 hover:bg-stone-900 text-white" : "text-stone-700"
-                              )}
-                              onClick={() => onPoolModeChange(opt.key as PoolMode)}
-                              type="button"
+                              value={opt.key}
+                              className="text-[10px] h-6 px-2 rounded-full border border-stone-200 data-[state=on]:bg-stone-800 data-[state=on]:text-white data-[state=on]:border-stone-800 hover:bg-stone-50 hover:text-stone-900 transition-colors"
                             >
                               {opt.label}
-                            </Button>
+                            </ToggleGroupItem>
                           ))}
-                        </div>
+                        </ToggleGroup>
                         <p className="text-[11px] text-stone-500 mt-1">
                           Single = 1 connection total; Shared = pool re-used across tabs; Per Tab = dedicated connection per tab.
                         </p>
@@ -371,10 +381,12 @@ export function ConnectionDialog({
                     </div>
                   </div>
                 ) : (
-                  <div className="h-full flex flex-col items-center justify-center text-stone-400 text-sm border-2 border-dashed border-stone-100 rounded-lg bg-stone-50/50">
-                    <Database className="h-8 w-8 mb-2 opacity-20" />
-                    <p>Select a connection to edit</p>
-                    <Button variant="link" onClick={handleAddConnection} className="text-stone-500 h-auto p-0 mt-1">
+                  <div className="h-full flex flex-col items-center justify-center text-stone-400 text-sm">
+                    <div className="h-10 w-10 rounded-full bg-stone-50 flex items-center justify-center mb-3">
+                      <Database className="h-5 w-5 text-stone-300" />
+                    </div>
+                    <p className="font-medium text-stone-500">Select a connection to edit</p>
+                    <Button variant="link" onClick={handleAddConnection} className="text-stone-500 hover:text-stone-800 h-auto p-0 mt-1 text-xs underline decoration-stone-300 hover:decoration-stone-500">
                       or create new
                     </Button>
                   </div>

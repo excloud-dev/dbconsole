@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useState, useRef } from "react"
 import { SchemasSidebar } from "./schemas-sidebar"
 import { QueryTabs, type Tab } from "./query-tabs"
 import { QueryEditor } from "./query-editor"
@@ -9,7 +9,7 @@ import { SaveNamedQueryDialog } from "./save-named-query-dialog"
 import { DataGrid } from "./data-grid"
 import { ConnectionDialog } from "./connection-dialog"
 import { Button } from "@/components/ui/button"
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle, type ImperativePanelHandle } from "@/components/ui/resizable"
 import { Settings, PanelLeftClose, PanelLeft } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import type { ClientConnectionMeta } from "@/lib/connections"
@@ -48,6 +48,14 @@ const renderSqlWithParams = (sql: string, params: unknown[]): string =>
     const i = Number(idx) - 1
     return toSqlLiteral(params[i] ?? null)
   })
+
+// Quote a possibly-qualified identifier (schema.table or table) safely.
+// Splits on dots and quotes each part so mixed-case/reserved names work.
+const quoteIdent = (name: string) =>
+  name
+    .split(".")
+    .map((part) => `"${part.replace(/"/g, '""')}"`)
+    .join(".")
 
 interface JoinConfig {
   table: string
@@ -212,7 +220,7 @@ export function DbConsole() {
           poolMode,
           scopeKey: id,
         }),
-      }).catch(() => {})
+      }).catch(() => { })
     }
     if (activeTab === id) {
       setActiveTab(newTabs[0].id)
@@ -306,16 +314,19 @@ export function DbConsole() {
   }
 
   const handleJoinTables = async (baseTable: string, joins: JoinConfig[]) => {
+    // Safety: quote identifiers to avoid breakage when table/column names are mixed-case or reserved words.
+    const q = quoteIdent
+    const base = q(baseTable)
+
     const joinClauses = joins
-      .map(
-        (j) =>
-          `${j.joinType} JOIN ${j.table} ON ${j.leftTable || baseTable}.${j.leftColumn} = ${j.table}.${j.rightColumn}`,
-      )
+      .map((j) => {
+        const leftTable = j.leftTable || baseTable
+        const rightTable = j.table
+        return `${j.joinType} JOIN ${q(rightTable)} ON ${q(leftTable)}.${q(j.leftColumn)} = ${q(rightTable)}.${q(j.rightColumn)}`
+      })
       .join("\n")
 
-    const joinQuery = `SELECT *
-FROM ${baseTable}
-${joinClauses}`
+    const joinQuery = `SELECT *\nFROM ${base}\n${joinClauses}`
 
     const joinNames = joins.map((j) => j.table).join(", ")
     const newId = `query-${Date.now()}`
@@ -369,7 +380,7 @@ ${joinClauses}`
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ connectionId: previous }),
-      }).catch(() => {})
+      }).catch(() => { })
     }
     void loadSchema(id)
   }
@@ -557,11 +568,68 @@ ${joinClauses}`
     }
   }
 
+  // Restore editor height when switching tabs
+  useEffect(() => {
+    const tab = tabs.find(t => t.id === activeTab)
+    if (tab?.editorHeight && editorPanelRef.current) {
+      // We use a small timeout to ensure the layout engine is ready if needed, 
+      // though usually instant is fine. 
+      editorPanelRef.current.resize(tab.editorHeight)
+    } else if (editorPanelRef.current) {
+      // Default size if no stored height
+      // editorPanelRef.current.resize(15) 
+      // actually we might want to keep current size if we switch to a new tab without pref? 
+      // No, user request implies "different heights for different tabs", so we should respect that.
+      // If undefined, maybe default to 15.
+      editorPanelRef.current.resize(15)
+    }
+  }, [activeTab, tabs]) // depends on tabs to find the tab, but careful not to loop if tabs update. 
+  // Actually, if we update tabs on resize, this effect fires? 
+  // We should depend on activeTab mainly. If tabs change (e.g. content), height shouldn't reset.
+  // But we need to look up the height from `tabs`.
+  // If `activeTab` changes, we look up.
+  // If `tabs` change (e.g. height updated), this effect fires again and re-resizes? That might be redundant but safe if value is same.
+
+  // Auto-resize logic for editor
+  const editorPanelRef = useRef<ImperativePanelHandle>(null)
+
+  const handleLineCountChange = (lines: number) => {
+    const panel = editorPanelRef.current
+    if (!panel) return
+
+    // If we have more than 8 lines of code and the panel is currently collapsed/small (<=15),
+    // expand it to 25 to give more breathing room.
+    if (lines > 8) {
+      const currentSize = panel.getSize()
+      if (currentSize <= 15) {
+        panel.resize(25)
+        // Persist the expansion
+        setTabs(prev => prev.map(t => t.id === activeTab ? { ...t, editorHeight: 25 } : t))
+      }
+    }
+  }
+
+  const handleRequestResize = (expand: boolean) => {
+    const panel = editorPanelRef.current
+    if (!panel) return
+
+    if (expand) {
+      // Expand to show query
+      panel.resize(25)
+      setTabs(prev => prev.map(t => t.id === activeTab ? { ...t, editorHeight: 25 } : t))
+    } else {
+      // Collapse back to small
+      // Check if user had a custom large size? Maybe better to go to 15 default.
+      panel.resize(15)
+      setTabs(prev => prev.map(t => t.id === activeTab ? { ...t, editorHeight: 15 } : t))
+    }
+  }
+
   return (
     <>
-      <div className="h-full w-full rounded-xl border border-stone-300 bg-stone-50 shadow-sm flex flex-col overflow-hidden">
+      <div className="h-full w-full bg-stone-50 flex flex-col overflow-hidden">
         {/* Header with tabs and settings */}
-        <div className="flex items-center justify-between border-b border-stone-200 bg-stone-100/50 px-2 py-2">
+        <div className="flex items-center justify-between border-b border-stone-200 bg-stone-50 px-2 py-2">
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
@@ -569,7 +637,7 @@ ${joinClauses}`
               className="h-8 w-8 text-stone-500 hover:text-stone-700"
               onClick={() => setSidebarOpen(!sidebarOpen)}
             >
-              {sidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
+              <PanelLeft className="h-4 w-4" />
             </Button>
             <QueryTabs
               tabs={tabs}
@@ -639,58 +707,94 @@ ${joinClauses}`
 
             {/* Query and results area */}
             <ResizablePanel defaultSize={80}>
-              <div className="h-full flex flex-col p-3 gap-3 overflow-hidden">
-                {/* Query editor section */}
-                <div className="rounded-lg border border-stone-200 bg-white p-3 shadow-sm">
-                  {currentTab?.isNamedQuery && currentNamedQuery ? (
-                    <NamedQueryEditor namedQuery={currentNamedQuery} onExecute={executeNamedQuery} />
-                  ) : (
-                  <QueryEditor
-                    query={currentTab?.query || ""}
-                    onChange={(q) => currentTab && updateQuery(currentTab.id, q)}
-                    onRun={() => executeRawQuery(undefined, undefined, undefined, 0)}
-                    onSaveAsNamed={() => setShowSaveNamedDialog(true)}
-                    schema={schema}
-                    params={currentTab?.params}
-                    paramLabels={currentParamLabels}
-                    onParamsChange={(p) => currentTab && updateParams(currentTab.id, p)}
-                  />
-                )}
-                </div>
-
-                {/* Data grid section */}
-                <div className="flex-1 rounded-lg border border-stone-200 bg-white shadow-sm overflow-hidden">
-            {currentResult ? (
-              currentTab && (
-                <DataGrid
-                  columns={currentResult?.columns || []}
-                  data={currentResult?.rows || []}
-                  loading={isRunning}
-                  error={error}
-                  executedSql={currentResult?.sqlDisplay}
-                  pagination={currentTab.pagination}
-                  onPageChange={(newOffset) => {
-                    if (currentTab.isNamedQuery && currentNamedQuery) {
-                      executeNamedQuery(currentNamedQuery, currentTab.namedParams ?? {}, newOffset)
-                    } else {
-                      executeRawQuery(undefined, currentTab.id, currentTab.connectionId ?? activeConnection ?? undefined, newOffset)
-                    }
-                  }}
-                  onLimitChange={(newLimit) => {
-                    if (currentTab.isNamedQuery && currentNamedQuery) {
-                      executeNamedQuery(currentNamedQuery, currentTab.namedParams ?? {}, 0, newLimit)
-                    } else {
-                      executeRawQuery(undefined, currentTab.id, currentTab.connectionId ?? activeConnection ?? undefined, 0, newLimit)
-                    }
-                  }}
-                />
-              )
-            ) : (
-                    <div className="flex h-full items-center justify-center text-stone-400 text-sm">
-                      {isRunning ? "Running query..." : "Run a query to see results"}
+              <div className="h-full flex flex-col overflow-hidden">
+                <ResizablePanelGroup direction="vertical">
+                  {/* Query editor section */}
+                  <ResizablePanel
+                    ref={editorPanelRef}
+                    defaultSize={15}
+                    minSize={15}
+                    className="flex flex-col"
+                    onResize={(size) => {
+                      if (currentTab) {
+                        // Debounce or just update? updating state on every resize frame is bad.
+                        // But we need it persisted.
+                        // For now, let's just update it. React state updates might be laggy.
+                        // Better: Ref update, then commit on stop?
+                        // Simplest: Just Update.
+                        setTabs(prev => prev.map(t => t.id === currentTab.id ? { ...t, editorHeight: size } : t))
+                      }
+                    }}
+                  >
+                    <div className="flex-1 min-h-0 relative">
+                      {currentTab?.isNamedQuery && currentNamedQuery ? (
+                        <NamedQueryEditor
+                          namedQuery={currentNamedQuery}
+                          onExecute={executeNamedQuery}
+                          onLineCountChange={handleLineCountChange}
+                          onRequestResize={handleRequestResize}
+                        />
+                      ) : (
+                        <QueryEditor
+                          query={currentTab?.query || ""}
+                          onChange={(q) => currentTab && updateQuery(currentTab.id, q)}
+                          onRun={() => executeRawQuery(undefined, undefined, undefined, 0)}
+                          onSaveAsNamed={() => setShowSaveNamedDialog(true)}
+                          schema={schema}
+                          params={currentTab?.params}
+                          paramLabels={currentParamLabels}
+                          onParamsChange={(p) => currentTab && updateParams(currentTab.id, p)}
+                          onLineCountChange={handleLineCountChange}
+                        />
+                      )}
                     </div>
-                  )}
-                </div>
+                  </ResizablePanel>
+
+                  <ResizableHandle className="h-px bg-stone-200" />
+
+                  {/* Data grid section */}
+                  <ResizablePanel defaultSize={60} minSize={20}>
+                    <div className="h-full overflow-hidden border-t border-stone-200 flex flex-col">
+                      {currentResult ? (
+                        currentTab && (
+                          <DataGrid
+                            columns={currentResult?.columns || []}
+                            data={currentResult?.rows || []}
+                            loading={isRunning}
+                            error={error}
+                            executedSql={currentResult?.sqlDisplay}
+                            pagination={currentTab.pagination}
+                            onPageChange={(newOffset) => {
+                              if (currentTab.isNamedQuery && currentNamedQuery) {
+                                executeNamedQuery(currentNamedQuery, currentTab.namedParams ?? {}, newOffset)
+                              } else {
+                                executeRawQuery(undefined, currentTab.id, currentTab.connectionId ?? activeConnection ?? undefined, newOffset)
+                              }
+                            }}
+                            onLimitChange={(newLimit) => {
+                              if (currentTab.isNamedQuery && currentNamedQuery) {
+                                executeNamedQuery(currentNamedQuery, currentTab.namedParams ?? {}, 0, newLimit)
+                              } else {
+                                executeRawQuery(undefined, currentTab.id, currentTab.connectionId ?? activeConnection ?? undefined, 0, newLimit)
+                              }
+                            }}
+                          />
+                        )
+                      ) : (
+                        <div className="flex h-full flex-col items-center justify-center text-stone-400 gap-2">
+                          {/* Empty state content */}
+                          <div className="h-10 w-10 rounded-full bg-stone-100 flex items-center justify-center">
+                            <svg className="h-5 w-5 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776" />
+                            </svg>
+                          </div>
+                          <span className="text-sm font-medium">{isRunning ? "Running query..." : "Run a query to see results"}</span>
+                          <span className="text-xs text-stone-400">Press ⌘+Enter to execute</span>
+                        </div>
+                      )}
+                    </div>
+                  </ResizablePanel>
+                </ResizablePanelGroup>
               </div>
             </ResizablePanel>
           </ResizablePanelGroup>

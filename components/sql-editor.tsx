@@ -20,6 +20,7 @@ interface SqlEditorProps {
     onExecute?: () => void
     schema?: SchemaInfo | null
     className?: string
+    onLineCountChange?: (lines: number) => void
 }
 
 // Custom highlighting for SQL
@@ -38,20 +39,22 @@ const editorTheme = EditorView.theme({
     "&": {
         fontSize: "13px",
         fontFamily: "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace",
-        backgroundColor: "#fafaf9",
-        border: "1px solid #e7e5e4",
-        borderRadius: "6px",
+        backgroundColor: "transparent",
+        height: "100%",
+    },
+    ".cm-scroller": {
+        overflow: "auto",
+        fontFamily: "inherit",
     },
     ".cm-content": {
-        padding: "8px 12px",
-        minHeight: "80px",
+        padding: "6px 8px",
+        paddingBottom: "40px", // Space for floating buttons
     },
     ".cm-focused": {
         outline: "none",
     },
     "&.cm-focused": {
-        borderColor: "#a8a29e",
-        boxShadow: "0 0 0 1px #a8a29e",
+        outline: "none",
     },
     ".cm-line": {
         padding: "0",
@@ -90,15 +93,17 @@ const editorTheme = EditorView.theme({
     },
 })
 
-export function SqlEditor({ value, onChange, onExecute, schema, className }: SqlEditorProps) {
+export function SqlEditor({ value, onChange, onExecute, schema, className, onLineCountChange }: SqlEditorProps) {
     const editorRef = useRef<HTMLDivElement>(null)
     const viewRef = useRef<EditorView | null>(null)
     const onChangeRef = useRef(onChange)
     const onExecuteRef = useRef(onExecute)
+    const onLineCountChangeRef = useRef(onLineCountChange)
 
     // Keep refs updated
     onChangeRef.current = onChange
     onExecuteRef.current = onExecute
+    onLineCountChangeRef.current = onLineCountChange
 
     // Build schema completions from schema prop
     const schemaCompletions = useCallback(
@@ -240,6 +245,7 @@ export function SqlEditor({ value, onChange, onExecute, schema, className }: Sql
                 EditorView.updateListener.of((update) => {
                     if (update.docChanged) {
                         onChangeRef.current(update.state.doc.toString())
+                        onLineCountChangeRef.current?.(update.state.doc.lines)
                     }
                 }),
                 EditorView.lineWrapping,
@@ -252,6 +258,9 @@ export function SqlEditor({ value, onChange, onExecute, schema, className }: Sql
         })
 
         viewRef.current = view
+
+        // Initial line count
+        onLineCountChangeRef.current?.(state.doc.lines)
 
         return () => {
             view.destroy()
@@ -272,5 +281,18 @@ export function SqlEditor({ value, onChange, onExecute, schema, className }: Sql
         }
     }, [value])
 
-    return <div ref={editorRef} className={className} />
+    return (
+        <div
+            ref={editorRef}
+            className={className}
+            style={{ height: '100%', cursor: 'text' }}
+            onClick={(e) => {
+                if (e.target === e.currentTarget && viewRef.current) {
+                    const length = viewRef.current.state.doc.length
+                    viewRef.current.dispatch({ selection: { anchor: length } })
+                    viewRef.current.focus()
+                }
+            }}
+        />
+    )
 }
