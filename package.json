@@ -6,7 +6,7 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "eslint .",
-    "start": "next start",
+    "start": "next start --hostname=100.103.6.96",
     "test": "vitest"
   },
   "dependencies": {
