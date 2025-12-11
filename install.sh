@@ -13,6 +13,11 @@ SERVICE_USER="dbconsole"
 SERVICE_GROUP="dbconsole"
 NODE_VERSION="lts/*"
 SERVICE_NAME="dbconsole"
+DEFAULT_PORT=3000
+
+# Installation mode (set via --new flag)
+NEW_INSTALL=false
+CUSTOM_PORT=""
 
 # Colors for output
 RED='\033[0;31m'
@@ -24,6 +29,61 @@ NC='\033[0m' # No Color
 #-------------------------------------------------------------------------------
 # Helper Functions
 #-------------------------------------------------------------------------------
+
+show_usage() {
+    echo "Usage: $0 [OPTIONS] [PORT]"
+    echo ""
+    echo "Options:"
+    echo "  --new     Full installation: installs nvm, Node.js, and all dependencies"
+    echo "            Without this flag, only copies files and restarts the service (redeploy mode)"
+    echo ""
+    echo "Arguments:"
+    echo "  PORT      Custom port number for the application (default: $DEFAULT_PORT)"
+    echo ""
+    echo "Examples:"
+    echo "  $0 --new              # Full installation with default port 3000"
+    echo "  $0 --new 8080         # Full installation with port 8080"
+    echo "  $0 3001               # Redeploy with port 3001"
+    echo "  $0                    # Redeploy with default port 3000"
+    echo ""
+}
+
+parse_arguments() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --new)
+                NEW_INSTALL=true
+                shift
+                ;;
+            --help|-h)
+                show_usage
+                exit 0
+                ;;
+            *)
+                # Assume it's a port number
+                if [[ $1 =~ ^[0-9]+$ ]]; then
+                    CUSTOM_PORT=$1
+                else
+                    log_error "Unknown option: $1"
+                    show_usage
+                    exit 1
+                fi
+                shift
+                ;;
+        esac
+    done
+    
+    # Set port to default if not specified
+    if [[ -z "$CUSTOM_PORT" ]]; then
+        CUSTOM_PORT=$DEFAULT_PORT
+    fi
+    
+    # Validate port range
+    if [[ $CUSTOM_PORT -lt 1 || $CUSTOM_PORT -gt 65535 ]]; then
+        log_error "Port must be between 1 and 65535"
+        exit 1
+    fi
+}
 
 log_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -197,13 +257,20 @@ setup_env_file() {
     local ENV_FILE="$INSTALL_DIR/.env"
     
     if [[ -f "$ENV_FILE" ]]; then
-        log_warning ".env file already exists, skipping..."
+        # Update the PORT in existing .env file
+        if grep -q "^PORT=" "$ENV_FILE"; then
+            sed -i "s/^PORT=.*/PORT=$CUSTOM_PORT/" "$ENV_FILE"
+            log_info "Updated PORT to $CUSTOM_PORT in existing .env file"
+        else
+            echo "PORT=$CUSTOM_PORT" >> "$ENV_FILE"
+            log_info "Added PORT=$CUSTOM_PORT to existing .env file"
+        fi
     else
         # Create a basic .env file (user can customize later)
-        cat > "$ENV_FILE" << 'EOF'
+        cat > "$ENV_FILE" << EOF
 # DBConsole Environment Configuration
 NODE_ENV=production
-PORT=3000
+PORT=$CUSTOM_PORT
 
 # Add your database connection strings and other config here
 # DATABASE_URL=postgresql://user:password@localhost:5432/dbname
@@ -268,7 +335,7 @@ print_summary() {
     echo "  Restart:         sudo systemctl restart $SERVICE_NAME"
     echo "  Stop:            sudo systemctl stop $SERVICE_NAME"
     echo ""
-    echo "Application URL:   http://localhost:3000"
+    echo "Application URL:   http://localhost:$CUSTOM_PORT"
     echo "Install directory: $INSTALL_DIR"
     echo "Environment file:  $INSTALL_DIR/.env"
     echo ""
@@ -279,21 +346,76 @@ print_summary() {
 #-------------------------------------------------------------------------------
 
 main() {
+    # Parse command line arguments first
+    parse_arguments "$@"
+    
     echo ""
     echo "=============================================="
     echo "  DBConsole Installation Script for Ubuntu"
     echo "=============================================="
     echo ""
     
+    if [[ "$NEW_INSTALL" == "true" ]]; then
+        echo -e "${BLUE}Mode: Full Installation (--new)${NC}"
+    else
+        echo -e "${BLUE}Mode: Redeploy (files + restart)${NC}"
+    fi
+    echo -e "${BLUE}Port: $CUSTOM_PORT${NC}"
+    echo ""
+    
     check_root
     check_ubuntu
     check_systemd
-    install_dependencies
-    create_service_user
-    install_nvm
-    setup_application
-    setup_env_file
-    install_service
+    
+    if [[ "$NEW_INSTALL" == "true" ]]; then
+        # Full installation: install everything from scratch
+        log_info "Running full installation..."
+        install_dependencies
+        create_service_user
+        install_nvm
+        setup_application
+        setup_env_file
+        install_service
+    else
+        # Redeploy mode: just copy files and restart service
+        log_info "Running redeploy (copying files and restarting service)..."
+        
+        # Check if service user exists (required for redeploy)
+        if ! id "$SERVICE_USER" &>/dev/null; then
+            log_error "Service user '$SERVICE_USER' does not exist. Use --new flag for initial setup."
+            exit 1
+        fi
+        
+        # Check if nvm/node is installed
+        if [[ ! -d "/home/$SERVICE_USER/.nvm" ]]; then
+            log_error "nvm not found. Use --new flag for initial setup."
+            exit 1
+        fi
+        
+        # Stop service if running
+        if systemctl is-active --quiet "$SERVICE_NAME"; then
+            log_info "Stopping existing service..."
+            systemctl stop "$SERVICE_NAME"
+        fi
+        
+        # Copy files and rebuild
+        setup_application
+        setup_env_file
+        
+        # Start service
+        log_info "Starting $SERVICE_NAME service..."
+        systemctl start "$SERVICE_NAME"
+        
+        # Check status
+        sleep 3
+        if systemctl is-active --quiet "$SERVICE_NAME"; then
+            log_success "Service restarted successfully!"
+        else
+            log_warning "Service may not have started properly. Check logs with:"
+            echo "  sudo journalctl -u $SERVICE_NAME -f"
+        fi
+    fi
+    
     print_summary
 }
 
