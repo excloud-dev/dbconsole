@@ -13,9 +13,8 @@ WorkingDirectory=/opt/dbconsole
 Environment=NVM_DIR=/home/dbconsole/.nvm
 ExecStart=/bin/bash -c 'source $NVM_DIR/nvm.sh && npm run start'
 
-# Environment
-Environment=NODE_ENV=production
-Environment=PORT=3000
+# Environment - load from .env file
+EnvironmentFile=/opt/dbconsole/.env
 
 # Restart policy
 Restart=on-failure
