@@ -290,9 +290,15 @@ install_service() {
     log_info "Installing systemd service..."
     
     local SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+    local TEMP_SERVICE_FILE="/tmp/${SERVICE_NAME}.service"
     
-    # Copy service file
-    cp "$INSTALL_DIR/dbconsole.service" "$SERVICE_FILE"
+    # Copy service file to temp location and update PORT
+    cp "$INSTALL_DIR/dbconsole.service" "$TEMP_SERVICE_FILE"
+    sed -i "s/Environment=PORT=.*/Environment=PORT=$CUSTOM_PORT/" "$TEMP_SERVICE_FILE"
+    
+    # Copy modified service file to systemd
+    cp "$TEMP_SERVICE_FILE" "$SERVICE_FILE"
+    rm -f "$TEMP_SERVICE_FILE"
     
     # Reload systemd
     systemctl daemon-reload
@@ -373,8 +379,8 @@ main() {
         install_dependencies
         create_service_user
         install_nvm
-        setup_application
         setup_env_file
+        setup_application
         install_service
     else
         # Redeploy mode: just copy files and restart service
@@ -399,8 +405,16 @@ main() {
         fi
         
         # Copy files and rebuild
-        setup_application
         setup_env_file
+        setup_application
+        
+        # Update systemd service file with new port
+        local SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+        if [[ -f "$SERVICE_FILE" ]]; then
+            sed -i "s/Environment=PORT=.*/Environment=PORT=$CUSTOM_PORT/" "$SERVICE_FILE"
+            systemctl daemon-reload
+            log_info "Updated systemd service with PORT=$CUSTOM_PORT"
+        fi
         
         # Start service
         log_info "Starting $SERVICE_NAME service..."
