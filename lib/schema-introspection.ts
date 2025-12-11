@@ -46,35 +46,41 @@ export async function loadSchemaGraph(connectionId: string): Promise<SchemaGraph
        WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
        ORDER BY table_schema, table_name, ordinal_position`,
         ),
+        // Use pg_catalog for foreign keys to be more reliable across environments/replicas
         pool.query(
             `SELECT
-         tc.table_schema AS src_schema,
-         tc.table_name   AS src_table,
-         kcu.column_name AS src_column,
-         ccu.table_schema AS dest_schema,
-         ccu.table_name   AS dest_table,
-         ccu.column_name  AS dest_column
-       FROM information_schema.table_constraints AS tc
-       JOIN information_schema.key_column_usage AS kcu
-         ON tc.constraint_name = kcu.constraint_name
-        AND tc.table_schema = kcu.table_schema
-       JOIN information_schema.constraint_column_usage AS ccu
-         ON ccu.constraint_name = tc.constraint_name
-        AND ccu.table_schema = tc.table_schema
-       WHERE tc.constraint_type = 'FOREIGN KEY'
-         AND tc.table_schema NOT IN ('pg_catalog', 'information_schema')`,
+              ns_from.nspname AS src_schema,
+              tbl_from.relname AS src_table,
+              att_from.attname AS src_column,
+              ns_to.nspname   AS dest_schema,
+              tbl_to.relname  AS dest_table,
+              att_to.attname  AS dest_column
+            FROM pg_constraint con
+            JOIN pg_class tbl_from ON tbl_from.oid = con.conrelid
+            JOIN pg_namespace ns_from ON ns_from.oid = tbl_from.relnamespace
+            JOIN pg_class tbl_to ON tbl_to.oid = con.confrelid
+            JOIN pg_namespace ns_to ON ns_to.oid = tbl_to.relnamespace
+            -- Align FK columns by ordinal position within the constraint
+            JOIN LATERAL unnest(con.conkey) WITH ORDINALITY AS fk_cols(attnum, ord) ON true
+            JOIN LATERAL unnest(con.confkey) WITH ORDINALITY AS pk_cols(attnum, ord) ON pk_cols.ord = fk_cols.ord
+            JOIN pg_attribute att_from ON att_from.attrelid = con.conrelid AND att_from.attnum = fk_cols.attnum
+            JOIN pg_attribute att_to   ON att_to.attrelid   = con.confrelid AND att_to.attnum   = pk_cols.attnum
+            WHERE con.contype = 'f'
+              AND ns_from.nspname NOT IN ('pg_catalog', 'information_schema')
+              AND ns_to.nspname   NOT IN ('pg_catalog', 'information_schema')`,
         ),
+        // Primary keys via pg_catalog to avoid information_schema visibility issues on replicas
         pool.query(
             `SELECT
-         tc.table_schema,
-         tc.table_name,
-         kcu.column_name
-       FROM information_schema.table_constraints AS tc
-       JOIN information_schema.key_column_usage AS kcu
-         ON tc.constraint_name = kcu.constraint_name
-        AND tc.table_schema = kcu.table_schema
-       WHERE tc.constraint_type = 'PRIMARY KEY'
-         AND tc.table_schema NOT IN ('pg_catalog', 'information_schema')`,
+              ns.nspname AS table_schema,
+              cls.relname AS table_name,
+              att.attname AS column_name
+            FROM pg_index idx
+            JOIN pg_class cls ON cls.oid = idx.indrelid
+            JOIN pg_namespace ns ON ns.oid = cls.relnamespace
+            JOIN pg_attribute att ON att.attrelid = cls.oid AND att.attnum = ANY(idx.indkey)
+            WHERE idx.indisprimary
+              AND ns.nspname NOT IN ('pg_catalog', 'information_schema')`,
         ),
     ])
 

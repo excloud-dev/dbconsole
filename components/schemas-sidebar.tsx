@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronRight, Table2, Search, Bookmark, GitMerge, X, Plus, ChevronDown, Eye } from "lucide-react"
+import { ChevronRight, Table2, Search, Bookmark, GitMerge, X, Plus, ChevronDown, Eye, RotateCcw } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -18,12 +18,13 @@ import type { SchemaGraph } from "@/lib/schema-introspection"
 interface TableInfo {
   name: string
   schema: string
+  qualifiedName: string
   columns: {
     name: string;
     type: string;
     isFk?: boolean;
     isPk?: boolean;
-    references?: { table: string; column: string }
+    references?: { schema: string; table: string; qualifiedTable: string; column: string }
   }[]
 }
 
@@ -55,6 +56,7 @@ interface SchemasSidebarProps {
   onJoinTables: (baseTable: string, joins: JoinConfig[]) => void
   onViewTable: (tableName: string) => void
   onOpenSettings: () => void
+  onRefreshSchema?: () => void
   schema?: SchemaGraph | null
 }
 
@@ -68,6 +70,7 @@ export function SchemasSidebar({
   onJoinTables,
   onViewTable,
   onOpenSettings,
+  onRefreshSchema,
   schema,
 }: SchemasSidebarProps) {
   const [search, setSearch] = useState("")
@@ -93,6 +96,7 @@ export function SchemasSidebar({
     ? schema.tables.map((t) => ({
       name: t.name,
       schema: t.schema,
+      qualifiedName: `${t.schema}.${t.name}`,
       columns:
         schema.columns
           .filter((c) => c.table.schema === t.schema && c.table.name === t.name)
@@ -116,7 +120,9 @@ export function SchemasSidebar({
               isPk: !!pk,
               references: fk
                 ? {
+                  schema: fk.to.schema,
                   table: fk.to.name,
+                  qualifiedTable: `${fk.to.schema}.${fk.to.name}`,
                   column: fk.toColumn,
                 }
                 : undefined,
@@ -217,20 +223,31 @@ export function SchemasSidebar({
       <div className="flex-1 overflow-auto space-y-3">
         {/* Tables section - collapsible */}
         <div>
-          <button
-            onClick={() => setTablesExpanded(!tablesExpanded)}
-            className="w-full flex items-center gap-2 px-1 py-1.5 hover:bg-stone-100 rounded transition-colors focus:outline-none focus:ring-0"
-          >
-            <ChevronRight
-              className={cn(
-                "h-3.5 w-3.5 text-stone-400 transition-transform",
-                tablesExpanded && "rotate-90",
-              )}
-            />
-            <Table2 className="h-3.5 w-3.5 text-stone-500" />
-            <span className="text-xs font-semibold text-stone-600 uppercase tracking-wide">Tables</span>
-            <span className="text-xs text-stone-400 ml-auto">{filteredTables.length}</span>
-          </button>
+          <div className="flex items-center gap-1 px-1 py-1.5 rounded hover:bg-stone-100">
+            <button
+              onClick={() => setTablesExpanded(!tablesExpanded)}
+              className="flex flex-1 items-center gap-2 text-left focus:outline-none focus:ring-0"
+            >
+              <ChevronRight
+                className={cn(
+                  "h-3.5 w-3.5 text-stone-400 transition-transform",
+                  tablesExpanded && "rotate-90",
+                )}
+              />
+              <Table2 className="h-3.5 w-3.5 text-stone-500" />
+              <span className="text-xs font-semibold text-stone-600 uppercase tracking-wide">Tables</span>
+              <span className="text-xs text-stone-400 ml-auto">{filteredTables.length}</span>
+            </button>
+            {onRefreshSchema && (
+              <button
+                title="Refresh schema"
+                className="h-7 w-7 flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-white rounded border border-transparent hover:border-stone-200"
+                onClick={() => onRefreshSchema()}
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
 
           {tablesExpanded && (
             <div className="mt-1 space-y-0.5">
@@ -268,7 +285,7 @@ export function SchemasSidebar({
                       className="h-7 w-7 invisible group-hover/row:visible text-stone-400 hover:text-blue-600 hover:bg-blue-50 focus:ring-0 focus-visible:ring-0 focus:outline-none"
                       onClick={(e) => {
                         e.stopPropagation()
-                        openJoinBuilder(table.name)
+                        openJoinBuilder(table.qualifiedName)
                       }}
                       title="Join with..."
                     >

@@ -696,6 +696,11 @@ export function DbConsole() {
                         onJoinTables={handleJoinTables}
                         onViewTable={handleViewTable}
                         onOpenSettings={() => setShowConnectionDialog(true)}
+                        onRefreshSchema={() => {
+                          if (activeConnection) {
+                            void loadSchema(activeConnection)
+                          }
+                        }}
                         schema={schema}
                       />
                     </div>

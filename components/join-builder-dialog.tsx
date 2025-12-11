@@ -11,7 +11,13 @@ import { cn } from "@/lib/utils"
 interface TableInfo {
   name: string
   schema: string
-  columns: { name: string; type: string; isFk?: boolean; references?: { table: string; column: string } }[]
+  qualifiedName: string
+  columns: {
+    name: string
+    type: string
+    isFk?: boolean
+    references?: { schema: string; table: string; qualifiedTable: string; column: string }
+  }[]
 }
 
 interface JoinConfig {
@@ -37,18 +43,19 @@ export function JoinBuilderDialog({ open, onOpenChange, baseTable, tables, onCre
   const getFkRelationships = useCallback((
     tableName: string,
     visited: Set<string> = new Set(),
-  ): { table: string; fromCol: string; toCol: string; direction: "outgoing" | "incoming" }[] => {
+  ): { table: string; fromTable: string; fromCol: string; toCol: string; direction: "outgoing" | "incoming" }[] => {
     if (visited.has(tableName)) return []
     visited.add(tableName)
 
-    const relationships: { table: string; fromCol: string; toCol: string; direction: "outgoing" | "incoming" }[] = []
-    const currentTable = tables.find((t) => t.name === tableName)
+    const relationships: { table: string; fromTable: string; fromCol: string; toCol: string; direction: "outgoing" | "incoming" }[] = []
+    const currentTable = tables.find((t) => t.qualifiedName === tableName || t.name === tableName)
 
     // Outgoing FKs (this table references another)
     currentTable?.columns.forEach((col) => {
-      if (col.isFk && col.references && !visited.has(col.references.table)) {
+      if (col.isFk && col.references && !visited.has(col.references.qualifiedTable)) {
         relationships.push({
-          table: col.references.table,
+          table: col.references.qualifiedTable,
+          fromTable: currentTable.qualifiedName,
           fromCol: col.name,
           toCol: col.references.column,
           direction: "outgoing",
@@ -58,11 +65,12 @@ export function JoinBuilderDialog({ open, onOpenChange, baseTable, tables, onCre
 
     // Incoming FKs (other tables reference this table)
     tables.forEach((t) => {
-      if (t.name !== tableName && !visited.has(t.name)) {
+      if (t.qualifiedName !== (currentTable?.qualifiedName ?? tableName) && !visited.has(t.qualifiedName)) {
         t.columns.forEach((col) => {
-          if (col.isFk && col.references?.table === tableName) {
+          if (col.isFk && col.references?.qualifiedTable === (currentTable?.qualifiedName ?? tableName)) {
             relationships.push({
-              table: t.name,
+              table: t.qualifiedName,
+              fromTable: currentTable?.qualifiedName ?? tableName,
               fromCol: col.references.column,
               toCol: col.name,
               direction: "incoming",
@@ -88,7 +96,7 @@ export function JoinBuilderDialog({ open, onOpenChange, baseTable, tables, onCre
       rels.forEach((rel) => {
         if (!joinedTables.has(rel.table)) {
           allRelationships.push({
-            fromTable: tableName,
+            fromTable: rel.fromTable ?? tableName,
             toTable: rel.table,
             fromCol: rel.fromCol,
             toCol: rel.toCol,
