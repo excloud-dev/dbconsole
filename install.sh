@@ -14,10 +14,12 @@ SERVICE_GROUP="dbconsole"
 NODE_VERSION="lts/*"
 SERVICE_NAME="dbconsole"
 DEFAULT_PORT=3000
+DEFAULT_HOST="127.0.0.1"
 
 # Installation mode (set via --new flag)
 NEW_INSTALL=false
 CUSTOM_PORT=""
+CUSTOM_HOST=""
 
 # Colors for output
 RED='\033[0;31m'
@@ -31,20 +33,21 @@ NC='\033[0m' # No Color
 #-------------------------------------------------------------------------------
 
 show_usage() {
-    echo "Usage: $0 [OPTIONS] [PORT]"
+    echo "Usage: $0 [OPTIONS]"
     echo ""
     echo "Options:"
-    echo "  --new     Full installation: installs nvm, Node.js, and all dependencies"
-    echo "            Without this flag, only copies files and restarts the service (redeploy mode)"
-    echo ""
-    echo "Arguments:"
-    echo "  PORT      Custom port number for the application (default: $DEFAULT_PORT)"
+    echo "  --new           Full installation: installs nvm, Node.js, and all dependencies"
+    echo "                  Without this flag, only copies files and restarts the service (redeploy mode)"
+    echo "  --port PORT     Custom port number for the application (default: $DEFAULT_PORT)"
+    echo "  --host HOST     IP address to bind to (default: $DEFAULT_HOST)"
+    echo "  --help, -h      Show this help message"
     echo ""
     echo "Examples:"
-    echo "  $0 --new              # Full installation with default port 3000"
-    echo "  $0 --new 8080         # Full installation with port 8080"
-    echo "  $0 3001               # Redeploy with port 3001"
-    echo "  $0                    # Redeploy with default port 3000"
+    echo "  $0 --new                           # Full installation with defaults"
+    echo "  $0 --new --port 8080               # Full installation with port 8080"
+    echo "  $0 --new --host 0.0.0.0            # Full installation, bind to all interfaces"
+    echo "  $0 --port 3001 --host 100.103.6.96 # Redeploy with custom port and host"
+    echo "  $0                                 # Redeploy with defaults"
     echo ""
 }
 
@@ -55,27 +58,42 @@ parse_arguments() {
                 NEW_INSTALL=true
                 shift
                 ;;
+            --port)
+                if [[ -n "$2" && ! "$2" =~ ^-- ]]; then
+                    CUSTOM_PORT=$2
+                    shift 2
+                else
+                    log_error "--port requires a value"
+                    exit 1
+                fi
+                ;;
+            --host)
+                if [[ -n "$2" && ! "$2" =~ ^-- ]]; then
+                    CUSTOM_HOST=$2
+                    shift 2
+                else
+                    log_error "--host requires a value"
+                    exit 1
+                fi
+                ;;
             --help|-h)
                 show_usage
                 exit 0
                 ;;
             *)
-                # Assume it's a port number
-                if [[ $1 =~ ^[0-9]+$ ]]; then
-                    CUSTOM_PORT=$1
-                else
-                    log_error "Unknown option: $1"
-                    show_usage
-                    exit 1
-                fi
-                shift
+                log_error "Unknown option: $1"
+                show_usage
+                exit 1
                 ;;
         esac
     done
     
-    # Set port to default if not specified
+    # Set defaults if not specified
     if [[ -z "$CUSTOM_PORT" ]]; then
         CUSTOM_PORT=$DEFAULT_PORT
+    fi
+    if [[ -z "$CUSTOM_HOST" ]]; then
+        CUSTOM_HOST=$DEFAULT_HOST
     fi
     
     # Validate port range
@@ -271,7 +289,7 @@ setup_env_file() {
 # DBConsole Environment Configuration
 NODE_ENV=production
 PORT=$CUSTOM_PORT
-HOSTNAME=127.0.0.1
+HOSTNAME=$CUSTOM_HOST
 
 # Add your database connection strings and other config here
 # DATABASE_URL=postgresql://user:password@localhost:5432/dbname
@@ -336,7 +354,7 @@ print_summary() {
     echo "  Restart:         sudo systemctl restart $SERVICE_NAME"
     echo "  Stop:            sudo systemctl stop $SERVICE_NAME"
     echo ""
-    echo "Application URL:   http://localhost:$CUSTOM_PORT"
+    echo "Application URL:   http://$CUSTOM_HOST:$CUSTOM_PORT"
     echo "Install directory: $INSTALL_DIR"
     echo "Environment file:  $INSTALL_DIR/.env"
     echo ""
@@ -362,6 +380,7 @@ main() {
         echo -e "${BLUE}Mode: Redeploy (files + restart)${NC}"
     fi
     echo -e "${BLUE}Port: $CUSTOM_PORT${NC}"
+    echo -e "${BLUE}Host: $CUSTOM_HOST${NC}"
     echo ""
     
     check_root
