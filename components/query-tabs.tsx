@@ -24,6 +24,7 @@ export interface Tab {
     total?: number
   }
   editorHeight?: number
+  showQuery?: boolean
 }
 
 interface QueryTabsProps {

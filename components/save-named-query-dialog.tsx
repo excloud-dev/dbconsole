@@ -81,53 +81,55 @@ export function SaveNamedQueryDialog({ open, onOpenChange, query: initialQuery, 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col p-0 gap-0">
+        <DialogHeader className="px-4 py-3 border-b border-stone-100 flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Bookmark className="h-4 w-4 text-accent-foreground" />
             {mode === "edit" ? "Edit Named Query" : "Save as Named Query"}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
-          <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g., Get User Orders"
-              className="border-stone-200"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="description">Description (optional)</Label>
-            <Input
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="e.g., Fetches all orders for a specific user"
-              className="border-stone-200"
-            />
-          </div>
-
-          <div className="space-y-2 flex-1 flex flex-col min-h-0">
-            <Label>SQL Query</Label>
-            <div className="flex-1 border border-stone-200 rounded-md overflow-hidden min-h-[150px]">
-              <SqlEditor
-                value={query}
-                onChange={setQuery}
-                className="h-full"
+        <div className="flex-1 flex flex-col gap-4 px-4 py-4 min-h-0">
+          <div className="flex-none space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Name</Label>
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g., Get User Orders"
+                className="border-stone-200"
               />
             </div>
-            <p className="text-[10px] text-stone-500">
-              Use <code>:paramName</code> for named parameters.
-            </p>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Description (optional)</Label>
+              <Input
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="e.g., Fetches all orders for a specific user"
+                className="border-stone-200"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>SQL Query</Label>
+              <div className="border border-stone-200 rounded-md overflow-hidden h-[180px]">
+                <SqlEditor
+                  value={query}
+                  onChange={setQuery}
+                  className="h-full"
+                />
+              </div>
+              <p className="text-[10px] text-stone-500">
+                Use <code>:paramName</code> for named parameters.
+              </p>
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
+          <div className="flex-1 flex flex-col min-h-0 gap-2">
+            <div className="flex items-center justify-between flex-shrink-0">
               <Label>Parameters</Label>
               <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={addParameter}>
                 <Plus className="h-3 w-3 mr-1" />
@@ -135,55 +137,57 @@ export function SaveNamedQueryDialog({ open, onOpenChange, query: initialQuery, 
               </Button>
             </div>
 
-            {parameters.length === 0 ? (
-              <p className="text-xs text-stone-500 italic">
-                No parameters defined.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {parameters.map((param, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <Input
-                      value={param.name}
-                      onChange={(e) => updateParameter(index, { name: e.target.value })}
-                      placeholder="Parameter name"
-                      className="h-8 text-sm border-stone-200 flex-1 font-mono"
-                    />
-                    <Select
-                      value={param.type}
-                      onValueChange={(v) => updateParameter(index, { type: v as NamedQueryParameter["type"] })}
-                    >
-                      <SelectTrigger className="h-8 w-24 text-sm border-stone-200">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="string">string</SelectItem>
-                        <SelectItem value="number">number</SelectItem>
-                        <SelectItem value="boolean">boolean</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      value={param.defaultValue || ""}
-                      onChange={(e) => updateParameter(index, { defaultValue: e.target.value })}
-                      placeholder="Default"
-                      className="h-8 text-sm border-stone-200 w-24"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-stone-400 hover:text-red-500"
-                      onClick={() => removeParameter(index)}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="flex-1 overflow-y-auto min-h-0 pr-2 -mr-2">
+              {parameters.length === 0 ? (
+                <p className="text-xs text-stone-500 italic">
+                  No parameters defined.
+                </p>
+              ) : (
+                <div className="space-y-2 pb-2">
+                  {parameters.map((param, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <Input
+                        value={param.name}
+                        onChange={(e) => updateParameter(index, { name: e.target.value })}
+                        placeholder="Parameter name"
+                        className="h-8 text-sm border-stone-200 flex-1 font-mono"
+                      />
+                      <Select
+                        value={param.type}
+                        onValueChange={(v) => updateParameter(index, { type: v as NamedQueryParameter["type"] })}
+                      >
+                        <SelectTrigger className="h-8 w-24 text-sm border-stone-200">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="string">string</SelectItem>
+                          <SelectItem value="number">number</SelectItem>
+                          <SelectItem value="boolean">boolean</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        value={param.defaultValue || ""}
+                        onChange={(e) => updateParameter(index, { defaultValue: e.target.value })}
+                        placeholder="Default"
+                        className="h-8 text-sm border-stone-200 w-24"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-stone-400 hover:text-red-500"
+                        onClick={() => removeParameter(index)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="p-4 border-t border-stone-100 bg-stone-50/50 flex-shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>

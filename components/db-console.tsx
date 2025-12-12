@@ -88,6 +88,9 @@ export function DbConsole() {
     return stored ?? "shared"
   })
 
+  // Global state for params expanded - applies to all named query tabs, default expanded
+  const [globalParamsExpanded, setGlobalParamsExpanded] = useState(true)
+
   // Persistence: Restore tabs on mount
   useEffect(() => {
     try {
@@ -460,10 +463,6 @@ export function DbConsole() {
   }
 
   const currentTab = tabs.find((t) => t.id === activeTab)
-  const activeEditorHeight = useMemo(() => {
-    const tab = tabs.find((t) => t.id === activeTab)
-    return tab?.editorHeight
-  }, [tabs, activeTab])
   const currentNamedQuery = currentTab?.namedQueryId
     ? namedQueries.find((nq) => nq.id === currentTab.namedQueryId)
     : null
@@ -648,56 +647,19 @@ export function DbConsole() {
     }
   }
 
-  // Auto-resize logic for editor
-  const editorPanelRef = useRef<ImperativePanelHandle>(null)
-
-  // Restore editor height when switching tabs.
-  // Guard against redundant resizes to avoid resize->setTabs->resize loops.
-  const lastAppliedEditorHeightRef = useRef<number | null>(null)
-  useEffect(() => {
-    const panel = editorPanelRef.current
-    if (!panel || activeEditorHeight == null) return
-    const currentSize = panel.getSize()
-    const shouldResize =
-      Math.abs(currentSize - activeEditorHeight) > 0.5 &&
-      lastAppliedEditorHeightRef.current !== activeEditorHeight
-    if (shouldResize) {
-      lastAppliedEditorHeightRef.current = activeEditorHeight
-      panel.resize(activeEditorHeight)
+  // Handle show/hide query toggle - persist to tab
+  const handleShowQueryChange = useCallback((shown: boolean) => {
+    // Persist to tab state
+    if (activeTab) {
+      setTabs(prev => prev.map(t => t.id === activeTab ? { ...t, showQuery: shown } : t))
     }
-  }, [activeTab, activeEditorHeight])
-
-  const handleLineCountChange = (lines: number) => {
-    const panel = editorPanelRef.current
-    if (!panel) return
-
-    // If we have more than 8 lines of code and the panel is currently collapsed/small (<=15),
-    // expand it to 25 to give more breathing room.
-    if (lines > 8) {
-      const currentSize = panel.getSize()
-      if (currentSize <= 15) {
-        panel.resize(25)
-        // Persist the expansion
-        setTabs(prev => prev.map(t => t.id === activeTab ? { ...t, editorHeight: 25 } : t))
-      }
-    }
-  }
-
-  const handleEnsurePanelHeight = (_neededPx: number) => {
-    // Reverted: keep default panel sizing
-    return
-  }
-
-  const handleEditorResize = useCallback((size: number) => {
-    if (!activeTab) return
-    setTabs((prev) =>
-      prev.map((t) => {
-        if (t.id !== activeTab) return t
-        if (t.editorHeight != null && Math.abs(t.editorHeight - size) < 0.5) return t
-        return { ...t, editorHeight: size }
-      }),
-    )
   }, [activeTab])
+
+  // Handle params expand/collapse - global state
+  const handleParamsExpandChange = useCallback((expanded: boolean) => {
+    // Update global state
+    setGlobalParamsExpanded(expanded)
+  }, [])
 
   return (
     <>
@@ -785,17 +747,15 @@ export function DbConsole() {
             )}
 
             {/* Query and results area */}
-            <ResizablePanel defaultSize={80}>
+            <ResizablePanel defaultSize={95}>
               <div className="h-full flex flex-col overflow-hidden">
                 <ResizablePanelGroup direction="vertical">
                   {/* Query editor section */}
-	                  <ResizablePanel
-	                    ref={editorPanelRef}
-	                    defaultSize={40}
-	                    minSize={15}
-	                    className="flex flex-col"
-	                    onResize={handleEditorResize}
-	                  >
+                  <ResizablePanel
+                    defaultSize={30}
+                    minSize={25}
+                    className="flex flex-col"
+                  >
                     <div className="flex-1 min-h-0 relative">
                       {currentTab?.isNamedQuery && currentNamedQuery ? (
                         <NamedQueryEditor
@@ -805,7 +765,8 @@ export function DbConsole() {
                             setEditingNamedQuery(currentNamedQuery)
                             setShowSaveNamedDialog(true)
                           }}
-                          onLineCountChange={handleLineCountChange}
+                          paramsExpanded={globalParamsExpanded}
+                          onParamsExpandChange={handleParamsExpandChange}
                         />
                       ) : (
                         <QueryEditor
@@ -817,7 +778,6 @@ export function DbConsole() {
                           params={currentTab?.params}
                           paramLabels={currentParamLabels}
                           onParamsChange={(p) => currentTab && updateParams(currentTab.id, p)}
-                          onLineCountChange={handleLineCountChange}
                         />
                       )}
                     </div>
