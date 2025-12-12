@@ -1,12 +1,10 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
-import { Geist, Geist_Mono } from "next/font/google"
+import { GeistSans } from "geist/font/sans"
+import { GeistMono } from "geist/font/mono"
 import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from "@/components/ui/toaster"
 import "./globals.css"
-
-const _geist = Geist({ subsets: ["latin"] })
-const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "dbconsole - Database Query Tool",
@@ -23,7 +21,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="h-full overflow-hidden">
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable} h-full overflow-hidden`}>
       <body className={`font-sans antialiased h-full overflow-hidden bg-stone-50`}>
         {children}
         <Toaster />

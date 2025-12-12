@@ -247,7 +247,7 @@ export function ConnectionDialog({
                             id="name"
                             value={editingConnection.label}
                             onChange={(e) => handleUpdateConnection({ label: e.target.value })}
-                            className="h-8 bg-white border-stone-200 focus:border-blue-400 focus:ring-blue-400/20"
+                            className="h-8 bg-white border-stone-200 focus:border-stone-400 focus:ring-stone-400/20"
                             placeholder="My Production DB"
                           />
                         </div>

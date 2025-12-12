@@ -88,8 +88,8 @@ export function DbConsole() {
     return stored ?? "shared"
   })
 
-  // Global state for params expanded - applies to all named query tabs, default expanded
-  const [globalParamsExpanded, setGlobalParamsExpanded] = useState(true)
+  // Global state for params expanded - applies to all named query tabs, default collapsed
+  const [globalParamsExpanded, setGlobalParamsExpanded] = useState(false)
 
   // Persistence: Restore tabs on mount
   useEffect(() => {
@@ -752,7 +752,7 @@ export function DbConsole() {
                 <ResizablePanelGroup direction="vertical">
                   {/* Query editor section */}
                   <ResizablePanel
-                    defaultSize={30}
+                    defaultSize={25}
                     minSize={25}
                     className="flex flex-col"
                   >

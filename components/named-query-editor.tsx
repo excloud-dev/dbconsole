@@ -36,7 +36,7 @@ interface NamedQueryEditorProps {
   onParamsExpandChange?: (expanded: boolean) => void
 }
 
-export function NamedQueryEditor({ namedQuery, onExecute, onEdit, paramsExpanded = true, onParamsExpandChange }: NamedQueryEditorProps) {
+export function NamedQueryEditor({ namedQuery, onExecute, onEdit, paramsExpanded = false, onParamsExpandChange }: NamedQueryEditorProps) {
   const defaultParamValues = useMemo(() => {
     const defaults: Record<string, string> = {}
     namedQuery.parameters.forEach((p) => {
@@ -89,19 +89,24 @@ export function NamedQueryEditor({ namedQuery, onExecute, onEdit, paramsExpanded
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" className="h-6 text-xs text-stone-400 hover:text-stone-700" onClick={onEdit}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-sm text-stone-500 hover:text-stone-700"
+              onClick={onEdit}
+            >
               Edit
             </Button>
-            <Button variant="ghost" size="sm" className="h-6 text-xs text-stone-400 hover:text-stone-700 gap-1" onClick={() => setShowQueryModal(true)}>
-              <FileCode className="h-3 w-3" />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-sm text-stone-500 hover:text-stone-700"
+              onClick={() => setShowQueryModal(true)}
+            >
               View SQL
             </Button>
-            <Button
-              size="sm"
-              className="h-6 gap-1 bg-stone-800 hover:bg-stone-900 text-white text-xs"
-              onClick={handleExecute}
-            >
-              <Play className="h-3 w-3" />
+            <Button size="sm" className="h-8 gap-1.5 bg-stone-800 hover:bg-stone-900 text-white shadow-sm" onClick={handleExecute}>
+              <Play className="h-3.5 w-3.5" />
               Run
             </Button>
           </div>

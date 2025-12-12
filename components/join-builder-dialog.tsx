@@ -196,7 +196,7 @@ export function JoinBuilderDialog({ open, onOpenChange, baseTable, tables, onCre
                   <button
                     key={i}
                     onClick={() => addJoin(rel)}
-                    className="group flex flex-col gap-1.5 p-3 text-xs rounded-lg border border-stone-200 bg-stone-50 hover:bg-white hover:border-blue-400 hover:shadow-sm hover:ring-1 hover:ring-blue-400/20 transition-all text-left w-full min-w-0"
+                    className="group flex flex-col gap-1.5 p-3 text-xs rounded-lg border border-stone-200 bg-stone-50 hover:bg-white hover:border-stone-400 hover:shadow-sm hover:ring-1 hover:ring-stone-400/20 transition-all text-left w-full min-w-0"
                   >
                     <div className="flex items-center justify-between w-full">
                       <div className="flex items-center gap-1.5 min-w-0">

@@ -1,0 +1,17 @@
+appId: com.excloud.dbconsole
+productName: DBConsole
+directories:
+  output: dist/electron-build
+files:
+  - electron/**
+  - package.json
+extraResources:
+  - from: dist/electron/next
+    to: next
+asar: true
+afterPack: electron/afterPack.cjs
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - dmg
+

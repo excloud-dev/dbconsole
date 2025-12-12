@@ -378,7 +378,7 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
                       "sticky left-0 z-30 w-10 min-w-[40px] px-0 border-b border-r border-stone-200 cursor-pointer transition-colors",
                       // Fix: if all selected, using standard hover might look bad.
                       isAllSelected()
-                        ? "bg-blue-50 hover:bg-blue-100"
+                        ? "bg-stone-100 hover:bg-stone-200"
                         : "bg-stone-100 hover:bg-stone-200"
                     )}
                     onClick={() => {
@@ -394,7 +394,7 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
                   >
                     <div className={cn(
                       "h-full w-full flex items-center justify-center text-[10px] font-mono",
-                      isAllSelected() ? "text-blue-600 font-bold" : "text-stone-400"
+                      isAllSelected() ? "text-stone-700 font-bold" : "text-stone-400"
                     )}>
                       ALL
                     </div>
@@ -459,8 +459,8 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
                         }}
                         className={cn(
                           "absolute right-0 top-0 h-full w-1.5 cursor-col-resize touch-none select-none transition-colors",
-                          "hover:bg-blue-400 group-hover:bg-stone-300",
-                          header.column.getIsResizing() && "bg-blue-500",
+                          "hover:bg-stone-400 group-hover:bg-stone-300",
+                          header.column.getIsResizing() && "bg-stone-500",
                         )}
                       />
                     </th>
@@ -476,7 +476,7 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
                     "border-b border-stone-100 transition-colors",
                     rowIdx % 2 === 0 ? "bg-white" : "bg-stone-50/50",
                     // We remove hover effect on row to focus on cell selection? Or keep it?
-                    "hover:bg-blue-50/30"
+                    "hover:bg-stone-50/50"
                   )}
                 >
                   {/* Gutter Cell */}
