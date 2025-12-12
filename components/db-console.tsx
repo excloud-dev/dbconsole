@@ -121,6 +121,7 @@ export function DbConsole() {
 
   const [namedQueries, setNamedQueries] = useState<NamedQuery[]>([])
   const [showSaveNamedDialog, setShowSaveNamedDialog] = useState(false)
+  const [editingNamedQuery, setEditingNamedQuery] = useState<NamedQuery | null>(null)
 
   const [resultsByTab, setResultsByTab] = useState<{
     [tabId: string]: { columns: string[]; rows: Record<string, unknown>[]; durationMs: number; sqlDisplay?: string } | undefined
@@ -300,6 +301,74 @@ export function DbConsole() {
       )
     } catch (e) {
       console.error("Failed to save named query", e)
+    }
+  }
+
+  const handleUpdateNamedQuery = async (updatedQuery: NamedQuery) => {
+    try {
+      const res = await fetch(`/api/named-queries/${encodeURIComponent(updatedQuery.id)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: updatedQuery.name,
+          description: updatedQuery.description,
+          sqlTemplate: updatedQuery.query,
+          params: updatedQuery.parameters,
+          defaultConnectionId: activeConnection ?? undefined,
+        }),
+      })
+
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string }
+        throw new Error(body.error || "Failed to update named query")
+      }
+
+      const saved = (await res.json()) as {
+        id: string
+        name: string
+        description?: string
+        sqlTemplate: string
+        params: { name: string; type: "string" | "number" | "boolean"; defaultValue?: string }[]
+      }
+
+      const mappedUpdated: NamedQuery = {
+        id: saved.id,
+        name: saved.name,
+        description: saved.description,
+        query: saved.sqlTemplate,
+        parameters: saved.params,
+      }
+
+      setNamedQueries((prev) => prev.map((q) => (q.id === mappedUpdated.id ? mappedUpdated : q)))
+
+      // Update tabs that are using this named query
+      setTabs((prevTabs) =>
+        prevTabs.map((t) => {
+          if (t.namedQueryId === mappedUpdated.id) {
+            // Determine if we need to update params on the tab if interface changed?
+            // For simplified UX, we'll keep existing params if possible, or reset if needed.
+            // Here we just update the content/name.
+            return {
+              ...t,
+              name: mappedUpdated.name,
+              query: mappedUpdated.query
+            }
+          }
+          return t
+        })
+      )
+
+      toast({
+        title: "Query updated",
+        description: "Saved changes to named query."
+      })
+    } catch (e: any) {
+      console.error("Failed to update named query", e)
+      toast({
+        variant: "destructive",
+        title: "Failed to update query",
+        description: e?.message || "Could not save changes."
+      })
     }
   }
 
@@ -720,6 +789,10 @@ export function DbConsole() {
                         <NamedQueryEditor
                           namedQuery={currentNamedQuery}
                           onExecute={executeNamedQuery}
+                          onEdit={() => {
+                            setEditingNamedQuery(currentNamedQuery)
+                            setShowSaveNamedDialog(true)
+                          }}
                           onLineCountChange={handleLineCountChange}
                         />
                       ) : (
@@ -812,9 +885,24 @@ export function DbConsole() {
 
       <SaveNamedQueryDialog
         open={showSaveNamedDialog}
-        onOpenChange={setShowSaveNamedDialog}
-        query={currentTab?.query || ""}
-        onSave={handleSaveAsNamed}
+        onOpenChange={(open) => {
+          setShowSaveNamedDialog(open)
+          if (!open) setEditingNamedQuery(null)
+        }}
+        query={editingNamedQuery ? editingNamedQuery.query : (currentTab?.query || "")}
+        mode={editingNamedQuery ? "edit" : "create"}
+        initialValues={editingNamedQuery ? {
+          name: editingNamedQuery.name,
+          description: editingNamedQuery.description,
+          parameters: editingNamedQuery.parameters
+        } : undefined}
+        onSave={(data) => {
+          if (editingNamedQuery) {
+            void handleUpdateNamedQuery({ ...data, id: editingNamedQuery.id })
+          } else {
+            void handleSaveAsNamed(data)
+          }
+        }}
       />
     </>
   )

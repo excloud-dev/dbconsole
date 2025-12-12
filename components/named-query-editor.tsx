@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Play, Bookmark, Code2, ChevronDown, ChevronUp } from "lucide-react"
+import { SqlEditor } from "@/components/sql-editor"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { cn } from "@/lib/utils"
 
 export interface NamedQueryParameter {
   name: string
@@ -24,10 +26,11 @@ export interface NamedQuery {
 interface NamedQueryEditorProps {
   namedQuery: NamedQuery
   onExecute: (query: NamedQuery, params: Record<string, string>) => void
+  onEdit: () => void
   onLineCountChange?: (lines: number) => void
 }
 
-export function NamedQueryEditor({ namedQuery, onExecute, onLineCountChange }: NamedQueryEditorProps) {
+export function NamedQueryEditor({ namedQuery, onExecute, onEdit, onLineCountChange }: NamedQueryEditorProps) {
   const defaultParamValues = useMemo(() => {
     const defaults: Record<string, string> = {}
     namedQuery.parameters.forEach((p) => {
@@ -45,7 +48,7 @@ export function NamedQueryEditor({ namedQuery, onExecute, onLineCountChange }: N
   // Reset params when the named query changes
   useEffect(() => {
     setParamValues(defaultParamValues)
-  }, [defaultParamValues])
+  }, [defaultParamValues, namedQuery])
 
   const handleExecute = () => {
     onExecute(namedQuery, { ...paramValues })
@@ -85,51 +88,68 @@ export function NamedQueryEditor({ namedQuery, onExecute, onLineCountChange }: N
       <div className="flex-1 min-h-[100px] relative flex flex-col">
         {/* Editor Area (Read-only/Visual) */}
         <div
-      className="flex-1 overflow-hidden p-4 transition-[min-height] duration-200 ease-out"
-      style={{
-        minHeight: showQuery ? containerMinHeight : 160,
-      }}
-    >
-          <div className="flex items-center gap-2 mb-4">
-            <Bookmark className="h-5 w-5 text-accent-foreground fill-accent" />
-            <div>
-              <h3 className="text-lg font-semibold text-stone-900 leading-none tracking-tight">{namedQuery.name}</h3>
-              {namedQuery.description && <p className="text-sm text-stone-500 mt-1 leading-snug">{namedQuery.description}</p>}
+          className="flex-1 overflow-hidden p-4 transition-[min-height] duration-200 ease-out"
+          style={{
+            minHeight: showQuery ? containerMinHeight : 160,
+          }}
+        >
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div className="flex items-center gap-2">
+              <Bookmark className="h-5 w-5 text-accent-foreground fill-accent" />
+              <div>
+                <h3 className="text-lg font-semibold text-stone-900 leading-none tracking-tight">{namedQuery.name}</h3>
+                {namedQuery.description && <p className="text-sm text-stone-500 mt-1 leading-snug">{namedQuery.description}</p>}
+              </div>
             </div>
+            <Button variant="ghost" size="sm" className="h-6 text-xs text-stone-400 hover:text-stone-700" onClick={onEdit}>
+              Edit
+            </Button>
           </div>
 
           {/* Collapsible query preview */}
           <div className="space-y-2">
-            <button
-              onClick={toggleQuery}
-              className="flex items-center gap-2 text-xs font-medium text-stone-500 hover:text-stone-800 transition-colors"
-            >
-              <div className="flex items-center gap-1.5">
-                <Code2 className="h-3.5 w-3.5" />
-                <span>{showQuery ? "Hide Query" : "Show Query"}</span>
-              </div>
-              {showQuery ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-            </button>
+            <div className="flex items-center justify-between">
+              <button
+                onClick={toggleQuery}
+                className="flex items-center gap-2 text-xs font-medium text-stone-500 hover:text-stone-800 transition-colors"
+              >
+                <div className="flex items-center gap-1.5">
+                  <Code2 className="h-3.5 w-3.5" />
+                  <span>{showQuery ? "Hide Query" : "Show Query"}</span>
+                </div>
+                {showQuery ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              </button>
+
+              {showQuery && (
+                <ToggleGroup
+                  type="single"
+                  value={queryView}
+                  onValueChange={(v) => v && setQueryView(v as "template" | "rendered")}
+                  className="h-6 bg-stone-100 border border-stone-200 rounded-md p-0.5"
+                >
+                  <ToggleGroupItem value="template" className="text-[10px] px-2 h-5 data-[state=on]:bg-white data-[state=on]:shadow-sm">Template</ToggleGroupItem>
+                  <ToggleGroupItem value="rendered" className="text-[10px] px-2 h-5 data-[state=on]:bg-white data-[state=on]:shadow-sm">Rendered</ToggleGroupItem>
+                </ToggleGroup>
+              )}
+            </div>
 
             {showQuery && (
-              <div className="relative group/preview">
-                <div className="absolute top-2 right-2 z-10 opacity-0 group-hover/preview:opacity-100 transition-opacity">
-                  <ToggleGroup
-                    type="single"
-                    value={queryView}
-                    onValueChange={(v) => v && setQueryView(v as "template" | "rendered")}
-                    className="h-6 bg-white/90 backdrop-blur border border-stone-200 shadow-sm rounded-md p-0.5"
-                  >
-                    <ToggleGroupItem value="template" className="text-[10px] px-2 h-5">Template</ToggleGroupItem>
-                    <ToggleGroupItem value="rendered" className="text-[10px] px-2 h-5">Rendered</ToggleGroupItem>
-                  </ToggleGroup>
-                </div>
-                <pre
-                  className="text-xs font-mono text-stone-700 whitespace-pre-wrap bg-stone-50 border border-stone-200 rounded-md p-3 max-h-60 overflow-auto"
-                  ref={preRef as any}
-                >
-                  {queryView === "template" ? namedQuery.query : renderPreview(namedQuery.query, paramValues)}
-                </pre>
+              <div className="relative group/preview animate-in fade-in slide-in-from-top-1 duration-200 border border-stone-200 rounded-md overflow-hidden bg-stone-50" style={{ height: Math.min(containerMinHeight - 24, 300) }}>
+                {queryView === "template" ? (
+                  <SqlEditor
+                    value={namedQuery.query}
+                    onChange={() => { }}
+                    readOnly={true}
+                    className="h-full"
+                  />
+                ) : (
+                  <SqlEditor
+                    value={renderPreview(namedQuery.query, paramValues)}
+                    onChange={() => { }}
+                    readOnly={true}
+                    className="h-full"
+                  />
+                )}
               </div>
             )}
           </div>

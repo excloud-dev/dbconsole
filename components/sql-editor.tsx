@@ -21,6 +21,7 @@ interface SqlEditorProps {
     schema?: SchemaInfo | null
     className?: string
     onLineCountChange?: (lines: number) => void
+    readOnly?: boolean
 }
 
 // Custom highlighting for SQL
@@ -93,7 +94,7 @@ const editorTheme = EditorView.theme({
     },
 })
 
-export function SqlEditor({ value, onChange, onExecute, schema, className, onLineCountChange }: SqlEditorProps) {
+export function SqlEditor({ value, onChange, onExecute, schema, className, onLineCountChange, ...props }: SqlEditorProps) {
     const editorRef = useRef<HTMLDivElement>(null)
     const viewRef = useRef<EditorView | null>(null)
     const onChangeRef = useRef(onChange)
@@ -249,6 +250,7 @@ export function SqlEditor({ value, onChange, onExecute, schema, className, onLin
                     }
                 }),
                 EditorView.lineWrapping,
+                EditorView.editable.of(!props.readOnly),
             ],
         })
 
