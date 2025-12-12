@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState, useRef } from "react"
+import { useCallback, useEffect, useMemo, useState, useRef } from "react"
 import { SchemasSidebar } from "./schemas-sidebar"
 import { QueryTabs, type Tab } from "./query-tabs"
 import { QueryEditor } from "./query-editor"
@@ -460,6 +460,10 @@ export function DbConsole() {
   }
 
   const currentTab = tabs.find((t) => t.id === activeTab)
+  const activeEditorHeight = useMemo(() => {
+    const tab = tabs.find((t) => t.id === activeTab)
+    return tab?.editorHeight
+  }, [tabs, activeTab])
   const currentNamedQuery = currentTab?.namedQueryId
     ? namedQueries.find((nq) => nq.id === currentTab.namedQueryId)
     : null
@@ -644,23 +648,24 @@ export function DbConsole() {
     }
   }
 
-  // Restore editor height when switching tabs
-  useEffect(() => {
-    const tab = tabs.find(t => t.id === activeTab)
-    if (tab?.editorHeight && editorPanelRef.current) {
-      // We use a small timeout to ensure the layout engine is ready if needed, 
-      // though usually instant is fine. 
-      editorPanelRef.current.resize(tab.editorHeight)
-    }
-  }, [activeTab, tabs]) // depends on tabs to find the tab, but careful not to loop if tabs update. 
-  // Actually, if we update tabs on resize, this effect fires? 
-  // We should depend on activeTab mainly. If tabs change (e.g. content), height shouldn't reset.
-  // But we need to look up the height from `tabs`.
-  // If `activeTab` changes, we look up.
-  // If `tabs` change (e.g. height updated), this effect fires again and re-resizes? That might be redundant but safe if value is same.
-
   // Auto-resize logic for editor
   const editorPanelRef = useRef<ImperativePanelHandle>(null)
+
+  // Restore editor height when switching tabs.
+  // Guard against redundant resizes to avoid resize->setTabs->resize loops.
+  const lastAppliedEditorHeightRef = useRef<number | null>(null)
+  useEffect(() => {
+    const panel = editorPanelRef.current
+    if (!panel || activeEditorHeight == null) return
+    const currentSize = panel.getSize()
+    const shouldResize =
+      Math.abs(currentSize - activeEditorHeight) > 0.5 &&
+      lastAppliedEditorHeightRef.current !== activeEditorHeight
+    if (shouldResize) {
+      lastAppliedEditorHeightRef.current = activeEditorHeight
+      panel.resize(activeEditorHeight)
+    }
+  }, [activeTab, activeEditorHeight])
 
   const handleLineCountChange = (lines: number) => {
     const panel = editorPanelRef.current
@@ -682,6 +687,17 @@ export function DbConsole() {
     // Reverted: keep default panel sizing
     return
   }
+
+  const handleEditorResize = useCallback((size: number) => {
+    if (!activeTab) return
+    setTabs((prev) =>
+      prev.map((t) => {
+        if (t.id !== activeTab) return t
+        if (t.editorHeight != null && Math.abs(t.editorHeight - size) < 0.5) return t
+        return { ...t, editorHeight: size }
+      }),
+    )
+  }, [activeTab])
 
   return (
     <>
@@ -773,17 +789,13 @@ export function DbConsole() {
               <div className="h-full flex flex-col overflow-hidden">
                 <ResizablePanelGroup direction="vertical">
                   {/* Query editor section */}
-                  <ResizablePanel
-                    ref={editorPanelRef}
-                    defaultSize={40}
-                    minSize={15}
-                    className="flex flex-col"
-                    onResize={(size) => {
-                      if (currentTab) {
-                        setTabs(prev => prev.map(t => t.id === currentTab.id ? { ...t, editorHeight: size } : t))
-                      }
-                    }}
-                  >
+	                  <ResizablePanel
+	                    ref={editorPanelRef}
+	                    defaultSize={40}
+	                    minSize={15}
+	                    className="flex flex-col"
+	                    onResize={handleEditorResize}
+	                  >
                     <div className="flex-1 min-h-0 relative">
                       {currentTab?.isNamedQuery && currentNamedQuery ? (
                         <NamedQueryEditor

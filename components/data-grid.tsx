@@ -111,7 +111,17 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
   // Smart sizing effect
   useEffect(() => {
     if (data.length > 0) {
-      setColumnSizing(calculateColumnWidths(rawColumns, data))
+      const nextSizing = calculateColumnWidths(rawColumns, data)
+      const isSizingEqual = (a: Record<string, number>, b: Record<string, number>) => {
+        const aKeys = Object.keys(a)
+        const bKeys = Object.keys(b)
+        if (aKeys.length !== bKeys.length) return false
+        for (const key of aKeys) {
+          if (a[key] !== b[key]) return false
+        }
+        return true
+      }
+      setColumnSizing((prev) => (isSizingEqual(prev, nextSizing) ? prev : nextSizing))
     }
   }, [rawColumns, data])
 
