@@ -5,13 +5,16 @@ directories:
 files:
   - electron/**
   - package.json
+  - dist/electron/build-info.json
+  - dist/electron/ipc.cjs
+  - dist/electron/ipc.cjs.map
 extraResources:
-  - from: dist/electron/next
-    to: next
+  - from: dist/renderer
+    to: renderer
+  - from: dist/electron/native
+    to: native
 asar: true
-afterPack: electron/afterPack.cjs
 mac:
   category: public.app-category.developer-tools
   target:
     - dmg
-

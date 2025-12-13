@@ -1,13 +1,23 @@
 # TODO
 
+## Desktop App / Packaging
+- [x] Electron app.
+- [x] Figure out if we need a seperate node_modules and setup for electron
+- [ ] Explore tauri instead of electron for leaner dmg and maybe perf?
+- [ ] Explore native packaging with native swiftui appkit views. May need to build a custom bridge?? or get rid of ipc.
+
+## API & Backend
+- [ ] Syncer api endpoint to allow syncing of named queries. Need to handle conflict resolution properly. Add a diff panel for this.
+- [x] Create sort of an SDK lib package for the API. And use that instead of doing fetch everytime. [apiClient]
+- [ ] Explore if we need some sort of auth prob using cloudflare access.
+
+## Query & Data Handling
 - [ ] Fix the query info in data grid table to show the actual query executed.
 - [ ] Auto add params to saved query from where clauses and not just :mac things.
 - [ ] Add a way to export the query results to a CSV file.
-- [ ] Electron app.
-- [ ] Syncer api endpoint to allow syncing.
 - [ ] Filter/Order in data grid.
-- [ ] Fix the sidebar styling. make it consistent with the rest of the app.
+
+## UI/UX Improvements
+- [x] Fix the sidebar styling. make it consistent with the rest of the app.
 - [ ] Fix setting modal styling, make it consistent with the rest of the app.
-- [ ] Add shortcuts for common actions. (For the app)
-- [ ] Create sort of an SDK lib package for the API. And use that instead of doing fetch everytime.
-- [ ] Some sort of auth prob using cloudflare access.
+- [ ] Shortcuts! But want to do this via a seperate interface if possible so we can remap shortcuts from settings if needed. Disable some for web or have sensible defaults for web vs desktop.

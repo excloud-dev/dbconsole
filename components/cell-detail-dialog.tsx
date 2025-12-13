@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Copy, Check, X, Expand } from "lucide-react"
+import { useMemo, useState } from "react"
+import { Copy, Check, Expand } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -62,10 +62,6 @@ function highlightJson(json: string) {
 
 export function CellDetailDialog({ open, onOpenChange, content, columnName }: CellDetailDialogProps) {
     const [isCopied, setIsCopied] = useState(false)
-    const [formattedContent, setFormattedContent] = useState<React.ReactNode>("")
-    const [isJson, setIsJson] = useState(false)
-    const [isSql, setIsSql] = useState(false)
-    const [rawText, setRawText] = useState<string>("")
 
     // Simple SQL highlighter
     const highlightSql = (sql: string) => {
@@ -115,21 +111,21 @@ export function CellDetailDialog({ open, onOpenChange, content, columnName }: Ce
         return output
     }
 
-    useEffect(() => {
+    const { formattedContent, rawText, isJson } = useMemo(() => {
         if (content === null) {
-            setFormattedContent(<span className="text-stone-400 italic">NULL</span>)
-            setRawText("NULL")
-            setIsJson(false)
-            setIsSql(false)
-            return
+            return {
+                formattedContent: <span className="text-stone-400 italic">NULL</span>,
+                rawText: "NULL",
+                isJson: false,
+            }
         }
 
         if (content === undefined) {
-            setFormattedContent("")
-            setRawText("")
-            setIsJson(false)
-            setIsSql(false)
-            return
+            return {
+                formattedContent: "",
+                rawText: "",
+                isJson: false,
+            }
         }
 
         let jsonString = ""
@@ -151,21 +147,24 @@ export function CellDetailDialog({ open, onOpenChange, content, columnName }: Ce
         }
 
         if (isValidJson) {
-            setIsJson(true)
-            setIsSql(false)
-            setFormattedContent(highlightJson(jsonString))
-            setRawText(jsonString)
+            return {
+                formattedContent: highlightJson(jsonString),
+                rawText: jsonString,
+                isJson: true,
+            }
         } else if (typeof content === "string" && columnName.toLowerCase().includes("sql")) {
-            setIsJson(false)
-            setIsSql(true)
-            setFormattedContent(highlightSql(content))
-            setRawText(content)
+            return {
+                formattedContent: highlightSql(content),
+                rawText: content,
+                isJson: false,
+            }
         } else {
             const plain = String(content)
-            setIsJson(false)
-            setIsSql(false)
-            setFormattedContent(plain)
-            setRawText(plain)
+            return {
+                formattedContent: plain,
+                rawText: plain,
+                isJson: false,
+            }
         }
     }, [content, columnName])
 

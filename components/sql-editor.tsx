@@ -97,14 +97,28 @@ const editorTheme = EditorView.theme({
 export function SqlEditor({ value, onChange, onExecute, schema, className, onLineCountChange, ...props }: SqlEditorProps) {
     const editorRef = useRef<HTMLDivElement>(null)
     const viewRef = useRef<EditorView | null>(null)
+    // Keep the latest external value available for editor re-creation cases (e.g. schema/readOnly changes).
+    // Without this, rebuilding the EditorView can temporarily reset the visible doc to the initial mount value.
+    const valueRef = useRef(value)
     const onChangeRef = useRef(onChange)
     const onExecuteRef = useRef(onExecute)
     const onLineCountChangeRef = useRef(onLineCountChange)
 
-    // Keep refs updated
-    onChangeRef.current = onChange
-    onExecuteRef.current = onExecute
-    onLineCountChangeRef.current = onLineCountChange
+    useEffect(() => {
+        onChangeRef.current = onChange
+    }, [onChange])
+
+    useEffect(() => {
+        onExecuteRef.current = onExecute
+    }, [onExecute])
+
+    useEffect(() => {
+        onLineCountChangeRef.current = onLineCountChange
+    }, [onLineCountChange])
+
+    useEffect(() => {
+        valueRef.current = value
+    }, [value])
 
     // Build schema completions from schema prop
     const schemaCompletions = useCallback(
@@ -228,7 +242,7 @@ export function SqlEditor({ value, onChange, onExecute, schema, className, onLin
         ])
 
         const state = EditorState.create({
-            doc: value,
+            doc: valueRef.current,
             extensions: [
                 executeKeymap,
                 keymap.of([...defaultKeymap, ...historyKeymap, ...completionKeymap]),
@@ -267,7 +281,7 @@ export function SqlEditor({ value, onChange, onExecute, schema, className, onLin
         return () => {
             view.destroy()
         }
-    }, [schemaCompletions])
+    }, [schemaCompletions, props.readOnly])
 
     // Sync external value changes
     useEffect(() => {

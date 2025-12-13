@@ -1,25 +1,11 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import {
-    listNamedQueries,
-    upsertNamedQuery,
-    deleteNamedQuery,
-    type QueryParamDef,
-} from '@/lib/meta-db'
+import { listAllNamedQueries, removeNamedQuery, saveNamedQuery } from '@/lib/core/named-queries'
 
 export const runtime = 'nodejs'
 
 export async function GET() {
-    const queries = listNamedQueries().map((q) => ({
-        id: q.id,
-        name: q.name,
-        description: q.description,
-        sqlTemplate: q.sqlTemplate,
-        params: JSON.parse(q.paramsJson) as QueryParamDef[],
-        defaultConnectionId: q.defaultConnectionId,
-    }))
-
-    return NextResponse.json(queries)
+    return NextResponse.json(listAllNamedQueries())
 }
 
 const SaveNamedQuerySchema = z.object({
@@ -41,24 +27,7 @@ export async function POST(req: Request) {
     try {
         const json = await req.json()
         const parsed = SaveNamedQuerySchema.parse(json)
-
-        const saved = upsertNamedQuery({
-            id: parsed.id,
-            name: parsed.name,
-            description: parsed.description,
-            sqlTemplate: parsed.sqlTemplate,
-            params: parsed.params,
-            defaultConnectionId: parsed.defaultConnectionId,
-        })
-
-        return NextResponse.json({
-            id: saved.id,
-            name: saved.name,
-            description: saved.description,
-            sqlTemplate: saved.sqlTemplate,
-            params: JSON.parse(saved.paramsJson) as QueryParamDef[],
-            defaultConnectionId: saved.defaultConnectionId,
-        })
+        return NextResponse.json(saveNamedQuery(parsed))
     } catch (err) {
         if (err instanceof z.ZodError) {
             return NextResponse.json({ error: 'Invalid named query payload', issues: err.issues }, { status: 400 })
@@ -77,7 +46,7 @@ export async function DELETE(req: Request) {
             return NextResponse.json({ error: 'Missing query id' }, { status: 400 })
         }
 
-        deleteNamedQuery(id)
+        removeNamedQuery(id)
         return NextResponse.json({ ok: true })
     } catch (err) {
         console.error('Failed to delete named query', err)

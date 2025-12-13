@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   useReactTable,
   getCoreRowModel,
@@ -155,6 +155,46 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
     return minR === 0 && maxR === data.length - 1 && minC === 0 && maxC === rawColumns.length - 1
   }
 
+  // Copy helpers
+  const stringifyVal = useCallback((val: unknown) => {
+    if (val === null) return ""
+    if (typeof val === "object") return JSON.stringify(val)
+    return String(val)
+  }, [])
+
+  const handleSmartCopy = useCallback(() => {
+    // User Logic: "copy button should only copy selected"
+    // If nothing selected, we do NOT copy all.
+    if (!selection || !data || data.length === 0) return
+
+    const minR = Math.min(selection.start.r, selection.end.r)
+    const maxR = Math.max(selection.start.r, selection.end.r)
+    const minC = Math.min(selection.start.c, selection.end.c)
+    const maxC = Math.max(selection.start.c, selection.end.c)
+
+    const visibleCols = rawColumns
+
+    let tsv = ""
+    for (let r = minR; r <= maxR; r++) {
+      const rowData = data[r]
+      const rowVals: string[] = []
+      for (let c = minC; c <= maxC; c++) {
+        const colName = visibleCols[c]
+        if (columnVisibility[colName] === false) continue
+
+        const val = rowData[colName]
+        // Use stringifyVal to fix [object Object] bug
+        rowVals.push(stringifyVal(val))
+      }
+      tsv += rowVals.join("\t") + "\n"
+    }
+
+    navigator.clipboard.writeText(tsv).then(() => {
+      setIsCopied(true)
+      setTimeout(() => setIsCopied(false), 2000)
+    })
+  }, [columnVisibility, data, rawColumns, selection, stringifyVal])
+
   // Keyboard support for Copy
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -167,7 +207,7 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
     }
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [selection])
+  }, [handleSmartCopy, selection])
 
   // Mouse Handlers for Drag Selection (Global Up)
   useEffect(() => {
@@ -199,46 +239,6 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
     }
   }
 
-  // Copy helpers
-  const stringifyVal = (val: unknown) => {
-    if (val === null) return ""
-    if (typeof val === "object") return JSON.stringify(val)
-    return String(val)
-  }
-
-  const handleSmartCopy = () => {
-    // User Logic: "copy button should only copy selected"
-    // If nothing selected, we do NOT copy all.
-    if (!selection || !data || data.length === 0) return
-
-    const minR = Math.min(selection.start.r, selection.end.r)
-    const maxR = Math.max(selection.start.r, selection.end.r)
-    const minC = Math.min(selection.start.c, selection.end.c)
-    const maxC = Math.max(selection.start.c, selection.end.c)
-
-    const visibleCols = rawColumns
-
-    let tsv = ""
-    for (let r = minR; r <= maxR; r++) {
-      const rowData = data[r]
-      const rowVals: string[] = []
-      for (let c = minC; c <= maxC; c++) {
-        const colName = visibleCols[c]
-        if (columnVisibility[colName] === false) continue
-
-        const val = rowData[colName]
-        // Use stringifyVal to fix [object Object] bug
-        rowVals.push(stringifyVal(val))
-      }
-      tsv += rowVals.join("\t") + "\n"
-    }
-
-    navigator.clipboard.writeText(tsv).then(() => {
-      setIsCopied(true)
-      setTimeout(() => setIsCopied(false), 2000)
-    })
-  }
-
   // Memoize columns definition
   const columns = useMemo<ColumnDef<Record<string, unknown>>[]>(
     () =>
@@ -255,6 +255,7 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
     [rawColumns, executedSql],
   )
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data,
     columns,

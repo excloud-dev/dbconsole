@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { loadSchemaGraph } from '@/lib/schema-introspection'
+import { loadSchema } from '@/lib/core/schema'
 
 export const runtime = 'nodejs'
 
@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     }
 
     try {
-        const graph = await loadSchemaGraph(parseResult.data.connectionId)
+        const graph = await loadSchema(parseResult.data.connectionId)
         return NextResponse.json(graph)
     } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to load schema'

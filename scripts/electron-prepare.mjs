@@ -1,13 +1,10 @@
-import fs from 'node:fs/promises'
-import { createRequire } from 'node:module'
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
+import fs from 'node:fs/promises'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const outDir = path.join(root, 'dist', 'electron', 'next')
-const require = createRequire(import.meta.url)
 
 function run(cmd, args, opts = {}) {
   return new Promise((resolve, reject) => {
@@ -21,49 +18,52 @@ function run(cmd, args, opts = {}) {
 }
 
 const args = new Set(process.argv.slice(2))
-const skipBuild = args.has('--skip-next-build')
-const useTurbopack = args.has('--turbopack')
+const skipRendererBuild = args.has('--skip-renderer-build')
+const skipNative = args.has('--skip-native')
 
-if (!skipBuild) {
-  const nextBin = require.resolve('next/dist/bin/next')
-  await run(process.execPath, [nextBin, 'build', useTurbopack ? '--turbopack' : '--webpack'])
+function capture(cmd, args) {
+  const res = spawnSync(cmd, args, { cwd: root, encoding: 'utf8' })
+  if (res.status !== 0) return ''
+  return String(res.stdout ?? '').trim()
 }
 
-const standaloneDir = path.join(root, '.next', 'standalone')
-const staticDir = path.join(root, '.next', 'static')
-const publicDir = path.join(root, 'public')
+async function writeBuildInfo() {
+  const pkgRaw = await fs.readFile(path.join(root, 'package.json'), 'utf8')
+  const pkg = JSON.parse(pkgRaw)
 
-await fs.rm(outDir, { recursive: true, force: true })
-await fs.mkdir(outDir, { recursive: true })
+  const fullSha =
+    (process.env.DBCONSOLE_BUILD_SHA ?? process.env.GITHUB_SHA ?? '').trim() || capture('git', ['rev-parse', 'HEAD'])
+  const shortSha =
+    (process.env.DBCONSOLE_BUILD_SHA_SHORT ?? '').trim() ||
+    (fullSha ? fullSha.slice(0, 12) : '') ||
+    capture('git', ['rev-parse', '--short', 'HEAD'])
 
-// Copy the standalone server bundle (includes its own node_modules + server.js).
-await fs.cp(standaloneDir, outDir, { recursive: true })
+  const buildTime = (process.env.DBCONSOLE_BUILD_TIME ?? '').trim() || new Date().toISOString()
 
-// Next standalone expects `.next/static` next to `server.js`.
-await fs.mkdir(path.join(outDir, '.next'), { recursive: true })
-await fs.cp(staticDir, path.join(outDir, '.next', 'static'), { recursive: true })
+  const buildInfo = {
+    version: typeof pkg?.version === 'string' ? pkg.version : '0.0.0',
+    sha: fullSha || undefined,
+    shaShort: shortSha || undefined,
+    time: buildTime,
+  }
 
-// Public assets (icons, etc).
-await fs.cp(publicDir, path.join(outDir, 'public'), { recursive: true })
-
-// Do not ship local secrets/state into the packaged app.
-// Next's file-tracing can pull these in if they exist at build time.
-try {
-  const entries = await fs.readdir(outDir)
-  await Promise.all(
-    entries.map(async (name) => {
-      const lower = name.toLowerCase()
-      if (lower === '.env' || lower.startsWith('.env.')) {
-        await fs.rm(path.join(outDir, name), { force: true })
-        return
-      }
-      if (lower.endsWith('.sqlite') || lower.includes('.sqlite-') || lower.endsWith('.sqlite3')) {
-        await fs.rm(path.join(outDir, name), { force: true })
-      }
-    }),
-  )
-} catch {
-  // Best-effort cleanup only.
+  const outDir = path.join(root, 'dist', 'electron')
+  await fs.mkdir(outDir, { recursive: true })
+  await fs.writeFile(path.join(outDir, 'build-info.json'), `${JSON.stringify(buildInfo, null, 2)}\n`)
 }
 
-console.log(`Prepared Electron Next bundle at: ${path.relative(root, outDir)}`)
+await writeBuildInfo()
+
+if (!skipNative) {
+  // Build Electron-ABI native deps into `dist/electron/native/deps` (packaged as `Resources/native/deps`).
+  await run('npm', ['run', 'electron:prepare-native'])
+}
+
+// Bundle Electron IPC handlers (transport-agnostic core backend for desktop IPC).
+await run(process.execPath, [path.join(root, 'scripts', 'electron-bundle-ipc.mjs')])
+
+if (!skipRendererBuild) {
+  await run('npm', ['run', 'renderer:build'])
+}
+
+console.log('Prepared Electron artifacts: native deps, IPC bundle, renderer build')

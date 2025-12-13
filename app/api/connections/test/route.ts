@@ -1,22 +1,12 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { Pool } from 'pg'
+import { testConnection } from '@/lib/core/connections'
 import {
     ConnectionDraftSchema,
     type ConnectionDraftInput,
 } from '@/lib/connection-schema'
 
 export const runtime = 'nodejs'
-
-function buildConnectionString(input: ConnectionDraftInput): string {
-    const host = input.host
-    const port = typeof input.port === 'string' ? Number(input.port) : input.port
-    const database = input.database
-    const user = encodeURIComponent(input.username)
-    const pass = encodeURIComponent(input.password)
-
-    return `postgres://${user}:${pass}@${host}:${port}/${database}`
-}
 
 export async function POST(req: Request) {
     let parsed: ConnectionDraftInput
@@ -35,29 +25,6 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: false, error: 'Invalid request body' }, { status: 400 })
     }
 
-    const connectionString = buildConnectionString(parsed)
-
-    const pool = new Pool({
-        connectionString,
-        max: 1,
-        idleTimeoutMillis: 5_000,
-        connectionTimeoutMillis: 5_000,
-        statement_timeout: 5_000,
-        query_timeout: 5_000,
-        application_name: 'dbconsole',
-    })
-
-    try {
-        await pool.query('SELECT 1')
-        return NextResponse.json({ ok: true })
-    } catch (err) {
-        const message = err instanceof Error ? err.message : 'Connection test failed'
-        return NextResponse.json({ ok: false, error: message })
-    } finally {
-        try {
-            await pool.end()
-        } catch {
-            // ignore
-        }
-    }
+    const result = await testConnection(parsed)
+    return NextResponse.json(result)
 }

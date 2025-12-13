@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { getNamedQuery, upsertNamedQuery, deleteNamedQuery, type QueryParamDef } from '@/lib/meta-db'
+import { getOneNamedQuery, removeNamedQuery, saveNamedQuery } from '@/lib/core/named-queries'
+import { isCoreError } from '@/lib/core/errors'
 
 export const runtime = 'nodejs'
 
@@ -9,19 +10,15 @@ export async function GET(
     context: { params: Promise<{ id: string }> },
 ) {
     const { id } = await context.params
-    const nq = getNamedQuery(id)
-    if (!nq) {
-        return NextResponse.json({ error: 'Named query not found' }, { status: 404 })
+    try {
+        return NextResponse.json(getOneNamedQuery(id))
+    } catch (err) {
+        if (isCoreError(err)) {
+            return NextResponse.json(err.body, { status: err.status })
+        }
+        console.error('Failed to load named query', err)
+        return NextResponse.json({ error: 'Failed to load named query' }, { status: 500 })
     }
-
-    return NextResponse.json({
-        id: nq.id,
-        name: nq.name,
-        description: nq.description,
-        sqlTemplate: nq.sqlTemplate,
-        params: JSON.parse(nq.paramsJson) as QueryParamDef[],
-        defaultConnectionId: nq.defaultConnectionId,
-    })
 }
 
 const UpdateNamedQuerySchema = z.object({
@@ -45,32 +42,30 @@ export async function PUT(
     context: { params: Promise<{ id: string }> },
 ) {
     const { id } = await context.params
-    const existing = getNamedQuery(id)
-    if (!existing) {
-        return NextResponse.json({ error: 'Named query not found' }, { status: 404 })
+    let existing: ReturnType<typeof getOneNamedQuery>
+    try {
+        existing = getOneNamedQuery(id)
+    } catch (err) {
+        if (isCoreError(err)) {
+            return NextResponse.json(err.body, { status: err.status })
+        }
+        console.error('Failed to load named query', err)
+        return NextResponse.json({ error: 'Failed to load named query' }, { status: 500 })
     }
 
     try {
         const json = await req.json()
         const parsed = UpdateNamedQuerySchema.parse(json)
-
-        const saved = upsertNamedQuery({
-            id: existing.id,
-            name: parsed.name ?? existing.name,
-            description: parsed.description ?? existing.description,
-            sqlTemplate: parsed.sqlTemplate ?? existing.sqlTemplate,
-            params: (parsed.params as QueryParamDef[] | undefined) ?? (JSON.parse(existing.paramsJson) as QueryParamDef[]),
-            defaultConnectionId: parsed.defaultConnectionId ?? existing.defaultConnectionId,
-        })
-
-        return NextResponse.json({
-            id: saved.id,
-            name: saved.name,
-            description: saved.description,
-            sqlTemplate: saved.sqlTemplate,
-            params: JSON.parse(saved.paramsJson) as QueryParamDef[],
-            defaultConnectionId: saved.defaultConnectionId,
-        })
+        return NextResponse.json(
+            saveNamedQuery({
+                id: existing.id,
+                name: parsed.name ?? existing.name,
+                description: parsed.description ?? existing.description,
+                sqlTemplate: parsed.sqlTemplate ?? existing.sqlTemplate,
+                params: parsed.params ?? existing.params,
+                defaultConnectionId: parsed.defaultConnectionId ?? existing.defaultConnectionId,
+            }),
+        )
     } catch (err) {
         if (err instanceof z.ZodError) {
             return NextResponse.json({ error: 'Invalid named query payload', issues: err.issues }, { status: 400 })
@@ -85,11 +80,16 @@ export async function DELETE(
     context: { params: Promise<{ id: string }> },
 ) {
     const { id } = await context.params
-    const existing = getNamedQuery(id)
-    if (!existing) {
-        return NextResponse.json({ error: 'Named query not found' }, { status: 404 })
-    }
 
-    deleteNamedQuery(id)
-    return NextResponse.json({ success: true })
+    try {
+        getOneNamedQuery(id)
+        removeNamedQuery(id)
+        return NextResponse.json({ success: true })
+    } catch (err) {
+        if (isCoreError(err)) {
+            return NextResponse.json(err.body, { status: err.status })
+        }
+        console.error('Failed to delete named query', err)
+        return NextResponse.json({ error: 'Failed to delete named query' }, { status: 500 })
+    }
 }

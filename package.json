@@ -8,7 +8,11 @@
     "lint": "eslint .",
     "start": "next start -H ${BIND_HOST:-0.0.0.0}",
     "test": "vitest",
+    "node:rebuild-native": "npm rebuild better-sqlite3",
+    "renderer:dev": "vite --config desktop/renderer/vite.config.ts",
+    "renderer:build": "vite build --config desktop/renderer/vite.config.ts",
     "electron:dev": "node scripts/electron-dev.mjs",
+    "electron:prepare-native": "node scripts/electron-prepare-native.mjs",
     "electron:prepare": "node scripts/electron-prepare.mjs",
     "electron:dist:mac": "npm run electron:prepare && electron-builder --config electron-builder.yml --mac"
   },

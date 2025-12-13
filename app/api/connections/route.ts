@@ -1,57 +1,30 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import {
-    getAllConnections,
-    getConnectionById,
-    toClientMeta,
-    invalidateConnectionsCache,
-} from '@/lib/connections'
-import {
-    insertUiConnection,
-    type UiConnectionInsert,
-} from '@/lib/meta-db'
+import { listConnections, createConnection } from '@/lib/core/connections'
 import {
     ConnectionDraftSchema,
     type ConnectionDraftInput,
 } from '@/lib/connection-schema'
+import { isCoreError } from '@/lib/core/errors'
 
 export const runtime = 'nodejs'
 
 export async function GET() {
-    const conns = getAllConnections().map(toClientMeta)
-    return NextResponse.json(conns)
+    return NextResponse.json(listConnections())
 }
 
 export async function POST(req: Request) {
     try {
         const json = await req.json()
         const parsed = ConnectionDraftSchema.parse(json) as ConnectionDraftInput
-
-        const uiInsert: UiConnectionInsert = {
-            id: crypto.randomUUID(),
-            label: parsed.label,
-            host: parsed.host,
-            port: typeof parsed.port === 'string' ? Number(parsed.port) : parsed.port,
-            database: parsed.database,
-            username: parsed.username,
-            password: parsed.password,
-            readOnly: parsed.readOnly,
-        }
-
-        const row = insertUiConnection(uiInsert)
-        invalidateConnectionsCache()
-
-        const serverConn = getConnectionById(row.id)
-        if (!serverConn) {
-            return NextResponse.json({ error: 'Connection created but could not be loaded' }, { status: 500 })
-        }
-
-        const client = toClientMeta(serverConn)
-
+        const client = createConnection(parsed)
         return NextResponse.json(client, { status: 201 })
     } catch (err) {
         if (err instanceof z.ZodError) {
             return NextResponse.json({ error: 'Invalid connection payload', issues: err.issues }, { status: 400 })
+        }
+        if (isCoreError(err)) {
+            return NextResponse.json(err.body, { status: err.status })
         }
         console.error('Failed to create connection', err)
         return NextResponse.json({ error: 'Failed to create connection' }, { status: 500 })

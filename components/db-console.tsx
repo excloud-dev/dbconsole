@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast"
 import type { ClientConnectionMeta } from "@/lib/connections"
 import type { SchemaGraph } from "@/lib/schema-introspection"
 import { isReadOnlySql } from "@/lib/sql/safety"
+import { apiClient } from "@/lib/client/apiClient"
 
 type PoolMode = "single" | "shared" | "per-scope"
 
@@ -135,9 +136,7 @@ export function DbConsole() {
 
   const loadSchema = useCallback(async (connectionId: string) => {
     try {
-      const res = await fetch(`/api/schema?connectionId=${encodeURIComponent(connectionId)}`)
-      if (!res.ok) return
-      const graph = (await res.json()) as SchemaGraph
+      const graph = await apiClient.schema.load(connectionId)
       setSchema(graph)
     } catch (e: any) {
       console.error("Failed to load schema", e)
@@ -155,13 +154,12 @@ export function DbConsole() {
 
     async function loadInitial() {
       try {
-        const [connsRes, nqRes] = await Promise.all([
-          fetch("/api/connections", { signal: controller.signal }),
-          fetch("/api/named-queries", { signal: controller.signal }),
+        const [conns, raw] = await Promise.all([
+          apiClient.connections.list({ signal: controller.signal }),
+          apiClient.namedQueries.list({ signal: controller.signal }),
         ])
 
-        if (connsRes.ok) {
-          const conns = (await connsRes.json()) as ClientConnectionMeta[]
+        if (Array.isArray(conns)) {
           const withStatus: ConnectionWithStatus[] = conns.map((c, index) => ({
             ...c,
             status: index === 0 ? "connected" : "disconnected",
@@ -173,16 +171,8 @@ export function DbConsole() {
           }
         }
 
-        if (nqRes.ok) {
-          const raw = (await nqRes.json()) as Array<{
-            id: string
-            name: string
-            description?: string
-            sqlTemplate: string
-            params: { name: string; type: "string" | "number" | "boolean"; defaultValue?: string }[]
-          }>
-
-          const mapped: NamedQuery[] = raw.map((q) => ({
+        if (Array.isArray(raw)) {
+          const mapped: NamedQuery[] = raw.map((q: any) => ({
             id: q.id,
             name: q.name,
             description: q.description,
@@ -206,7 +196,7 @@ export function DbConsole() {
     return () => {
       controller.abort()
     }
-  }, [toast])
+  }, [loadSchema, toast])
 
   const addTab = () => {
     const newId = `query-${Date.now()}`
@@ -221,14 +211,10 @@ export function DbConsole() {
     setTabs(newTabs)
     // If we are using per-tab pools, release the tab-specific pool on close.
     if (poolMode === "per-scope" && closingTab?.connectionId) {
-      void fetch("/api/connections/release", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          connectionId: closingTab.connectionId,
-          poolMode,
-          scopeKey: id,
-        }),
+      void apiClient.connections.releasePools({
+        connectionId: closingTab.connectionId,
+        poolMode,
+        scopeKey: id,
       }).catch(() => { })
     }
     if (activeTab === id) {
@@ -260,30 +246,13 @@ export function DbConsole() {
 
   const handleSaveAsNamed = async (namedQuery: Omit<NamedQuery, "id">) => {
     try {
-      const res = await fetch("/api/named-queries", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: namedQuery.name,
-          description: namedQuery.description,
-          sqlTemplate: namedQuery.query,
-          params: namedQuery.parameters,
-          defaultConnectionId: activeConnection ?? undefined,
-        }),
+      const saved = await apiClient.namedQueries.save({
+        name: namedQuery.name,
+        description: namedQuery.description,
+        sqlTemplate: namedQuery.query,
+        params: namedQuery.parameters,
+        defaultConnectionId: activeConnection ?? undefined,
       })
-
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string }
-        throw new Error(body.error || "Failed to save named query")
-      }
-
-      const saved = (await res.json()) as {
-        id: string
-        name: string
-        description?: string
-        sqlTemplate: string
-        params: { name: string; type: "string" | "number" | "boolean"; defaultValue?: string }[]
-      }
 
       const newNamedQuery: NamedQuery = {
         id: saved.id,
@@ -309,30 +278,13 @@ export function DbConsole() {
 
   const handleUpdateNamedQuery = async (updatedQuery: NamedQuery) => {
     try {
-      const res = await fetch(`/api/named-queries/${encodeURIComponent(updatedQuery.id)}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: updatedQuery.name,
-          description: updatedQuery.description,
-          sqlTemplate: updatedQuery.query,
-          params: updatedQuery.parameters,
-          defaultConnectionId: activeConnection ?? undefined,
-        }),
+      const saved = await apiClient.namedQueries.update(updatedQuery.id, {
+        name: updatedQuery.name,
+        description: updatedQuery.description,
+        sqlTemplate: updatedQuery.query,
+        params: updatedQuery.parameters,
+        defaultConnectionId: activeConnection ?? undefined,
       })
-
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string }
-        throw new Error(body.error || "Failed to update named query")
-      }
-
-      const saved = (await res.json()) as {
-        id: string
-        name: string
-        description?: string
-        sqlTemplate: string
-        params: { name: string; type: "string" | "number" | "boolean"; defaultValue?: string }[]
-      }
 
       const mappedUpdated: NamedQuery = {
         id: saved.id,
@@ -453,11 +405,7 @@ export function DbConsole() {
     setActiveConnection(id)
     // Release pools tied to the previous connection to avoid leaks when switching targets.
     if (previous && previous !== id) {
-      void fetch("/api/connections/release", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ connectionId: previous }),
-      }).catch(() => { })
+      void apiClient.connections.releasePools({ connectionId: previous }).catch(() => { })
     }
     void loadSchema(id)
   }
@@ -517,28 +465,18 @@ export function DbConsole() {
 
       const shouldIncludeCount = offset === 0 || targetTab?.pagination?.total === undefined
 
-      const res = await fetch("/api/query/run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          kind: "raw",
-          sql: cleanSql,
-          originalSql: cleanSql,
-          connectionId: targetConnectionId,
-          poolMode,
-          scopeKey: poolMode === "per-scope" ? targetTabId : undefined,
-          params: paramValues,
-          limit,
-          offset,
-          includeCount: shouldIncludeCount,
-        }),
+      const data = await apiClient.query.run({
+        kind: "raw",
+        sql: cleanSql,
+        originalSql: cleanSql,
+        connectionId: targetConnectionId,
+        poolMode,
+        scopeKey: poolMode === "per-scope" ? targetTabId : undefined,
+        params: paramValues,
+        limit,
+        offset,
+        includeCount: shouldIncludeCount,
       })
-
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string }
-        throw new Error(body.error || "Query failed")
-      }
-      const data = (await res.json()) as { columns: string[]; rows: Record<string, unknown>[]; durationMs: number; totalCount?: number }
 
       const sqlDisplay = renderSqlWithParams(cleanSql, paramValues)
       setResultsByTab((prev) => ({ ...prev, [targetTabId]: { ...data, sqlDisplay } }))
@@ -585,29 +523,18 @@ export function DbConsole() {
     try {
       const shouldIncludeCount = offset === 0 || targetTab?.pagination?.total === undefined
 
-      const res = await fetch("/api/query/run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          kind: "named",
-          queryId: query.id,
-          params,
-          connectionId: activeConnection,
-          poolMode,
-          scopeKey: poolMode === "per-scope" ? currentTab?.id : undefined,
-          limit,
-          offset,
-          originalSql: query.query,
-          includeCount: shouldIncludeCount,
-        }),
+      const data = await apiClient.query.run({
+        kind: "named",
+        queryId: query.id,
+        params,
+        connectionId: activeConnection,
+        poolMode,
+        scopeKey: poolMode === "per-scope" ? currentTab?.id : undefined,
+        limit,
+        offset,
+        originalSql: query.query,
+        includeCount: shouldIncludeCount,
       })
-
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string }
-        throw new Error(body.error || "Query failed")
-      }
-
-      const data = (await res.json()) as { columns: string[]; rows: Record<string, unknown>[]; durationMs: number; totalCount?: number }
 
       if (currentTab) {
         // For display, substitute :param occurrences with literals in the template
@@ -710,13 +637,7 @@ export function DbConsole() {
                         onOpenNamedQuery={openNamedQueryTab}
                         onDeleteNamedQuery={async (id) => {
                           try {
-                            const res = await fetch(`/api/named-queries?id=${encodeURIComponent(id)}`, {
-                              method: "DELETE",
-                            })
-                            if (!res.ok) {
-                              const body = (await res.json().catch(() => ({}))) as { error?: string }
-                              throw new Error(body.error || "Failed to delete query")
-                            }
+                            await apiClient.namedQueries.delete(id)
                             setNamedQueries((prev) => prev.filter((nq) => nq.id !== id))
                             // Close any open tabs for this query
                             setTabs((prev) => prev.filter((t) => t.namedQueryId !== id))
@@ -759,6 +680,7 @@ export function DbConsole() {
                     <div className="flex-1 min-h-0 relative">
                       {currentTab?.isNamedQuery && currentNamedQuery ? (
                         <NamedQueryEditor
+                          key={`${currentNamedQuery.id}:${currentNamedQuery.parameters.map((p) => `${p.name}:${p.defaultValue ?? ""}`).join("|")}`}
                           namedQuery={currentNamedQuery}
                           onExecute={executeNamedQuery}
                           onEdit={() => {
@@ -856,6 +778,7 @@ export function DbConsole() {
       />
 
       <SaveNamedQueryDialog
+        key={`${showSaveNamedDialog ? "open" : "closed"}:${editingNamedQuery?.id ?? "new"}:${editingNamedQuery ? "edit" : "create"}`}
         open={showSaveNamedDialog}
         onOpenChange={(open) => {
           setShowSaveNamedDialog(open)

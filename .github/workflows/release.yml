@@ -1,0 +1,135 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  mac-arm64:
+    name: macOS (arm64)
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Assert arm64 runner
+        run: |
+          set -euo pipefail
+          arch="$(uname -m)"
+          if [ "${arch}" != "arm64" ]; then
+            echo "Expected arm64 runner, got: ${arch}"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build desktop artifacts (arm64)
+        run: npm run electron:dist:mac -- --arm64
+
+      - name: Extract release notes from CHANGELOG
+        run: |
+          set -euo pipefail
+
+          tag="${GITHUB_REF_NAME:?GITHUB_REF_NAME is missing}"
+
+          changelog=""
+          if [ -f CHANGELOG.md ]; then
+            changelog="CHANGELOG.md"
+          elif [ -f CHANGELOG ]; then
+            changelog="CHANGELOG"
+          else
+            echo "No changelog file found. Expected CHANGELOG.md or CHANGELOG at repo root."
+            exit 1
+          fi
+
+          escape_re() {
+            # Escape for awk regex (ERE-ish) by backslashing common regex metacharacters.
+            printf '%s' "$1" | sed -E 's/[][\\.^$*+?()|{}]/\\&/g'
+          }
+
+          try_extract() {
+            cand="$1"
+            cand_escaped="$(escape_re "${cand}")"
+            awk -v cand="${cand_escaped}" '
+              BEGIN { started = 0 }
+              {
+                if (!started) {
+                  if ($0 ~ "^##[[:space:]]+\\[?" cand "\\]?([[:space:]]+-.*)?[[:space:]]*$") {
+                    started = 1
+                    print
+                    next
+                  }
+                } else {
+                  if ($0 ~ "^##[[:space:]]+") exit
+                  print
+                }
+              }
+              END { if (!started) exit 2 }
+            ' "${changelog}"
+          }
+
+          candidates=("${tag}")
+          if [ "${tag#v}" != "${tag}" ]; then
+            candidates+=("${tag#v}")
+          else
+            candidates+=("v${tag}")
+          fi
+
+          # De-dupe
+          uniq_candidates=()
+          for cand in "${candidates[@]}"; do
+            seen=0
+            for u in "${uniq_candidates[@]}"; do
+              if [ "${u}" = "${cand}" ]; then
+                seen=1
+                break
+              fi
+            done
+            if [ "${seen}" -eq 0 ]; then
+              uniq_candidates+=("${cand}")
+            fi
+          done
+
+          found=0
+          for cand in "${uniq_candidates[@]}"; do
+            set +e
+            out="$(try_extract "${cand}")"
+            code=$?
+            set -e
+
+            if [ "${code}" -eq 0 ] && [ -n "$(printf '%s' "${out}" | tr -d '[:space:]')" ]; then
+              printf '%s\n' "${out}" > release-notes.md
+              echo "Wrote release-notes.md from ${changelog} section: ${cand}"
+              found=1
+              break
+            fi
+          done
+
+          if [ "${found}" -ne 1 ]; then
+            echo "No changelog section found for tag '${tag}' in ${changelog}."
+            echo "Add a heading like: '## ${tag} - YYYY-MM-DD' (or '## [${tag}] - YYYY-MM-DD')"
+            exit 1
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release-notes.md
+          fail_on_unmatched_files: true
+          files: |
+            dist/electron-build/*.dmg
+            dist/electron-build/*.dmg.blockmap
+            dist/electron-build/latest-mac.yml

@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { getAllConnections, getConnectionById, invalidateConnectionsCache, toClientMeta } from '@/lib/connections'
-import { updateUiConnection, deleteUiConnection } from '@/lib/meta-db'
-import { closePoolsForConnection } from '@/lib/pg-pool'
+import { deleteConnection, updateConnection } from '@/lib/core/connections'
+import { isCoreError } from '@/lib/core/errors'
 
 export const runtime = 'nodejs'
 
@@ -22,46 +21,17 @@ export async function PUT(
 ) {
     const { id } = await context.params
 
-    // Only UI connections can be updated.
-    const existing = getAllConnections().find((c) => c.id === id)
-    if (!existing) {
-        return NextResponse.json({ error: 'Connection not found' }, { status: 404 })
-    }
-    if (existing.from !== 'ui') {
-        return NextResponse.json({ error: 'Env connections are read-only' }, { status: 400 })
-    }
-
     try {
         const json = await req.json()
         const parsed = ConnectionUpdateSchema.parse(json)
-
-        const updated = updateUiConnection(id, {
-            label: parsed.label,
-            host: parsed.host,
-            port: parsed.port !== undefined ? (typeof parsed.port === 'string' ? Number(parsed.port) : parsed.port) : undefined,
-            database: parsed.database,
-            username: parsed.username,
-            password: parsed.password,
-            readOnly: parsed.readOnly,
-        })
-
-        if (!updated) {
-            return NextResponse.json({ error: 'Connection not found' }, { status: 404 })
-        }
-
-        invalidateConnectionsCache()
-
-        const serverConn = getConnectionById(updated.id)
-        if (!serverConn) {
-            return NextResponse.json({ error: 'Connection updated but could not be loaded' }, { status: 500 })
-        }
-
-        await closePoolsForConnection(updated.id)
-
-        return NextResponse.json(toClientMeta(serverConn))
+        const client = await updateConnection(id, parsed)
+        return NextResponse.json(client)
     } catch (err) {
         if (err instanceof z.ZodError) {
             return NextResponse.json({ error: 'Invalid connection payload', issues: err.issues }, { status: 400 })
+        }
+        if (isCoreError(err)) {
+            return NextResponse.json(err.body, { status: err.status })
         }
         console.error('Failed to update connection', err)
         return NextResponse.json({ error: 'Failed to update connection' }, { status: 500 })
@@ -74,17 +44,14 @@ export async function DELETE(
 ) {
     const { id } = await context.params
 
-    const existing = getAllConnections().find((c) => c.id === id)
-    if (!existing) {
-        return NextResponse.json({ error: 'Connection not found' }, { status: 404 })
+    try {
+        const result = await deleteConnection(id)
+        return NextResponse.json(result)
+    } catch (err) {
+        if (isCoreError(err)) {
+            return NextResponse.json(err.body, { status: err.status })
+        }
+        console.error('Failed to delete connection', err)
+        return NextResponse.json({ error: 'Failed to delete connection' }, { status: 500 })
     }
-    if (existing.from !== 'ui') {
-        return NextResponse.json({ error: 'Env connections are read-only' }, { status: 400 })
-    }
-
-    deleteUiConnection(id)
-    invalidateConnectionsCache()
-    await closePoolsForConnection(id)
-
-    return NextResponse.json({ success: true })
 }

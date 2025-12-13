@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,6 +10,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { cn } from "@/lib/utils"
 import type { ClientConnectionMeta } from "@/lib/connections"
 import { useToast } from "@/hooks/use-toast"
+import { apiClient, type AppInfo } from "@/lib/client/apiClient"
 
 type PoolMode = "single" | "shared" | "per-scope"
 
@@ -49,6 +50,22 @@ export function ConnectionDialog({
   const { toast } = useToast()
   const [editingConnection, setEditingConnection] = useState<ConnectionDraft | null>(null)
   const [testStatus, setTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle")
+  const [appInfo, setAppInfo] = useState<AppInfo | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    let canceled = false
+    apiClient.app.info().then((info: AppInfo) => {
+      if (canceled) return
+      setAppInfo(info)
+    }).catch(() => {
+      if (canceled) return
+      setAppInfo(null)
+    })
+    return () => {
+      canceled = true
+    }
+  }, [open])
 
   const createNewConnection = (): ConnectionDraft => ({
     label: "New Connection",
@@ -77,13 +94,7 @@ export function ConnectionDialog({
       return
     }
     try {
-      const res = await fetch(`/api/connections/${encodeURIComponent(id)}`, {
-        method: "DELETE",
-      })
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string }
-        throw new Error(body.error || "Failed to delete connection")
-      }
+      await apiClient.connections.delete(id)
       onConnectionsChange(connections.filter((c) => c.id !== id))
       if (editingConnection?.id === id) {
         setEditingConnection(null)
@@ -108,22 +119,17 @@ export function ConnectionDialog({
     try {
       if (!editingConnection) return
       setTestStatus("testing")
-      const res = await fetch("/api/connections/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          label: editingConnection.label,
-          host: editingConnection.host,
-          port: editingConnection.port,
-          database: editingConnection.database,
-          username: editingConnection.username,
-          password: editingConnection.password,
-          readOnly: editingConnection.readOnly,
-        }),
+      const result = await apiClient.connections.test({
+        label: editingConnection.label,
+        host: editingConnection.host,
+        port: editingConnection.port,
+        database: editingConnection.database,
+        username: editingConnection.username,
+        password: editingConnection.password,
+        readOnly: editingConnection.readOnly,
       })
-      const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
 
-      if (body.ok) {
+      if (result.ok) {
         setTestStatus("success")
         toast({
           title: "Connection successful",
@@ -134,7 +140,7 @@ export function ConnectionDialog({
         toast({
           variant: "destructive",
           title: "Connection failed",
-          description: body.error || "Could not connect to the database with the provided settings.",
+          description: result.error || "Could not connect to the database with the provided settings.",
         })
       }
     } catch (e: any) {
@@ -395,6 +401,16 @@ export function ConnectionDialog({
             </div>
           </div>
 
+          {appInfo && (
+            <div className="mt-2 pt-3 border-t border-stone-100 flex items-center justify-between text-xs text-stone-500">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-stone-700">DBConsole v{appInfo.version}</span>
+                {appInfo.buildSha && <span className="text-stone-400">build {appInfo.buildSha}</span>}
+              </div>
+              {appInfo.runtime?.electron && <span className="text-stone-400">Electron {appInfo.runtime.electron}</span>}
+            </div>
+          )}
+
           <DialogFooter>
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
@@ -421,24 +437,19 @@ export function ConnectionDialog({
                   }
 
                   const isNew = !editingConnection.id
-                  const url = isNew
-                    ? "/api/connections"
-                    : `/api/connections/${encodeURIComponent(editingConnection.id!)}`
-                  const method = isNew ? "POST" : "PUT"
 
                   try {
-                    const res = await fetch(url, {
-                      method,
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify(payload),
-                    })
-
-                    if (!res.ok) {
-                      const body = (await res.json().catch(() => ({}))) as { error?: string }
-                      throw new Error(body.error || "Failed to save connection")
-                    }
-
-                    const saved = (await res.json()) as ClientConnectionMeta
+                    const saved = isNew
+                      ? await apiClient.connections.create({
+                        label: payload.label,
+                        host: payload.host,
+                        port: payload.port,
+                        database: payload.database,
+                        username: payload.username,
+                        password: editingConnection.password,
+                        readOnly: payload.readOnly,
+                      })
+                      : await apiClient.connections.update(editingConnection.id!, payload)
                     if (isNew) {
                       onConnectionsChange([...connections, saved])
                     } else {

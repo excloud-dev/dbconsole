@@ -9,7 +9,6 @@ type PoolKey = string
 // during dev hot reload or under light concurrency.
 
 declare global {
-    // eslint-disable-next-line no-var
     var __dbconsolePgPools: Map<PoolKey, Pool> | undefined
 }
 

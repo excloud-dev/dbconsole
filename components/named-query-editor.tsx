@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useLayoutEffect, useRef } from "react"
+import { useState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Play, ChevronDown, ChevronUp, FileCode, Copy, Check, Expand } from "lucide-react"
@@ -56,11 +56,6 @@ export function NamedQueryEditor({ namedQuery, onExecute, onEdit, paramsExpanded
     setIsCopied(true)
     setTimeout(() => setIsCopied(false), 2000)
   }
-
-  // Reset params when the named query changes
-  useEffect(() => {
-    setParamValues(defaultParamValues)
-  }, [defaultParamValues, namedQuery])
 
   const handleExecute = () => {
     onExecute(namedQuery, { ...paramValues })

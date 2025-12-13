@@ -1,8 +1,13 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-// Use a dedicated SQLite file for tests so we don't touch the real metadata DB.
-const testDbPath = path.join(process.cwd(), 'tests', 'dbconsole-meta-test.sqlite')
+// Use a dedicated SQLite file per Vitest worker so parallel test files don't contend.
+const workerId =
+    process.env.VITEST_WORKER_ID ??
+    process.env.VITEST_POOL_ID ??
+    String(process.pid)
+
+const testDbPath = path.join(process.cwd(), 'tests', `dbconsole-meta-test.${workerId}.sqlite`)
 
 try {
     fs.mkdirSync(path.dirname(testDbPath), { recursive: true })

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,35 +25,16 @@ interface SaveNamedQueryDialogProps {
 }
 
 export function SaveNamedQueryDialog({ open, onOpenChange, query: initialQuery, onSave, mode = "create", initialValues }: SaveNamedQueryDialogProps) {
-  const [name, setName] = useState("")
-  const [description, setDescription] = useState("")
-  const [query, setQuery] = useState("")
-  const [parameters, setParameters] = useState<NamedQueryParameter[]>([])
+  const [name, setName] = useState(() => (mode === "edit" && initialValues ? initialValues.name : ""))
+  const [description, setDescription] = useState(() => (mode === "edit" && initialValues ? initialValues.description || "" : ""))
+  const [query, setQuery] = useState(() => initialQuery)
+  const [parameters, setParameters] = useState<NamedQueryParameter[]>(() => {
+    if (mode === "edit" && initialValues) return initialValues.parameters
 
-  // Reset/Initialize state when dialog opens or props change
-  useEffect(() => {
-    if (open) {
-      if (mode === "edit" && initialValues) {
-        setName(initialValues.name)
-        setDescription(initialValues.description || "")
-        setParameters(initialValues.parameters)
-        setQuery(initialQuery) // In edit mode, initialQuery is the existing query
-      } else {
-        // Create mode
-        setName("")
-        setDescription("")
-        setParameters([]) // We'll detect params from query
-        setQuery(initialQuery)
-
-        // Auto-detect params for convenience in create mode
-        const detectedParams = initialQuery.match(/:(\w+)/g)?.map((p) => p.slice(1)) || []
-        const uniqueParams = [...new Set(detectedParams)]
-        if (uniqueParams.length > 0) {
-          setParameters(uniqueParams.map(p => ({ name: p, type: "string" })))
-        }
-      }
-    }
-  }, [open, mode, initialValues, initialQuery])
+    const detectedParams = initialQuery.match(/:(\w+)/g)?.map((p) => p.slice(1)) || []
+    const uniqueParams = [...new Set(detectedParams)]
+    return uniqueParams.map((p) => ({ name: p, type: "string" }))
+  })
 
 
   const addParameter = () => {

@@ -1,13 +1,14 @@
-import Database from 'better-sqlite3'
+import type BetterSqlite3 from 'better-sqlite3'
 import path from 'node:path'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core'
 import { asc, eq } from 'drizzle-orm'
+import { createRequire } from 'node:module'
 
 // Server-only SQLite metadata DB for dbconsole.
 // Holds UI-defined connections, named queries, and query run logs.
 
-let _db: Database.Database | undefined
+let _db: BetterSqlite3.Database | undefined
 let _orm: ReturnType<typeof drizzle> | undefined
 
 function getDbPath() {
@@ -18,9 +19,23 @@ function getDbPath() {
     return path.join(process.cwd(), 'dbconsole-meta.sqlite')
 }
 
-export function getMetaDb(): Database.Database {
+function loadBetterSqlite3() {
+    // When running under Electron, we need an Electron-ABI build of better-sqlite3.
+    // Keeping a separate Electron-only node_modules tree prevents breaking Node.js dev (Next) builds.
+    const nativeDir = process.env.DBCONSOLE_ELECTRON_NATIVE_DIR
+    if (nativeDir && nativeDir.trim().length > 0) {
+        const req = createRequire(path.join(nativeDir, 'package.json'))
+        return req('better-sqlite3') as typeof import('better-sqlite3')
+    }
+
+    // Default: use the standard Node resolution (web/dev server).
+    return require('better-sqlite3') as typeof import('better-sqlite3')
+}
+
+export function getMetaDb(): BetterSqlite3.Database {
     if (_db) return _db
     const dbPath = getDbPath()
+    const Database = loadBetterSqlite3()
     const db = new Database(dbPath)
     db.pragma('journal_mode = WAL')
     db.pragma('foreign_keys = ON')

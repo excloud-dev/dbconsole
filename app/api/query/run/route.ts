@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { runQuery, type RawQueryInput, type NamedQueryInput } from '@/lib/query-engine'
+import { runApiQuery } from '@/lib/core/query'
+import type { RawQueryInput, NamedQueryInput } from '@/lib/query-engine'
 
 export const runtime = 'nodejs'
 
@@ -39,7 +40,7 @@ export async function POST(req: Request) {
         const json = await req.json()
         const parsed = BodySchema.parse(json)
 
-        const result = await runQuery(parsed as RawQueryInput | NamedQueryInput)
+        const result = await runApiQuery(parsed as RawQueryInput | NamedQueryInput)
 
         return NextResponse.json(result)
     } catch (err) {
