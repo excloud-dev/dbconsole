@@ -70,6 +70,7 @@ async function createMinimalAppPackageJson() {
 
   const appDir = path.join(root, 'dist', 'electron', 'app')
   await fs.mkdir(appDir, { recursive: true })
+  // Update package.json (may already exist from postinstall)
   await fs.writeFile(
     path.join(appDir, 'package.json'),
     `${JSON.stringify(minimalPkg, null, 2)}\n`
