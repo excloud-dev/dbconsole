@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.1.2 - 2025-12-13
+
+- chore: add README (6c6b8ec)
+- feat: optimize Electron app packaging by creating a minimal app directory, reducing bundle size, and disabling sourcemaps in production builds (1079fd0)
+- chore: update postinstall script to initialize app directory before installing dependencies (421dd76)
+
 ## v0.1.1 - 2025-12-13
 
 - init (c649d26)
