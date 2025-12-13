@@ -88,30 +88,21 @@ jobs:
             candidates+=("v${tag}")
           fi
 
-          # De-dupe
-          uniq_candidates=()
-          for cand in "${candidates[@]}"; do
-            seen=0
-            for u in "${uniq_candidates[@]}"; do
-              if [ "${u}" = "${cand}" ]; then
-                seen=1
-                break
-              fi
-            done
-            if [ "${seen}" -eq 0 ]; then
-              uniq_candidates+=("${cand}")
-            fi
-          done
-
+          declare -A seen_candidates=()
           found=0
-          for cand in "${uniq_candidates[@]}"; do
+          for cand in "${candidates[@]}"; do
+            key="${cand}"
+            if [ -n "${seen_candidates[$key]:-}" ]; then
+              continue
+            fi
+            seen_candidates["$key"]=1
             set +e
             out="$(try_extract "${cand}")"
             code=$?
             set -e
 
             if [ "${code}" -eq 0 ] && [ -n "$(printf '%s' "${out}" | tr -d '[:space:]')" ]; then
-              printf '%s\n' "${out}" > release-notes.md
+              printf '```markdown\n%s\n```\n' "${out}" > release-notes.md
               echo "Wrote release-notes.md from ${changelog} section: ${cand}"
               found=1
               break
