@@ -673,14 +673,14 @@ export function DbConsole() {
                 <ResizablePanelGroup direction="vertical">
                   {/* Query editor section */}
                   <ResizablePanel
-                    defaultSize={25}
-                    minSize={25}
+                    defaultSize={20}
+                    minSize={20}
                     className="flex flex-col"
                   >
                     <div className="flex-1 min-h-0 relative">
                       {currentTab?.isNamedQuery && currentNamedQuery ? (
                         <NamedQueryEditor
-                          key={`${currentNamedQuery.id}:${currentNamedQuery.parameters.map((p) => `${p.name}:${p.defaultValue ?? ""}`).join("|")}`}
+                          key={`${currentNamedQuery.id}:${currentNamedQuery.query}:${currentNamedQuery.parameters.map((p) => `${p.name}:${p.defaultValue ?? ""}`).join("|")}`}
                           namedQuery={currentNamedQuery}
                           onExecute={executeNamedQuery}
                           onEdit={() => {

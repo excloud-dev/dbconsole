@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useEffect, useMemo, useLayoutEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Play, ChevronDown, ChevronUp, FileCode, Copy, Check, Expand } from "lucide-react"
@@ -36,7 +36,7 @@ interface NamedQueryEditorProps {
   onParamsExpandChange?: (expanded: boolean) => void
 }
 
-export function NamedQueryEditor({ namedQuery, onExecute, onEdit, paramsExpanded = false, onParamsExpandChange }: NamedQueryEditorProps) {
+export function NamedQueryEditor({ namedQuery, onExecute, onEdit, paramsExpanded = true, onParamsExpandChange }: NamedQueryEditorProps) {
   const defaultParamValues = useMemo(() => {
     const defaults: Record<string, string> = {}
     namedQuery.parameters.forEach((p) => {
@@ -57,6 +57,11 @@ export function NamedQueryEditor({ namedQuery, onExecute, onEdit, paramsExpanded
     setTimeout(() => setIsCopied(false), 2000)
   }
 
+  // Reset params when the named query changes
+  useEffect(() => {
+    setParamValues(defaultParamValues)
+  }, [defaultParamValues, namedQuery])
+
   const handleExecute = () => {
     onExecute(namedQuery, { ...paramValues })
   }
@@ -67,11 +72,6 @@ export function NamedQueryEditor({ namedQuery, onExecute, onEdit, paramsExpanded
       handleExecute()
     }
   }
-
-
-
-
-
   return (
     <div className="flex flex-col h-full bg-white relative group/editor">
       {/* Editor Area (Read-only/Visual) - scrollable */}
@@ -84,32 +84,24 @@ export function NamedQueryEditor({ namedQuery, onExecute, onEdit, paramsExpanded
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 text-sm text-stone-500 hover:text-stone-700"
-              onClick={onEdit}
-            >
+            <Button variant="ghost" size="sm" className="h-6 text-xs text-stone-400 hover:text-stone-700" onClick={onEdit}>
               Edit
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 text-sm text-stone-500 hover:text-stone-700"
-              onClick={() => setShowQueryModal(true)}
-            >
+            <Button variant="ghost" size="sm" className="h-6 text-xs text-stone-400 hover:text-stone-700 gap-1" onClick={() => setShowQueryModal(true)}>
+              <FileCode className="h-3 w-3" />
               View SQL
             </Button>
-            <Button size="sm" className="h-8 gap-1.5 bg-stone-800 hover:bg-stone-900 text-white shadow-sm" onClick={handleExecute}>
-              <Play className="h-3.5 w-3.5" />
+            <Button
+              size="sm"
+              className="h-6 gap-1 bg-stone-800 hover:bg-stone-900 text-white text-xs"
+              onClick={handleExecute}
+            >
+              <Play className="h-3 w-3" />
               Run
             </Button>
           </div>
         </div>
-
-
       </div>
-
       {/* Parameters Footer - collapsible when >6 params (2 rows with 3 columns) */}
       {namedQuery.parameters.length > 0 && (
         <div className="shrink-0 border-t border-stone-200 bg-stone-50/50 z-10 relative">

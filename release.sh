@@ -106,10 +106,6 @@ add_changelog_section_if_missing() {
 # Changelog
 
 All notable changes to this project will be documented in this file.
-
-## Unreleased
-
-- TBD
 EOF
   fi
 
