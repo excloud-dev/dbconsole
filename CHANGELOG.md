@@ -2,15 +2,6 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
-
-- TBD
-
-# Changelog
-
-All notable changes to this project will be documented in this file.
-
-
 ## v0.1.1 - 2025-12-13
 
 - chore: fix releases workflow (ccb3903)

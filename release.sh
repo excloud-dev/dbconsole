@@ -143,49 +143,28 @@ EOF
 ${changes}
 EOF
 
-  # Ensure Unreleased exists. If not, prepend it.
-  if ! grep -Eq '^##[[:space:]]+Unreleased[[:space:]]*$' "${changelog}"; then
-    info "CHANGELOG missing '## Unreleased'; adding it"
-    cat > "${out_file}" <<EOF
-# Changelog
 
-All notable changes to this project will be documented in this file.
-
-## Unreleased
-
-- TBD
-
-EOF
-    cat "${changelog}" >> "${out_file}"
-    mv "${out_file}" "${changelog}"
-    out_file="$(mktemp)"
-  fi
-
-  # Insert release section after the Unreleased block (right before the next "## " heading).
+  # Insert release section at the top, right after the header (before any existing release sections).
   awk -v secfile="${section_file}" '
     function print_section() {
       while ((getline s < secfile) > 0) print s
       close(secfile)
     }
-    BEGIN { inserted = 0; in_unreleased = 0 }
-    /^##[[:space:]]+Unreleased[[:space:]]*$/ { in_unreleased = 1; print; next }
+    BEGIN { inserted = 0 }
     /^##[[:space:]]+/ {
-      if (in_unreleased && !inserted) {
-        print ""
+      if (!inserted) {
         print_section()
         print ""
         inserted = 1
-        in_unreleased = 0
       }
       print
       next
     }
     { print }
     END {
-      if (in_unreleased && !inserted) {
+      if (!inserted) {
         print ""
         print_section()
-        print ""
       }
     }
   ' "${changelog}" > "${out_file}"
