@@ -3,8 +3,11 @@
 ## Desktop App / Packaging
 - [x] Electron app.
 - [x] Figure out if we need a seperate node_modules and setup for electron
+- [x] Reduce desktop bundle size by packaging Electron from a minimal `dist/electron/app` (own `package.json`) and setting `directories.app` in `electron-builder.yml` so root (Next/web) deps don’t get bundled.
+- [x] Disable/strip sourcemaps in release builds (Vite renderer + IPC bundle) and stop shipping `dist/electron/ipc.cjs.map`.
 - [ ] Explore tauri instead of electron for leaner dmg and maybe perf?
 - [ ] Explore native packaging with native swiftui appkit views. May need to build a custom bridge?? or get rid of ipc.
+- [ ] Updater
 
 ## API & Backend
 - [ ] Syncer api endpoint to allow syncing of named queries. Need to handle conflict resolution properly. Add a diff panel for this.

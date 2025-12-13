@@ -17,7 +17,7 @@ export default defineConfig({
     build: {
         outDir: path.resolve(repoRoot, 'dist', 'renderer'),
         emptyOutDir: true,
-        sourcemap: true,
+        sourcemap: process.env.NODE_ENV !== 'production',
     },
     server: {
         host: '127.0.0.1',

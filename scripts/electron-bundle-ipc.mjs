@@ -38,6 +38,8 @@ const aliasPlugin = {
   },
 }
 
+const isProduction = process.env.NODE_ENV === 'production'
+
 await esbuild.build({
   entryPoints: [entry],
   outfile: outFile,
@@ -45,7 +47,7 @@ await esbuild.build({
   platform: 'node',
   format: 'cjs',
   target: 'node20',
-  sourcemap: true,
+  sourcemap: !isProduction,
   plugins: [aliasPlugin],
   external: [
     'electron',

@@ -2,6 +2,11 @@ const path = require('node:path')
 const fs = require('node:fs')
 
 function resolveIpcBundlePath(app) {
+  // In packaged app, ipc.cjs is in the app root
+  // In dev, it's in dist/electron/ipc.cjs relative to project root
+  if (app.isPackaged) {
+    return path.join(app.getAppPath(), 'ipc.cjs')
+  }
   return path.join(app.getAppPath(), 'dist', 'electron', 'ipc.cjs')
 }
 

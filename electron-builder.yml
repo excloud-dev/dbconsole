@@ -2,12 +2,11 @@ appId: com.excloud.dbconsole
 productName: DBConsole
 directories:
   output: dist/electron-build
+  app: dist/electron/app
 files:
   - electron/**
-  - package.json
-  - dist/electron/build-info.json
-  - dist/electron/ipc.cjs
-  - dist/electron/ipc.cjs.map
+  - build-info.json
+  - ipc.cjs
 extraResources:
   - from: dist/renderer
     to: renderer

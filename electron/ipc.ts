@@ -28,7 +28,11 @@ function coreErrorToResponse(e: unknown): IpcResponse | null {
 
 function readBuildInfo(): { sha?: string; shaShort?: string; time?: string } | null {
     try {
-        const buildInfoPath = path.join(app.getAppPath(), 'dist', 'electron', 'build-info.json')
+        // In packaged app, build-info.json is in the app root
+        // In dev, it's in dist/electron/build-info.json relative to project root
+        const buildInfoPath = app.isPackaged
+            ? path.join(app.getAppPath(), 'build-info.json')
+            : path.join(app.getAppPath(), 'dist', 'electron', 'build-info.json')
         const raw = fs.readFileSync(buildInfoPath, 'utf8')
         return JSON.parse(raw) as { sha?: string; shaShort?: string; time?: string }
     } catch {
