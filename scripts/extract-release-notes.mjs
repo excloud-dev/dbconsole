@@ -48,12 +48,12 @@ for (const cand of candidates) {
     if (start === -1) continue;
 
     const out = [];
-    out.push(lines[start]);
     for (let i = start + 1; i < lines.length; i++) {
         if (isHeading(lines[i])) break;
         out.push(lines[i]);
     }
 
+    while (out.length > 0 && out[0].trim() === "") out.shift();
     const content = out.join("\n").trimEnd() + "\n";
     if (!content.trim()) continue;
 
@@ -66,5 +66,4 @@ die(
     `No changelog section found for tag '${tagArg}' in ${changelog}.\n` +
     `Add a heading like: '## ${tagArg} - YYYY-MM-DD' (or '## [${tagArg}] - YYYY-MM-DD')`,
 );
-
 
