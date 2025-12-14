@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.2.1 - 2025-12-14
+
+- fix: ensure leading empty lines are removed from extracted release notes for cleaner output (c0fcbfe)
+- feat: implement centralized keyboard shortcut stack, enhance UI with lucide-powered chips, and polish desktop experience with new file associations and metadata tweaks (5aac760)
+
 ## v0.3.0 - 2025-12-14
 
 - feat: landed the centralized keyboard shortcut stack (`lib/shortcuts/*`, `ShortcutsProvider`, `useCommand`, `/api/shortcuts` route, desktop IPC/preload bindings, `apiClient` plumbing, `SHORTCUTS.md`) and wired it into both runtimes (`WebShortcutsRoot`, desktop renderer provider) plus the new “Keyboard Shortcuts” dialog off the Connections modal.
