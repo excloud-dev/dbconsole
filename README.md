@@ -51,6 +51,15 @@ It can run as:
    - `SELECT 1 AS ok`
 4. Save a reusable query via **Save Named Query** and run it with params later.
 
+## Keyboard shortcuts (defaults)
+
+- **Run query**: <kbd>⌘</kbd><kbd>Enter</kbd> (desktop + web)
+- **Focus query panel** (jump to SQL editor / first named-param / Run button): <kbd>/</kbd>
+- **Show saved queries tab (sidebar)**: <kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>Q</kbd> (desktop)
+- **Copy selected results cells**: <kbd>⌘</kbd><kbd>C</kbd> (copies only when a grid selection exists)
+
+To view/edit shortcuts in the app: **Settings** → **Keyboard Shortcuts**.
+
 ## Development
 
 Prereqs: Node.js + npm.

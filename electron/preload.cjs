@@ -42,6 +42,13 @@ contextBridge.exposeInMainWorld('dbconsole', {
     query: {
       run: (payload) => invoke('dbconsole:query:run', payload),
     },
+    sqlFile: {
+      openDialog: () => invoke('dbconsole:sqlFile:openDialog'),
+    },
+    shortcuts: {
+      get: () => invoke('dbconsole:shortcuts:get'),
+      set: (payload) => invoke('dbconsole:shortcuts:set', payload),
+    },
     syncer: {
       settings: {
         get: () => invoke('dbconsole:syncer:settings:get'),
@@ -54,6 +61,16 @@ contextBridge.exposeInMainWorld('dbconsole', {
       get: () => invoke('dbconsole:syncer:settings:get'),
       set: (payload) => invoke('dbconsole:syncer:settings:set', payload),
       sync: (payload) => invoke('dbconsole:syncer:namedQueries:sync', payload ?? {}),
+    },
+  },
+  events: {
+    onSqlFileOpen: (handler) => {
+      if (typeof handler !== 'function') return () => { }
+      const listener = (_evt, payload) => {
+        handler(payload)
+      }
+      ipcRenderer.on('dbconsole:sqlFile:open', listener)
+      return () => ipcRenderer.removeListener('dbconsole:sqlFile:open', listener)
     },
   },
 })

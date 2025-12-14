@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils"
 import type { ClientConnectionMeta } from "@/lib/connections"
 import { useToast } from "@/hooks/use-toast"
 import { apiClient, type AppInfo } from "@/lib/client/apiClient"
+import { KeyboardShortcutsDialog } from "@/components/keyboard-shortcuts-dialog"
 
 type PoolMode = "single" | "shared" | "per-scope"
 
@@ -51,6 +52,7 @@ export function ConnectionDialog({
   const [editingConnection, setEditingConnection] = useState<ConnectionDraft | null>(null)
   const [testStatus, setTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle")
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null)
+  const [showShortcuts, setShowShortcuts] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -412,6 +414,9 @@ export function ConnectionDialog({
           )}
 
           <DialogFooter>
+            <Button variant="outline" onClick={() => setShowShortcuts(true)}>
+              Keyboard Shortcuts
+            </Button>
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
@@ -479,6 +484,7 @@ export function ConnectionDialog({
           </DialogFooter>
         </div>
       </DialogContent>
+      <KeyboardShortcutsDialog open={showShortcuts} onOpenChange={setShowShortcuts} />
     </Dialog>
   )
 }

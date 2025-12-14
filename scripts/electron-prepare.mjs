@@ -62,6 +62,14 @@ async function createMinimalAppPackageJson() {
   const minimalPkg = {
     name: pkg.name,
     version: pkg.version,
+    description:
+      typeof pkg.description === 'string' && pkg.description.trim().length > 0
+        ? pkg.description
+        : 'DBConsole',
+    author:
+      typeof pkg.author === 'string' && pkg.author.trim().length > 0
+        ? pkg.author
+        : 'ExCloud',
     main: 'electron/main.cjs',
     dependencies: {
       'better-sqlite3': pkg.dependencies['better-sqlite3'],

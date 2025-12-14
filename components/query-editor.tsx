@@ -39,6 +39,7 @@ export function QueryEditor({ query, onChange, onRun, onSaveAsNamed, isNamedQuer
           onExecute={onRun}
           schema={schema}
           className="h-full w-full"
+          domId="sql-editor-main"
           onLineCountChange={onLineCountChange}
         />
 

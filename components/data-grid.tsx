@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   useReactTable,
   getCoreRowModel,
@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { useCommand } from "@/components/shortcuts/useCommand"
 
 interface DataGridProps {
   columns: string[]
@@ -107,6 +108,7 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
   // Track last clicked row for Shift+Click range selection
   const [lastSelectedRow, setLastSelectedRow] = useState<number | null>(null)
   const [isCopied, setIsCopied] = useState(false)
+  const copyResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Smart sizing effect
   useEffect(() => {
@@ -189,25 +191,58 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
       tsv += rowVals.join("\t") + "\n"
     }
 
-    navigator.clipboard.writeText(tsv).then(() => {
-      setIsCopied(true)
-      setTimeout(() => setIsCopied(false), 2000)
+    // Set UI state immediately so keyboard copy and button click feel identical.
+    setIsCopied(true)
+    if (copyResetTimerRef.current) clearTimeout(copyResetTimerRef.current)
+    // Best-effort: reset after a moment even if clipboard fails (permissions, etc).
+    copyResetTimerRef.current = setTimeout(() => setIsCopied(false), 2000)
+
+    navigator.clipboard.writeText(tsv).catch(() => {
+      // Leave "Copied" feedback short-lived; we don't toast here to avoid noise.
     })
   }, [columnVisibility, data, rawColumns, selection, stringifyVal])
 
-  // Keyboard support for Copy
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "c") {
-        if (selection) {
-          e.preventDefault() // Prevent browser copy
-          handleSmartCopy()
-        }
-      }
-    }
-    window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [handleSmartCopy, selection])
+  useCommand("results.copySelection", (e) => {
+    if (!selection) return false
+    e.preventDefault()
+    handleSmartCopy()
+    return true
+  })
+
+  useCommand("results.toggleFullscreen", () => {
+    setIsFullscreen((v) => !v)
+    return true
+  })
+
+  useCommand("results.showExecutedSql", () => {
+    if (!executedSql) return false
+    setDetailCell({ content: executedSql, column: "Executed SQL", executedSql })
+    return true
+  })
+
+  useCommand("results.pageNext", () => {
+    if (!onPageChange || !pagination) return false
+    const total = pagination.total
+    const next = pagination.offset + pagination.limit
+    if (total !== undefined && next >= total) return false
+    onPageChange(next)
+    return true
+  })
+
+  useCommand("results.pagePrev", () => {
+    if (!onPageChange || !pagination) return false
+    const prev = Math.max(0, pagination.offset - pagination.limit)
+    if (prev === pagination.offset) return false
+    onPageChange(prev)
+    return true
+  })
+
+  useCommand("results.clearSelection", () => {
+    if (detailCell) return false
+    if (!selection) return false
+    setSelection(null)
+    return true
+  })
 
   // Mouse Handlers for Drag Selection (Global Up)
   useEffect(() => {

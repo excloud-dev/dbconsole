@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bgGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(512 410) rotate(90) scale(540)">
+      <stop offset="0" stop-color="#34D399" stop-opacity="0.22"/>
+      <stop offset="0.55" stop-color="#60A5FA" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#0B1220" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bg" x1="240" y1="180" x2="820" y2="900" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#111827"/>
+      <stop offset="1" stop-color="#0B1220"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="340" y1="220" x2="760" y2="820" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#34D399"/>
+      <stop offset="0.55" stop-color="#60A5FA"/>
+      <stop offset="1" stop-color="#A78BFA"/>
+    </linearGradient>
+    <filter id="shadow" x="0" y="0" width="1024" height="1024" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+    <filter id="softGlow" x="0" y="0" width="1024" height="1024" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feColorMatrix in="blur" type="matrix"
+        values="1 0 0 0 0
+                0 1 0 0 0
+                0 0 1 0 0
+                0 0 0 0.55 0" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <clipPath id="clip">
+      <!-- Full-bleed clip (avoid transparent margins that macOS renders as a white “plate”) -->
+      <rect x="0" y="0" width="1024" height="1024" rx="0"/>
+    </clipPath>
+  </defs>
+
+  <!-- Full-bleed app tile -->
+  <g filter="url(#shadow)">
+    <rect x="0" y="0" width="1024" height="1024" rx="0" fill="url(#bg)"/>
+    <rect x="0" y="0" width="1024" height="1024" rx="0" fill="url(#bgGlow)"/>
+    <rect x="0" y="0" width="1024" height="1024" rx="0" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="2"/>
+  </g>
+
+  <!-- Icon content -->
+  <g clip-path="url(#clip)">
+    <!-- sheen removed per request -->
+
+    <!-- Database cylinder -->
+    <g filter="url(#softGlow)">
+      <!-- body -->
+      <path d="M292 372C292 328 384 292 512 292C640 292 732 328 732 372V672C732 716 640 752 512 752C384 752 292 716 292 672V372Z"
+            fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.10)" stroke-width="3"/>
+
+      <!-- top ellipse -->
+      <path d="M732 372C732 416 640 452 512 452C384 452 292 416 292 372C292 328 384 292 512 292C640 292 732 328 732 372Z"
+            fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.14)" stroke-width="3"/>
+
+      <!-- accent rim (full ring) -->
+      <path d="M732 372C732 416 640 452 512 452C384 452 292 416 292 372C292 328 384 292 512 292C640 292 732 328 732 372Z"
+            fill="none" stroke="url(#accent)" stroke-width="7"/>
+
+      <!-- horizontal rings -->
+      <path d="M292 476C292 520 384 556 512 556C640 556 732 520 732 476"
+            stroke="rgba(255,255,255,0.12)" stroke-width="3"/>
+      <path d="M292 582C292 626 384 662 512 662C640 662 732 626 732 582"
+            stroke="rgba(255,255,255,0.10)" stroke-width="3"/>
+
+      <!-- accent highlights for mid + bottom rings (front arc) -->
+      <path d="M724 476C724 516 636 546 512 546C388 546 300 516 300 476"
+            fill="none" stroke="url(#accent)" stroke-opacity="0.70" stroke-width="6" stroke-linecap="round"/>
+      <path d="M724 582C724 622 636 652 512 652C388 652 300 622 300 582"
+            fill="none" stroke="url(#accent)" stroke-opacity="0.55" stroke-width="6" stroke-linecap="round"/>
+    </g>
+  </g>
+</svg>
+

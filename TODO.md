@@ -13,7 +13,7 @@
 - [x] Syncer api endpoint to allow syncing of named queries. Need to handle conflict resolution properly. Add a diff panel for this.
 - [x] Create sort of an SDK lib package for the API. And use that instead of doing fetch everytime. [apiClient]
 - [ ] Explore if we need some sort of auth prob using cloudflare access.
-- [ ] Encrypt the connection passwords somehow
+- [x] Encrypt the connection passwords somehow
 
 ## Query & Data Handling
 - [ ] Fix the query info in data grid table to show the actual query executed.
@@ -24,4 +24,5 @@
 ## UI/UX Improvements
 - [x] Fix the sidebar styling. make it consistent with the rest of the app.
 - [ ] Fix setting modal styling, make it consistent with the rest of the app.
-- [ ] Shortcuts! But want to do this via a seperate interface if possible so we can remap shortcuts from settings if needed. Disable some for web or have sensible defaults for web vs desktop.
+- [x] Shortcuts! But want to do this via a seperate interface if possible so we can remap shortcuts from settings if needed. Disable some for web or have sensible defaults for web vs desktop.
+- [ ] Add support to open sql files in desktop.

@@ -63,6 +63,8 @@ interface SchemasSidebarProps {
   onOpenSyncSettings?: () => void
   onRefreshSchema?: () => void
   schema?: SchemaGraph | null
+  activeTab?: "tables" | "queries"
+  onActiveTabChange?: (tab: "tables" | "queries") => void
 }
 
 export function SchemasSidebar({
@@ -79,12 +81,19 @@ export function SchemasSidebar({
   onOpenSyncSettings,
   onRefreshSchema,
   schema,
+  activeTab: activeTabProp,
+  onActiveTabChange,
 }: SchemasSidebarProps) {
   const [search, setSearch] = useState("")
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set())
-  const [activeTab, setActiveTab] = useState<"tables" | "queries">("tables")
+  const [activeTabState, setActiveTabState] = useState<"tables" | "queries">("tables")
   const [joinDialogOpen, setJoinDialogOpen] = useState(false)
   const [joinBaseTable, setJoinBaseTable] = useState<string>("")
+  const activeTab = activeTabProp ?? activeTabState
+  const setActiveTab = (tab: "tables" | "queries") => {
+    if (onActiveTabChange) onActiveTabChange(tab)
+    else setActiveTabState(tab)
+  }
 
   const toggleTable = (name: string) => {
     const next = new Set(expandedTables)
@@ -226,6 +235,7 @@ export function SchemasSidebar({
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
           <Input
+            id="schema-sidebar-search"
             placeholder="Search tables & queries..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}

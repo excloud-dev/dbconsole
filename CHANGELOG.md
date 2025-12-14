@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.3.0 - 2025-12-14
+
+- feat: landed the centralized keyboard shortcut stack (`lib/shortcuts/*`, `ShortcutsProvider`, `useCommand`, `/api/shortcuts` route, desktop IPC/preload bindings, `apiClient` plumbing, `SHORTCUTS.md`) and wired it into both runtimes (`WebShortcutsRoot`, desktop renderer provider) plus the new “Keyboard Shortcuts” dialog off the Connections modal.
+- feat: UI improvements for shortcuts — lucide-powered `kbd` chips (Shift/Enter/Tab/Esc/Delete), improved capture dialog, and documentation updates in `README`/`SHORTCUT_INVENTORY.md` to describe the defaults plus new `/` focus behavior.
+- minor: desktop polish — new `app://` protocol, slicing “use client” directives for the renderer, chunked Vite output, enriched Electron menu (Cmd/Ctrl+O to open SQL scripts), `.sql` file open helpers (IPC, types, CLI + Finder handling), mac file associations/icon, and metadata/scripting tweaks so packaged builds inherit the new focus areas.
+
 ## v0.2.0 - 2025-12-14
 
 - feat: end-to-end encrypted (E2E) named-query sync via “sync phrase” + sync relay endpoints (`/api/sync/named-queries/pull|push`)

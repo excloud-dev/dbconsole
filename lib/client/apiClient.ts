@@ -207,6 +207,16 @@ export const apiClient = {
             return http<AppInfo>('/api/app-info', { method: 'GET', signal: opts.signal })
         },
     },
+    shortcuts: {
+        get: () => {
+            if (isDesktopRuntime()) return ipcInvoke(() => (window as any).dbconsole.api.shortcuts.get())
+            return http('/api/shortcuts', { method: 'GET' })
+        },
+        set: (payload: any) => {
+            if (isDesktopRuntime()) return ipcInvoke(() => (window as any).dbconsole.api.shortcuts.set(payload))
+            return http('/api/shortcuts', { method: 'POST', body: JSON.stringify(payload) })
+        },
+    },
     connections: {
         list: (opts: { signal?: AbortSignal } = {}) => {
             if (isDesktopRuntime()) return ipcInvoke<ClientConnectionMeta[]>(() => (window as any).dbconsole.api.connections.list())
@@ -272,14 +282,14 @@ export const apiClient = {
             get: () => {
                 if (isDesktopRuntime()) {
                     const fn = getDesktopIpcFnOrThrow(['syncer', 'settings', 'get'], [['syncer', 'get']])
-                    return ipcInvoke<SyncerSettings>(() => fn())
+                    return ipcInvoke<SyncerSettings>(() => fn() as Promise<SyncerSettings>)
                 }
                 return http<SyncerSettings>('/api/syncer/settings', { method: 'GET' })
             },
             set: (payload: { clear?: boolean; remoteUrl?: string; syncPhrase?: string; syncDeletions?: boolean }) => {
                 if (isDesktopRuntime()) {
                     const fn = getDesktopIpcFnOrThrow(['syncer', 'settings', 'set'], [['syncer', 'set']])
-                    return ipcInvoke<{ ok: true }>(() => fn(payload))
+                    return ipcInvoke<{ ok: true }>(() => fn(payload) as Promise<{ ok: true }>)
                 }
                 return http<{ ok: true }>('/api/syncer/settings', { method: 'POST', body: JSON.stringify(payload) })
             },
@@ -288,7 +298,7 @@ export const apiClient = {
             sync: (payload: { resolutions?: NamedQuerySyncResolution[] } = {}) => {
                 if (isDesktopRuntime()) {
                     const fn = getDesktopIpcFnOrThrow(['syncer', 'namedQueries', 'sync'], [['syncer', 'sync']])
-                    return ipcInvoke<NamedQuerySyncOkResult>(() => fn(payload))
+                    return ipcInvoke<NamedQuerySyncOkResult>(() => fn(payload) as Promise<NamedQuerySyncOkResult>)
                 }
                 return http<NamedQuerySyncOkResult>('/api/syncer/named-queries', { method: 'POST', body: JSON.stringify(payload) })
             },

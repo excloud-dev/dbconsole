@@ -7,6 +7,11 @@ files:
   - electron/**
   - build-info.json
   - ipc.cjs
+fileAssociations:
+  - ext: sql
+    name: SQL File
+    description: SQL script
+    role: Editor
 extraResources:
   - from: dist/renderer
     to: renderer
@@ -15,5 +20,6 @@ extraResources:
 asar: true
 mac:
   category: public.app-category.developer-tools
+  icon: assets/icons/dbconsole.icns
   target:
     - dmg

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useCallback } from "react"
+import { useEffect, useRef, useCallback, useMemo } from "react"
 import { EditorState } from "@codemirror/state"
 import { EditorView, keymap, placeholder } from "@codemirror/view"
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands"
@@ -8,6 +8,7 @@ import { sql, PostgreSQL } from "@codemirror/lang-sql"
 import { autocompletion, completionKeymap, CompletionContext, Completion } from "@codemirror/autocomplete"
 import { syntaxHighlighting, defaultHighlightStyle, HighlightStyle } from "@codemirror/language"
 import { tags } from "@lezer/highlight"
+import { useBinding } from "@/components/shortcuts/useBinding"
 
 interface SchemaInfo {
     tables: { name: string; schema: string }[]
@@ -22,6 +23,7 @@ interface SqlEditorProps {
     className?: string
     onLineCountChange?: (lines: number) => void
     readOnly?: boolean
+    domId?: string
 }
 
 // Custom highlighting for SQL
@@ -119,6 +121,9 @@ export function SqlEditor({ value, onChange, onExecute, schema, className, onLin
     useEffect(() => {
         valueRef.current = value
     }, [value])
+
+    const executeBinding = useBinding("query.run")
+    const codeMirrorExecuteKey = useMemo(() => (executeBinding ? executeBinding.replace(/\+/g, "-") : "Mod-Enter"), [executeBinding])
 
     // Build schema completions from schema prop
     const schemaCompletions = useCallback(
@@ -233,7 +238,7 @@ export function SqlEditor({ value, onChange, onExecute, schema, className, onLin
         // Custom keymap for Cmd/Ctrl+Enter to execute
         const executeKeymap = keymap.of([
             {
-                key: "Mod-Enter",
+                key: codeMirrorExecuteKey,
                 run: () => {
                     onExecuteRef.current?.()
                     return true
@@ -281,7 +286,7 @@ export function SqlEditor({ value, onChange, onExecute, schema, className, onLin
         return () => {
             view.destroy()
         }
-    }, [schemaCompletions, props.readOnly])
+    }, [schemaCompletions, props.readOnly, codeMirrorExecuteKey])
 
     // Sync external value changes
     useEffect(() => {
@@ -301,6 +306,7 @@ export function SqlEditor({ value, onChange, onExecute, schema, className, onLin
         <div
             ref={editorRef}
             className={className}
+            id={props.domId}
             style={{ height: '100%', cursor: 'text' }}
             onClick={(e) => {
                 if (e.target === e.currentTarget && viewRef.current) {

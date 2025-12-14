@@ -1,5 +1,15 @@
 {
   "name": "dbconsole",
+  "description": "A lightweight read-only Postgres console with a modern UI for exploring schemas, running queries, and saving reusable named queries.",
+  "author": "Ayaan, ExCloud",
+  "homepage": "https://excloud.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/excloud/dbconsole"
+  },
+  "bugs": {
+    "url": "https://github.com/excloud/dbconsole/issues"
+  },
   "version": "0.2.0",
   "private": true,
   "scripts": {

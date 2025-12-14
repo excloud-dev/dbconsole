@@ -11,6 +11,9 @@ declare global {
                 app: {
                     info: () => DesktopIpcResponse<unknown>
                 }
+                sqlFile: {
+                    openDialog: () => DesktopIpcResponse<{ name: string; sql: string } | null>
+                }
                 connections: {
                     list: () => DesktopIpcResponse<unknown>
                     create: (draft: unknown) => DesktopIpcResponse<unknown>
@@ -41,6 +44,9 @@ declare global {
                         sync: (payload?: unknown) => DesktopIpcResponse<unknown>
                     }
                 }
+            }
+            events: {
+                onSqlFileOpen: (handler: (payload: { name?: string; sql: string }) => void) => () => void
             }
         }
     }

@@ -19,6 +19,12 @@ import type { ClientConnectionMeta } from "@/lib/connections"
 import type { SchemaGraph } from "@/lib/schema-introspection"
 import { isReadOnlySql } from "@/lib/sql/safety"
 import { ApiError, apiClient, type NamedQuerySyncResolution } from "@/lib/client/apiClient"
+import { useCommand } from "@/components/shortcuts/useCommand"
+import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator, CommandShortcut } from "@/components/ui/command"
+import { listCommands } from "@/lib/shortcuts/commands"
+import { useShortcutsContext } from "@/components/shortcuts/ShortcutsProvider"
+import { parseBinding } from "@/lib/shortcuts/parse"
+import { formatBinding } from "@/lib/shortcuts/format"
 
 type PoolMode = "single" | "shared" | "per-scope"
 
@@ -92,7 +98,10 @@ interface ConnectionWithStatus extends ClientConnectionMeta {
 
 export function DbConsole() {
   const { toast } = useToast()
+  const shortcuts = useShortcutsContext()
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarTab, setSidebarTab] = useState<"tables" | "queries">("tables")
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
 
   const topPanelRef = useRef<ImperativePanelHandle | null>(null)
   const verticalGroupRef = useRef<HTMLDivElement | null>(null)
@@ -157,6 +166,33 @@ export function DbConsole() {
   const [schema, setSchema] = useState<SchemaGraph | null>(null)
   const [isRunning, setIsRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const openSqlInNewTab = useCallback(
+    (sql: string, name?: string) => {
+      const newId = `query-${Date.now()}`
+      setTabs((prev) => [
+        ...prev,
+        {
+          id: newId,
+          name: name?.trim() || `Query ${prev.length + 1}`,
+          query: sql,
+          connectionId: activeConnection ?? undefined,
+        },
+      ])
+      setActiveTab(newId)
+    },
+    [activeConnection],
+  )
+
+  useEffect(() => {
+    const events = typeof window !== "undefined" ? window.dbconsole?.events : undefined
+    if (!events?.onSqlFileOpen) return
+    const unsubscribe = events.onSqlFileOpen((payload) => {
+      if (!payload || !payload.sql) return
+      openSqlInNewTab(payload.sql, payload.name)
+    })
+    return unsubscribe
+  }, [openSqlInNewTab])
 
   const loadSchema = useCallback(async (connectionId: string) => {
     try {
@@ -307,11 +343,9 @@ export function DbConsole() {
     }
   }, [loadSchema, toast])
 
-  const addTab = () => {
-    const newId = `query-${Date.now()}`
-    setTabs([...tabs, { id: newId, name: `Query ${tabs.length + 1}`, query: "", connectionId: activeConnection ?? undefined }])
-    setActiveTab(newId)
-  }
+  const addTab = useCallback(() => {
+    openSqlInNewTab("")
+  }, [openSqlInNewTab])
 
   const closeTab = (id: string) => {
     if (tabs.length === 1) return
@@ -330,6 +364,99 @@ export function DbConsole() {
       setActiveTab(newTabs[0].id)
     }
   }
+
+  useCommand("tabs.newQuery", () => addTab())
+
+  useCommand("tabs.close", () => {
+    if (!activeTab) return
+    closeTab(activeTab)
+  })
+
+  useCommand("tabs.next", () => {
+    if (!tabs.length) return
+    const idx = tabs.findIndex((t) => t.id === activeTab)
+    const next = tabs[(idx + 1) % tabs.length]
+    if (next) setActiveTab(next.id)
+  })
+
+  useCommand("tabs.prev", () => {
+    if (!tabs.length) return
+    const idx = tabs.findIndex((t) => t.id === activeTab)
+    const prev = tabs[(idx - 1 + tabs.length) % tabs.length]
+    if (prev) setActiveTab(prev.id)
+  })
+
+  useCommand("file.openSql", () => {
+    const api = typeof window !== "undefined" ? window.dbconsole?.api?.sqlFile : undefined
+    if (!api?.openDialog) return
+    void api.openDialog().then((payload: any) => {
+      if (payload && typeof payload.sql === "string") {
+        openSqlInNewTab(payload.sql, payload.name)
+      }
+    })
+  })
+
+  useCommand("ui.toggleSchemaSidebar", () => setSidebarOpen((prev) => !prev))
+
+  useCommand("ui.openConnections", () => setShowConnectionDialog(true))
+
+  useCommand("ui.focusSidebarSearch", () => {
+    const el = typeof document !== "undefined" ? document.getElementById("schema-sidebar-search") : null
+    if (el && "focus" in el) (el as any).focus()
+  })
+
+  useCommand("ui.showSavedQueriesTab", () => {
+    setSidebarOpen(true)
+    setSidebarTab("queries")
+  })
+
+  useCommand("ui.commandPalette", () => setCommandPaletteOpen(true))
+
+  useCommand("schema.refresh", () => {
+    if (activeConnection) void loadSchema(activeConnection)
+  })
+
+  useCommand("sync.openSettings", () => setShowSyncSettingsDialog(true))
+  useCommand("sync.namedQueriesNow", () => {
+    void handleSyncNamedQueries()
+  })
+
+  useCommand("ui.focusQueryPanel", () => {
+    // Named query tab: prefer focusing first param; if no params, focus Run.
+    if (currentTab?.isNamedQuery && currentNamedQuery) {
+      if (currentNamedQuery.parameters.length > 0) {
+        const el = typeof document !== "undefined"
+          ? (document.querySelector('[data-named-query-param="1"]') as HTMLInputElement | null)
+          : null
+        if (el) {
+          el.focus()
+          // Put caret at end when a value exists (consistent with SQL editor behavior)
+          const len = el.value?.length ?? 0
+          try {
+            el.setSelectionRange(len, len)
+          } catch { }
+          return true
+        }
+      }
+
+      const runBtn = typeof document !== "undefined"
+        ? (document.querySelector('[data-named-query-run="1"]') as HTMLButtonElement | null)
+        : null
+      if (runBtn) {
+        runBtn.focus()
+        return true
+      }
+      return false
+    }
+
+    // Raw query tab: click the SqlEditor container so it focuses and moves caret to end.
+    const editorRoot = typeof document !== "undefined" ? (document.getElementById("sql-editor-main") as HTMLElement | null) : null
+    if (editorRoot) {
+      editorRoot.click()
+      return true
+    }
+    return false
+  })
 
   const updateQuery = (id: string, query: string) => {
     setTabs(tabs.map((t) => {
@@ -774,6 +901,8 @@ export function DbConsole() {
                           }
                         }}
                         schema={schema}
+                        activeTab={sidebarTab}
+                        onActiveTabChange={setSidebarTab}
                       />
                     </div>
                   </div>
@@ -935,6 +1064,46 @@ export function DbConsole() {
           }
         }}
       />
+
+      <CommandDialog open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen}>
+        <CommandInput placeholder="Type a command…" />
+        <CommandList>
+          <CommandEmpty>No results.</CommandEmpty>
+          {Object.entries(
+            listCommands().reduce((acc, cmd) => {
+              const cat = cmd.category ?? "Other"
+              acc[cat] = acc[cat] ?? []
+              acc[cat].push(cmd)
+              return acc
+            }, {} as Record<string, ReturnType<typeof listCommands>>),
+          ).map(([category, cmds], idx) => (
+            <div key={category}>
+              {idx > 0 && <CommandSeparator />}
+              <CommandGroup heading={category}>
+                {cmds.map((cmd) => {
+                  const raw = shortcuts.getBinding(cmd.id)
+                  const parsed = raw ? parseBinding(raw) : null
+                  const isMac = typeof navigator !== "undefined" ? /mac/i.test(navigator.platform) : false
+                  const label = parsed ? formatBinding(parsed, shortcuts.runtime, { isMac }) : undefined
+                  return (
+                    <CommandItem
+                      key={cmd.id}
+                      value={`${cmd.title} ${cmd.id}`}
+                      onSelect={() => {
+                        shortcuts.invoke(cmd.id)
+                        setCommandPaletteOpen(false)
+                      }}
+                    >
+                      <span className="truncate">{cmd.title}</span>
+                      {label && <CommandShortcut>{label}</CommandShortcut>}
+                    </CommandItem>
+                  )
+                })}
+              </CommandGroup>
+            </div>
+          ))}
+        </CommandList>
+      </CommandDialog>
     </>
   )
 }

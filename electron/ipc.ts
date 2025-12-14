@@ -1,4 +1,4 @@
-import { app, ipcMain } from 'electron'
+import { app, dialog, ipcMain } from 'electron'
 import { z } from 'zod'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -21,6 +21,15 @@ import { loadSchema } from '@/lib/core/schema'
 import { isCoreError } from '@/lib/core/errors'
 import { ConnectionDraftSchema, type ConnectionDraftInput } from '@/lib/connection-schema'
 import type { NamedQueryInput, RawQueryInput } from '@/lib/query-engine'
+import { readSqlFileOrThrow } from './sql-file-open.cjs'
+import {
+    OverridesRecordSchema,
+    getShortcutsKeymap,
+    resetAllShortcutsOverrides,
+    resetShortcutsOverride,
+    setShortcutsKeymap,
+    setShortcutsOverride,
+} from '@/lib/core/shortcuts-settings'
 
 type IpcResponse = { status: number; body: unknown }
 
@@ -143,6 +152,23 @@ const SyncResolutionSchema: z.ZodType<NamedQuerySyncResolution> = z.discriminate
     z.object({ conflictKey: z.string().min(1), action: z.literal('keep-local') }),
     z.object({ conflictKey: z.string().min(1), action: z.literal('rename-local'), newName: z.string().min(1) }),
 ])
+
+const RuntimeSchema = z.enum(['web', 'desktop'])
+
+const ShortcutsPayloadSchema = z.object({
+    overrides: z
+        .object({
+            web: OverridesRecordSchema.optional(),
+            desktop: OverridesRecordSchema.optional(),
+        })
+        .partial()
+        .optional(),
+    runtime: RuntimeSchema.optional(),
+    commandId: z.string().optional(),
+    binding: z.union([z.string().min(1), z.null()]).optional(),
+    reset: z.boolean().optional(),
+    resetAll: z.boolean().optional(),
+})
 
 export function registerDesktopIpcHandlers(): void {
     ipcMain.handle('dbconsole:app:info', () => {
@@ -309,6 +335,72 @@ export function registerDesktopIpcHandlers(): void {
             if (e instanceof z.ZodError) return err(400, { error: 'Invalid query payload', issues: e.issues })
             const message = e instanceof Error ? e.message : 'Query failed'
             return err(400, { error: message })
+        }
+    })
+
+    ipcMain.handle('dbconsole:sqlFile:openDialog', async () => {
+        const result = await dialog.showOpenDialog({
+            properties: ['openFile'],
+            filters: [{ name: 'SQL', extensions: ['sql'] }],
+        })
+
+        if (result.canceled || !result.filePaths?.length) {
+            return ok(null)
+        }
+
+        const filePath = result.filePaths[0]
+        try {
+            const sql = readSqlFileOrThrow(filePath)
+            return ok({ name: path.basename(filePath), sql })
+        } catch (e) {
+            const message = e instanceof Error ? e.message : 'Failed to open SQL file'
+            return err(400, { error: message })
+        }
+    })
+
+    ipcMain.handle('dbconsole:shortcuts:get', () => {
+        return ok({
+            version: 1,
+            overrides: {
+                web: getShortcutsKeymap('web'),
+                desktop: getShortcutsKeymap('desktop'),
+            },
+        })
+    })
+
+    ipcMain.handle('dbconsole:shortcuts:set', (_evt, payload: unknown) => {
+        try {
+            const parsed = ShortcutsPayloadSchema.parse(payload)
+
+            if (parsed.overrides && Object.keys(parsed.overrides).length > 0) {
+                if (parsed.overrides.web) setShortcutsKeymap('web', parsed.overrides.web)
+                if (parsed.overrides.desktop) setShortcutsKeymap('desktop', parsed.overrides.desktop)
+                return ok({ ok: true })
+            }
+
+            if (parsed.runtime) {
+                const rt = parsed.runtime
+                if (parsed.resetAll) {
+                    resetAllShortcutsOverrides(rt)
+                    return ok({ ok: true })
+                }
+
+                if (parsed.commandId) {
+                    if (parsed.reset) {
+                        resetShortcutsOverride(rt, parsed.commandId as any)
+                        return ok({ ok: true })
+                    }
+                    if (parsed.binding !== undefined) {
+                        setShortcutsOverride(rt, parsed.commandId as any, parsed.binding)
+                        return ok({ ok: true })
+                    }
+                }
+            }
+
+            return err(400, { error: 'Invalid shortcuts payload' })
+        } catch (e) {
+            if (e instanceof z.ZodError) return err(400, { error: 'Invalid shortcuts payload', issues: e.issues })
+            return err(500, { error: 'Failed to save shortcuts' })
         }
     })
 

@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
+import { useCommand } from "@/components/shortcuts/useCommand"
 
 export interface NamedQueryParameter {
   name: string
@@ -61,12 +62,7 @@ export function NamedQueryEditor({ namedQuery, onExecute, onEdit, paramsExpanded
     onExecute(namedQuery, { ...paramValues })
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-      e.preventDefault()
-      handleExecute()
-    }
-  }
+  useCommand("query.run", () => handleExecute())
   return (
     <div className="flex flex-col h-full bg-white relative group/editor">
       {/* Editor Area (Read-only/Visual) - scrollable */}
@@ -89,6 +85,7 @@ export function NamedQueryEditor({ namedQuery, onExecute, onEdit, paramsExpanded
             <Button
               size="sm"
               className="h-6 gap-1 bg-stone-800 hover:bg-stone-900 text-white text-xs"
+              data-named-query-run="1"
               onClick={handleExecute}
             >
               <Play className="h-3 w-3" />
@@ -141,11 +138,11 @@ export function NamedQueryEditor({ namedQuery, onExecute, onEdit, paramsExpanded
                 <Input
                   id={param.name}
                   type={param.type === "number" ? "number" : "text"}
+                  data-named-query-param={index === 0 ? "1" : undefined}
                   value={paramValues[param.name] || ""}
                   onChange={(e) => setParamValues({ ...paramValues, [param.name]: e.target.value })}
                   placeholder={param.type}
                   className="flex-1 h-5 bg-transparent border-none text-xs focus-visible:ring-0 p-0 text-stone-800 placeholder:text-stone-300 min-w-0 font-mono shadow-none"
-                  onKeyDown={handleKeyDown}
                 />
               </div>
             ))}
