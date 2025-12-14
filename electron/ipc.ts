@@ -5,6 +5,17 @@ import path from 'node:path'
 import { execSync } from 'node:child_process'
 import { listConnections, createConnection, deleteConnection, releasePools, testConnection, updateConnection } from '@/lib/core/connections'
 import { listAllNamedQueries, getOneNamedQuery, removeNamedQuery, saveNamedQuery } from '@/lib/core/named-queries'
+import { syncNamedQueriesWithServer, type NamedQuerySyncResolution } from '@/lib/core/named-queries-sync'
+import {
+    clearSyncerSettings,
+    getSyncerSettings,
+    getSyncerSyncDeletions,
+    getSyncerPhraseOrThrow,
+    getSyncerRemoteUrlOrThrow,
+    setSyncerPhrase,
+    setSyncerRemoteUrl,
+    setSyncerSyncDeletions,
+} from '@/lib/core/syncer-settings'
 import { runApiQuery } from '@/lib/core/query'
 import { loadSchema } from '@/lib/core/schema'
 import { isCoreError } from '@/lib/core/errors'
@@ -126,6 +137,12 @@ const UpdateNamedQuerySchema = z.object({
         .optional(),
     defaultConnectionId: z.string().optional(),
 })
+
+const SyncResolutionSchema: z.ZodType<NamedQuerySyncResolution> = z.discriminatedUnion('action', [
+    z.object({ conflictKey: z.string().min(1), action: z.literal('keep-remote') }),
+    z.object({ conflictKey: z.string().min(1), action: z.literal('keep-local') }),
+    z.object({ conflictKey: z.string().min(1), action: z.literal('rename-local'), newName: z.string().min(1) }),
+])
 
 export function registerDesktopIpcHandlers(): void {
     ipcMain.handle('dbconsole:app:info', () => {
@@ -292,6 +309,67 @@ export function registerDesktopIpcHandlers(): void {
             if (e instanceof z.ZodError) return err(400, { error: 'Invalid query payload', issues: e.issues })
             const message = e instanceof Error ? e.message : 'Query failed'
             return err(400, { error: message })
+        }
+    })
+
+    // --- Syncer (E2E named query sync) ---
+
+    ipcMain.handle('dbconsole:syncer:settings:get', () => {
+        return ok(getSyncerSettings())
+    })
+
+    ipcMain.handle('dbconsole:syncer:settings:set', (_evt, payload: unknown) => {
+        const schema = z.object({
+            clear: z.boolean().optional(),
+            remoteUrl: z.string().url().optional(),
+            syncPhrase: z.string().min(1).optional(),
+            syncDeletions: z.boolean().optional(),
+        })
+        try {
+            const parsed = schema.parse(payload)
+            if (parsed.clear) {
+                clearSyncerSettings()
+                return ok({ ok: true })
+            }
+            if (parsed.remoteUrl !== undefined) setSyncerRemoteUrl(parsed.remoteUrl)
+            if (parsed.syncPhrase !== undefined) setSyncerPhrase(parsed.syncPhrase)
+            if (parsed.syncDeletions !== undefined) setSyncerSyncDeletions(parsed.syncDeletions)
+            return ok({ ok: true })
+        } catch (e) {
+            if (e instanceof z.ZodError) return err(400, { error: 'Invalid sync settings', issues: e.issues })
+            return err(500, { error: 'Failed to save sync settings' })
+        }
+    })
+
+    ipcMain.handle('dbconsole:syncer:namedQueries:sync', async (_evt, payload: unknown) => {
+        const schema = z.object({ resolutions: z.array(SyncResolutionSchema).optional() })
+
+        let remoteUrl: string
+        let syncPhrase: string
+        try {
+            remoteUrl = getSyncerRemoteUrlOrThrow()
+            syncPhrase = getSyncerPhraseOrThrow()
+        } catch (e) {
+            const message = e instanceof Error ? e.message : 'Missing sync settings'
+            return err(400, { error: message })
+        }
+
+        try {
+            const parsed = schema.parse(payload)
+            const result = await syncNamedQueriesWithServer({
+                remoteUrl,
+                syncPhrase,
+                syncDeletions: getSyncerSyncDeletions(),
+                resolutions: parsed.resolutions,
+            })
+            if (result.status === 'conflict') {
+                return err(409, { error: 'Conflicts', remoteVersion: result.remoteVersion, conflicts: result.conflicts })
+            }
+            return ok(result)
+        } catch (e) {
+            if (e instanceof z.ZodError) return err(400, { error: 'Invalid sync payload', issues: e.issues })
+            const message = e instanceof Error ? e.message : 'Sync failed'
+            return err(500, { error: message })
         }
     })
 }

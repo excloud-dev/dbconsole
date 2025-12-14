@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.2.0 - 2025-12-14
+
+- feat: end-to-end encrypted (E2E) named-query sync via “sync phrase” + sync relay endpoints (`/api/sync/named-queries/pull|push`)
+- feat: “sync server only” mode for running the web app purely as a low-profile sync relay (`DBCONSOLE_SYNC_SERVER_ONLY=1`) + install script support (`--sync-server-only`)
+- feat: conflict resolution UX improvements (3-way merge base to reduce constant conflicts, conflict dialog shows parameter definitions)
+- feat: encryption-at-rest for locally stored secrets (connection passwords, sync phrase/settings)
+- feat: auto-sync on named query create/edit + option to leave/opt-out of a sync chain
+- feat: deletion sync is optional and off by default (safer cross-device behavior)
+
 ## v0.1.2 - 2025-12-13
 
 - chore: add README (6c6b8ec)

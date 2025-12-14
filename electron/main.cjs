@@ -71,6 +71,8 @@ function createMainWindow() {
 
   if (isDev) {
     win.webContents.openDevTools({ mode: 'detach' })
+  } else if (process.env.DBCONSOLE_OPEN_DEVTOOLS === '1') {
+    win.webContents.openDevTools({ mode: 'detach' })
   }
 
   if (isDev) {

@@ -3,10 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron')
 async function invoke(channel, payload) {
   const res = await ipcRenderer.invoke(channel, payload)
   if (!res || typeof res !== 'object') {
-    const err = new Error('Invalid IPC response')
-    err.status = 500
-    err.body = { error: 'Invalid IPC response' }
-    throw err
+    throw { message: 'Invalid IPC response', status: 500, body: { error: 'Invalid IPC response' } }
   }
 
   const status = res.status
@@ -14,10 +11,7 @@ async function invoke(channel, payload) {
   if (typeof status === 'number' && status >= 200 && status < 300) return body
 
   const message = body && typeof body === 'object' && typeof body.error === 'string' ? body.error : 'Request failed'
-  const err = new Error(message)
-  err.status = typeof status === 'number' ? status : 500
-  err.body = body
-  throw err
+  throw { message, status: typeof status === 'number' ? status : 500, body }
 }
 
 contextBridge.exposeInMainWorld('dbconsole', {
@@ -47,6 +41,19 @@ contextBridge.exposeInMainWorld('dbconsole', {
     },
     query: {
       run: (payload) => invoke('dbconsole:query:run', payload),
+    },
+    syncer: {
+      settings: {
+        get: () => invoke('dbconsole:syncer:settings:get'),
+        set: (payload) => invoke('dbconsole:syncer:settings:set', payload),
+      },
+      namedQueries: {
+        sync: (payload) => invoke('dbconsole:syncer:namedQueries:sync', payload ?? {}),
+      },
+      // Back-compat aliases (older renderers may not have nested groups)
+      get: () => invoke('dbconsole:syncer:settings:get'),
+      set: (payload) => invoke('dbconsole:syncer:settings:set', payload),
+      sync: (payload) => invoke('dbconsole:syncer:namedQueries:sync', payload ?? {}),
     },
   },
 })

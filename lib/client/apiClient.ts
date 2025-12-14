@@ -16,6 +16,32 @@ function isDesktopRuntime(): boolean {
     return typeof window !== 'undefined' && !!(window as any).dbconsole?.isDesktop
 }
 
+function getDesktopApiOrThrow(): any {
+    const api = typeof window !== 'undefined' ? (window as any).dbconsole?.api : undefined
+    if (!api) {
+        throw new ApiError('Desktop API not available (preload missing or failed to load)', 500, {
+            error: 'Desktop API not available (preload missing or failed to load)',
+        })
+    }
+    return api
+}
+
+function getDesktopIpcFnOrThrow(path: string[], fallbackPaths: string[][] = []): (...args: any[]) => Promise<unknown> {
+    const api = getDesktopApiOrThrow()
+    const allPaths = [path, ...fallbackPaths]
+
+    for (const p of allPaths) {
+        let cur: any = api
+        for (const key of p) cur = cur?.[key]
+        if (typeof cur === 'function') return cur
+    }
+
+    const variants = allPaths.map((p) => `api.${p.join('.')}`).join(' or ')
+    throw new ApiError(`Desktop API mismatch: expected ${variants}`, 500, {
+        error: `Desktop API mismatch: expected ${variants}`,
+    })
+}
+
 async function parseJsonSafe(res: Response): Promise<unknown> {
     try {
         return await res.json()
@@ -108,6 +134,24 @@ export type ClientNamedQuery = {
     sqlTemplate: string
     params: QueryParamDef[]
     defaultConnectionId?: string
+}
+
+export type SyncerSettings = {
+    remoteUrl: string | null
+    hasPhrase: boolean
+    syncDeletions: boolean
+}
+
+export type NamedQuerySyncResolution =
+    | { conflictKey: string; action: 'keep-remote' }
+    | { conflictKey: string; action: 'keep-local' }
+    | { conflictKey: string; action: 'rename-local'; newName: string }
+
+export type NamedQuerySyncOkResult = {
+    status: 'ok'
+    remoteVersion: number
+    pushed: boolean
+    newRemoteVersion?: number
 }
 
 export type SchemaGraph = {
@@ -221,6 +265,33 @@ export const apiClient = {
         run: (payload: RawQueryPayload | NamedQueryPayload) => {
             if (isDesktopRuntime()) return ipcInvoke<QueryResult>(() => (window as any).dbconsole.api.query.run(payload))
             return http<QueryResult>('/api/query/run', { method: 'POST', body: JSON.stringify(payload) })
+        },
+    },
+    syncer: {
+        settings: {
+            get: () => {
+                if (isDesktopRuntime()) {
+                    const fn = getDesktopIpcFnOrThrow(['syncer', 'settings', 'get'], [['syncer', 'get']])
+                    return ipcInvoke<SyncerSettings>(() => fn())
+                }
+                return http<SyncerSettings>('/api/syncer/settings', { method: 'GET' })
+            },
+            set: (payload: { clear?: boolean; remoteUrl?: string; syncPhrase?: string; syncDeletions?: boolean }) => {
+                if (isDesktopRuntime()) {
+                    const fn = getDesktopIpcFnOrThrow(['syncer', 'settings', 'set'], [['syncer', 'set']])
+                    return ipcInvoke<{ ok: true }>(() => fn(payload))
+                }
+                return http<{ ok: true }>('/api/syncer/settings', { method: 'POST', body: JSON.stringify(payload) })
+            },
+        },
+        namedQueries: {
+            sync: (payload: { resolutions?: NamedQuerySyncResolution[] } = {}) => {
+                if (isDesktopRuntime()) {
+                    const fn = getDesktopIpcFnOrThrow(['syncer', 'namedQueries', 'sync'], [['syncer', 'sync']])
+                    return ipcInvoke<NamedQuerySyncOkResult>(() => fn(payload))
+                }
+                return http<NamedQuerySyncOkResult>('/api/syncer/named-queries', { method: 'POST', body: JSON.stringify(payload) })
+            },
         },
     },
 }

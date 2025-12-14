@@ -1,6 +1,11 @@
 import { DbConsole } from "@/components/db-console"
+import { notFound } from "next/navigation"
 
 export default function Home() {
+  if ((process.env.DBCONSOLE_SYNC_SERVER_ONLY ?? "").trim() === "1") {
+    notFound()
+  }
+
   return (
     <main className="h-full w-full bg-white">
       <DbConsole />

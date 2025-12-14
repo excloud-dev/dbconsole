@@ -23,6 +23,11 @@ try {
 
 process.env.DBCONSOLE_META_SQLITE_PATH = testDbPath
 
+// Deterministic key for encryption-at-rest in Node test runtime.
+if (!process.env.DBCONSOLE_SECRET_KEY_B64) {
+    process.env.DBCONSOLE_SECRET_KEY_B64 = Buffer.alloc(32).toString('base64')
+}
+
 // If a Postgres URL is provided, wire it into the env connections JSON for tests.
 if (process.env.DBCONSOLE_TEST_PG_URL) {
     process.env.DBCONSOLE_CONNECTIONS_JSON = JSON.stringify([

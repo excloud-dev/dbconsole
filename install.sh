@@ -20,6 +20,8 @@ DEFAULT_HOST="127.0.0.1"
 NEW_INSTALL=false
 CUSTOM_PORT=""
 CUSTOM_HOST=""
+SYNC_SERVER_ONLY=false
+SYNC_SERVER_ONLY_EXPLICIT=false
 
 # Colors for output
 RED='\033[0;31m'
@@ -40,12 +42,15 @@ show_usage() {
     echo "                  Without this flag, only copies files and restarts the service (redeploy mode)"
     echo "  --port PORT     Custom port number for the application (default: $DEFAULT_PORT)"
     echo "  --host HOST     IP address to bind to (default: $DEFAULT_HOST)"
+    echo "  --sync-server-only     Run as a named-query sync relay only (sets DBCONSOLE_SYNC_SERVER_ONLY=1)"
+    echo "  --no-sync-server-only  Disable sync-server-only mode (sets DBCONSOLE_SYNC_SERVER_ONLY=0)"
     echo "  --help, -h      Show this help message"
     echo ""
     echo "Examples:"
     echo "  $0 --new                           # Full installation with defaults"
     echo "  $0 --new --port 8080               # Full installation with port 8080"
     echo "  $0 --new --host 0.0.0.0            # Full installation, bind to all interfaces"
+    echo "  $0 --new --sync-server-only        # Full installation in sync relay mode"
     echo "  $0 --port 3001 --host 100.103.6.96 # Redeploy with custom port and host"
     echo "  $0                                 # Redeploy with defaults"
     echo ""
@@ -75,6 +80,16 @@ parse_arguments() {
                     log_error "--host requires a value"
                     exit 1
                 fi
+                ;;
+            --sync-server-only)
+                SYNC_SERVER_ONLY=true
+                SYNC_SERVER_ONLY_EXPLICIT=true
+                shift
+                ;;
+            --no-sync-server-only)
+                SYNC_SERVER_ONLY=false
+                SYNC_SERVER_ONLY_EXPLICIT=true
+                shift
                 ;;
             --help|-h)
                 show_usage
@@ -273,6 +288,10 @@ setup_env_file() {
     log_info "Setting up environment file..."
     
     local ENV_FILE="$INSTALL_DIR/.env"
+    local SYNC_ENV_VALUE="0"
+    if [[ "$SYNC_SERVER_ONLY" == "true" ]]; then
+        SYNC_ENV_VALUE="1"
+    fi
     
     if [[ -f "$ENV_FILE" ]]; then
         # Update the PORT in existing .env file
@@ -294,6 +313,17 @@ setup_env_file() {
             echo "BIND_HOST=$CUSTOM_HOST" >> "$ENV_FILE"
             log_info "Added BIND_HOST=$CUSTOM_HOST to existing .env file"
         fi
+
+        # Only update sync-server-only setting if explicitly requested.
+        if [[ "$SYNC_SERVER_ONLY_EXPLICIT" == "true" ]]; then
+            if grep -q "^DBCONSOLE_SYNC_SERVER_ONLY=" "$ENV_FILE"; then
+                sed -i "s/^DBCONSOLE_SYNC_SERVER_ONLY=.*/DBCONSOLE_SYNC_SERVER_ONLY=$SYNC_ENV_VALUE/" "$ENV_FILE"
+                log_info "Updated DBCONSOLE_SYNC_SERVER_ONLY to $SYNC_ENV_VALUE in existing .env file"
+            else
+                echo "DBCONSOLE_SYNC_SERVER_ONLY=$SYNC_ENV_VALUE" >> "$ENV_FILE"
+                log_info "Added DBCONSOLE_SYNC_SERVER_ONLY=$SYNC_ENV_VALUE to existing .env file"
+            fi
+        fi
     else
         # Create a basic .env file (user can customize later)
         cat > "$ENV_FILE" << EOF
@@ -301,6 +331,7 @@ setup_env_file() {
 NODE_ENV=production
 PORT=$CUSTOM_PORT
 BIND_HOST=$CUSTOM_HOST
+DBCONSOLE_SYNC_SERVER_ONLY=$SYNC_ENV_VALUE
 
 # Add your database connection strings and other config here
 # DATABASE_URL=postgresql://user:password@localhost:5432/dbname
@@ -366,6 +397,12 @@ print_summary() {
     echo "  Stop:            sudo systemctl stop $SERVICE_NAME"
     echo ""
     echo "Application URL:   http://$CUSTOM_HOST:$CUSTOM_PORT"
+    if [[ "$SYNC_SERVER_ONLY" == "true" ]]; then
+        echo "Mode:              sync-server-only (named-query relay)"
+        echo "Sync endpoints:"
+        echo "  Pull:            http://$CUSTOM_HOST:$CUSTOM_PORT/api/sync/named-queries/pull"
+        echo "  Push:            http://$CUSTOM_HOST:$CUSTOM_PORT/api/sync/named-queries/push"
+    fi
     echo "Install directory: $INSTALL_DIR"
     echo "Environment file:  $INSTALL_DIR/.env"
     echo ""
@@ -392,6 +429,13 @@ main() {
     fi
     echo -e "${BLUE}Port: $CUSTOM_PORT${NC}"
     echo -e "${BLUE}Host: $CUSTOM_HOST${NC}"
+    if [[ "$SYNC_SERVER_ONLY_EXPLICIT" == "true" ]]; then
+        if [[ "$SYNC_SERVER_ONLY" == "true" ]]; then
+            echo -e "${BLUE}Sync relay only: enabled${NC}"
+        else
+            echo -e "${BLUE}Sync relay only: disabled${NC}"
+        fi
+    fi
     echo ""
     
     check_root

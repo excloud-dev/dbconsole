@@ -10,7 +10,9 @@ const itMaybe = hasTestPg ? it : it.skip
 
 function resetMetaDb() {
     const db = getMetaDb()
-    db.exec('DELETE FROM dbconsole_connections; DELETE FROM dbconsole_queries; DELETE FROM dbconsole_query_runs;')
+    db.exec(
+        'DELETE FROM dbconsole_connections; DELETE FROM dbconsole_queries; DELETE FROM dbconsole_query_runs; DELETE FROM dbconsole_query_tombstones; DELETE FROM dbconsole_settings; DELETE FROM dbconsole_sync_named_queries;',
+    )
     invalidateConnectionsCache()
 }
 

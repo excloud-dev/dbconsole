@@ -4,7 +4,9 @@ import { getMetaDb, insertUiConnection, listUiConnections, upsertNamedQuery, lis
 describe('meta-db SQLite helpers', () => {
     beforeEach(() => {
         const db = getMetaDb()
-        db.exec('DELETE FROM dbconsole_connections; DELETE FROM dbconsole_queries; DELETE FROM dbconsole_query_runs;')
+        db.exec(
+            'DELETE FROM dbconsole_connections; DELETE FROM dbconsole_queries; DELETE FROM dbconsole_query_runs; DELETE FROM dbconsole_query_tombstones; DELETE FROM dbconsole_settings; DELETE FROM dbconsole_sync_named_queries;',
+        )
     })
 
     it('inserts and lists UI connections', () => {

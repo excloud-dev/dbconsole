@@ -10,7 +10,7 @@
 - [ ] Updater
 
 ## API & Backend
-- [ ] Syncer api endpoint to allow syncing of named queries. Need to handle conflict resolution properly. Add a diff panel for this.
+- [x] Syncer api endpoint to allow syncing of named queries. Need to handle conflict resolution properly. Add a diff panel for this.
 - [x] Create sort of an SDK lib package for the API. And use that instead of doing fetch everytime. [apiClient]
 - [ ] Explore if we need some sort of auth prob using cloudflare access.
 - [ ] Encrypt the connection passwords somehow

@@ -218,6 +218,14 @@ Checks you can run (prove IPC works + web still works)
   - In Electron DevTools console:
     - `await window.dbconsole.api.connections.list()` returns the same shape as `await fetch('/api/connections').then(r => r.json())`
     - Trigger one known-error case and verify parity:
+
+Debugging note (desktop networking)
+
+- In desktop mode, many “API calls” are **IPC** (renderer → main), and any `fetch(...)` done by the backend runs in the **Electron main process**.
+- As a result, the renderer DevTools **Network** tab may show *nothing* even though sync is working.
+- To debug:
+  - Watch the terminal that launched `npm run electron:dev` (main-process logs).
+  - Force DevTools open in packaged builds by launching with `DBCONSOLE_OPEN_DEVTOOLS=1`.
       - example: call an IPC method with an invalid payload and confirm you can observe `status === 400` and an `{ error, issues? }` body matching HTTP.
 
 ---

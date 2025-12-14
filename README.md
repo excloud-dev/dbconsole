@@ -32,6 +32,10 @@ It can run as:
   - Fullscreen mode
   - Cell detail viewer
   - “Executed SQL” viewer (what was actually run)
+- **E2E sync for named queries** (optional)
+  - Share a “sync phrase” across devices to join a sync chain
+  - Server stores ciphertext only (cannot read query SQL)
+  - Conflict resolution UI when two devices changed the same query
 
 ## Install (macOS desktop)
 
@@ -57,11 +61,35 @@ Prereqs: Node.js + npm.
 - Build: `npm run build`
 - Start: `npm run start`
 
+### Web sync server only (named-query relay)
+
+Run DBConsole as a minimal **sync relay server** for desktop apps (no UI, no connections/query endpoints):
+
+- `DBCONSOLE_SYNC_SERVER_ONLY=1 npm run dev`
+
+Production build:
+
+- `DBCONSOLE_SYNC_SERVER_ONLY=1 npm run build`
+- `DBCONSOLE_SYNC_SERVER_ONLY=1 npm run start`
+
+In this mode, only these endpoints are exposed:
+
+- `POST /api/sync/named-queries/pull`
+- `POST /api/sync/named-queries/push`
+
+All other routes return `404`.
+
+Ubuntu/systemd install (sync relay only):
+
+- `sudo ./install.sh --new --sync-server-only --host 127.0.0.1 --port 3000`
+
 ### Desktop app (Electron)
 
 - Dev (starts Vite + Electron): `npm run electron:dev`
 - Package (DMG): `npm run electron:dist:mac`
   - Apple Silicon build: `npm run electron:dist:mac -- --arm64`
+
+Debug tip (packaged builds): set `DBCONSOLE_OPEN_DEVTOOLS=1` when launching the app to force DevTools open.
 
 ### Tests / lint
 
@@ -92,3 +120,7 @@ If it still won’t open, try clearing all extended attributes:
 ```sh
 xattr -cr "/Applications/DBConsole.app"
 ```
+
+## Sync docs
+
+See `SYNC_DESIGN.md` for how the sync phrase, E2E encryption, 3-way merge conflict detection, and the pull/push APIs work.

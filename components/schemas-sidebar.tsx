@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronRight, Table2, Search, Bookmark, GitMerge, X, Plus, ChevronDown, Eye, RotateCcw } from "lucide-react"
+import { ChevronRight, Table2, Search, Bookmark, GitMerge, X, Plus, ChevronDown, Eye, RotateCcw, KeyRound } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -59,6 +59,8 @@ interface SchemasSidebarProps {
   onJoinTables: (baseTable: string, joins: JoinConfig[]) => void
   onViewTable: (tableName: string) => void
   onOpenSettings: () => void
+  onSyncNamedQueries?: () => void
+  onOpenSyncSettings?: () => void
   onRefreshSchema?: () => void
   schema?: SchemaGraph | null
 }
@@ -73,6 +75,8 @@ export function SchemasSidebar({
   onJoinTables,
   onViewTable,
   onOpenSettings,
+  onSyncNamedQueries,
+  onOpenSyncSettings,
   onRefreshSchema,
   schema,
 }: SchemasSidebarProps) {
@@ -400,6 +404,46 @@ export function SchemasSidebar({
           </TabsContent>
 
           <TabsContent value="queries" className="m-0 outline-none">
+            {/* Queries header row with sync controls */}
+            <div className="group flex items-center gap-2 rounded-md px-2 py-1 text-xs font-medium text-stone-600 hover:bg-stone-100">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <span className="uppercase tracking-wide">Saved queries</span>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <Badge
+                  variant="secondary"
+                  className="h-5 px-1.5 text-[11px] tabular-nums text-stone-600 bg-stone-100 border-stone-200"
+                >
+                  {filteredQueries.length}
+                </Badge>
+
+                {onOpenSyncSettings && (
+                  <div className="w-0 overflow-hidden opacity-0 group-hover:w-5 group-hover:opacity-100 transition-all duration-300 ease-in-out flex-shrink-0">
+                    <button
+                      onClick={() => onOpenSyncSettings()}
+                      className="p-0.5 hover:bg-stone-200 rounded text-stone-400 hover:text-stone-600 transition-colors outline-none"
+                      title="Sync settings"
+                    >
+                      <KeyRound className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {onSyncNamedQueries && (
+                  <div className="w-0 overflow-hidden opacity-0 group-hover:w-5 group-hover:opacity-100 transition-all duration-300 ease-in-out flex-shrink-0">
+                    <button
+                      onClick={() => onSyncNamedQueries()}
+                      className="p-0.5 hover:bg-stone-200 rounded text-stone-400 hover:text-stone-600 transition-colors outline-none"
+                      title="Sync saved queries"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="space-y-0.5">
               {filteredQueries.map((nq) => (
                 <div key={nq.id} className="group/item flex items-center">

@@ -8,6 +8,9 @@ import { NamedQueryEditor, type NamedQuery } from "./named-query-editor"
 import { SaveNamedQueryDialog } from "./save-named-query-dialog"
 import { DataGrid } from "./data-grid"
 import { ConnectionDialog } from "./connection-dialog"
+import { SyncSettingsDialog } from "./sync-settings-dialog"
+import { NamedQuerySyncConflictsDialog } from "./named-query-sync-conflicts-dialog"
+import { ToastAction } from "@/components/ui/toast"
 import { Button } from "@/components/ui/button"
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle, type ImperativePanelHandle } from "@/components/ui/resizable"
 import { Settings, PanelLeftClose, PanelLeft } from "lucide-react"
@@ -15,7 +18,7 @@ import { useToast } from "@/hooks/use-toast"
 import type { ClientConnectionMeta } from "@/lib/connections"
 import type { SchemaGraph } from "@/lib/schema-introspection"
 import { isReadOnlySql } from "@/lib/sql/safety"
-import { apiClient } from "@/lib/client/apiClient"
+import { ApiError, apiClient, type NamedQuerySyncResolution } from "@/lib/client/apiClient"
 
 type PoolMode = "single" | "shared" | "per-scope"
 
@@ -34,6 +37,21 @@ const deriveParamLabels = (sql: string, maxIndex: number): string[] => {
     }
   }
   return labels
+}
+
+function getErrorInfo(e: any): { status?: number; body?: any; message: string } {
+  if (e instanceof ApiError) return { status: e.status, body: e.body, message: e.message }
+
+  const status = typeof e?.status === "number" ? e.status : undefined
+  const body = e?.body
+  const message =
+    typeof e?.message === "string"
+      ? e.message
+      : typeof body?.error === "string"
+        ? body.error
+        : "Unknown error"
+
+  return { status, body, message }
 }
 
 const toSqlLiteral = (v: unknown): string => {
@@ -127,6 +145,12 @@ export function DbConsole() {
   const [showSaveNamedDialog, setShowSaveNamedDialog] = useState(false)
   const [editingNamedQuery, setEditingNamedQuery] = useState<NamedQuery | null>(null)
 
+  const [showSyncSettingsDialog, setShowSyncSettingsDialog] = useState(false)
+  const [syncBusy, setSyncBusy] = useState(false)
+  const [syncConflicts, setSyncConflicts] = useState<any[] | null>(null)
+  const [showSyncConflictsDialog, setShowSyncConflictsDialog] = useState(false)
+  const autoSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const [resultsByTab, setResultsByTab] = useState<{
     [tabId: string]: { columns: string[]; rows: Record<string, unknown>[]; durationMs: number; sqlDisplay?: string } | undefined
   }>({})
@@ -147,6 +171,91 @@ export function DbConsole() {
       })
     }
   }, [toast])
+
+  const reloadNamedQueries = useCallback(async () => {
+    const raw = await apiClient.namedQueries.list()
+    if (Array.isArray(raw)) {
+      const mapped: NamedQuery[] = raw.map((q: any) => ({
+        id: q.id,
+        name: q.name,
+        description: q.description,
+        query: q.sqlTemplate,
+        parameters: q.params,
+      }))
+      setNamedQueries(mapped)
+    }
+  }, [])
+
+  const handleSyncNamedQueries = useCallback(async () => {
+    if (syncBusy) return
+    setSyncBusy(true)
+    try {
+      await apiClient.syncer.namedQueries.sync()
+      await reloadNamedQueries()
+      toast({ title: "Synced saved queries" })
+    } catch (e: any) {
+      const info = getErrorInfo(e)
+
+      if (info.status === 409 || info.message === "Conflicts") {
+        const conflicts = info.body?.conflicts
+        if (Array.isArray(conflicts)) {
+          setSyncConflicts(conflicts)
+          setShowSyncConflictsDialog(true)
+          toast({
+            title: "Sync needs attention",
+            description: "Resolve conflicts to continue.",
+            action: (
+              <ToastAction altText="Resolve" onClick={() => setShowSyncConflictsDialog(true)}>
+                Resolve
+              </ToastAction>
+            ),
+          })
+        } else {
+          toast({ variant: "destructive", title: "Sync conflict", description: info.message })
+        }
+      } else if (info.status === 400) {
+        // Missing local settings (remote URL / phrase)
+        setShowSyncSettingsDialog(true)
+        toast({ variant: "destructive", title: "Sync not configured", description: info.message })
+      } else {
+        toast({ variant: "destructive", title: "Sync failed", description: info.message })
+      }
+    } finally {
+      setSyncBusy(false)
+    }
+  }, [reloadNamedQueries, syncBusy, toast])
+
+  const scheduleAutoSyncNamedQueries = useCallback(() => {
+    if (autoSyncTimerRef.current) clearTimeout(autoSyncTimerRef.current)
+    autoSyncTimerRef.current = setTimeout(() => {
+      void handleSyncNamedQueries()
+    }, 300)
+  }, [handleSyncNamedQueries])
+
+  const applySyncResolutions = useCallback(async (resolutions: NamedQuerySyncResolution[]) => {
+    if (syncBusy) return
+    setSyncBusy(true)
+    try {
+      await apiClient.syncer.namedQueries.sync({ resolutions })
+      await reloadNamedQueries()
+      setShowSyncConflictsDialog(false)
+      setSyncConflicts(null)
+      toast({ title: "Synced saved queries" })
+    } catch (e: any) {
+      const info = getErrorInfo(e)
+      if (info.status === 409 || info.message === "Conflicts") {
+        const conflicts = info.body?.conflicts
+        if (Array.isArray(conflicts)) {
+          setSyncConflicts(conflicts)
+          setShowSyncConflictsDialog(true)
+          return
+        }
+      }
+      toast({ variant: "destructive", title: "Sync failed", description: info.message })
+    } finally {
+      setSyncBusy(false)
+    }
+  }, [reloadNamedQueries, syncBusy, toast])
 
   // Load initial connections & named queries on mount
   useEffect(() => {
@@ -271,6 +380,8 @@ export function DbConsole() {
             : t,
         ),
       )
+
+      scheduleAutoSyncNamedQueries()
     } catch (e) {
       console.error("Failed to save named query", e)
     }
@@ -317,6 +428,8 @@ export function DbConsole() {
         title: "Query updated",
         description: "Saved changes to named query."
       })
+
+      scheduleAutoSyncNamedQueries()
     } catch (e: any) {
       console.error("Failed to update named query", e)
       toast({
@@ -653,6 +766,8 @@ export function DbConsole() {
                         onJoinTables={handleJoinTables}
                         onViewTable={handleViewTable}
                         onOpenSettings={() => setShowConnectionDialog(true)}
+                        onOpenSyncSettings={() => setShowSyncSettingsDialog(true)}
+                        onSyncNamedQueries={handleSyncNamedQueries}
                         onRefreshSchema={() => {
                           if (activeConnection) {
                             void loadSchema(activeConnection)
@@ -776,6 +891,27 @@ export function DbConsole() {
         }}
         onPoolModeChange={(mode) => setPoolMode(mode)}
       />
+
+      <SyncSettingsDialog
+        open={showSyncSettingsDialog}
+        onOpenChange={setShowSyncSettingsDialog}
+        onSaved={() => {
+          toast({ title: "Sync settings saved" })
+          void handleSyncNamedQueries()
+        }}
+        onCleared={() => {
+          toast({ title: "Sync disabled on this device" })
+        }}
+      />
+
+      {syncConflicts && (
+        <NamedQuerySyncConflictsDialog
+          open={showSyncConflictsDialog}
+          onOpenChange={setShowSyncConflictsDialog}
+          conflicts={syncConflicts as any}
+          onApply={applySyncResolutions}
+        />
+      )}
 
       <SaveNamedQueryDialog
         key={`${showSaveNamedDialog ? "open" : "closed"}:${editingNamedQuery?.id ?? "new"}:${editingNamedQuery ? "edit" : "create"}`}

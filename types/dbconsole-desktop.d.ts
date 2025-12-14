@@ -1,4 +1,4 @@
-export {}
+export { }
 
 declare global {
     type DesktopIpcResponse<T> = Promise<T>
@@ -31,6 +31,15 @@ declare global {
                 }
                 query: {
                     run: (payload: unknown) => DesktopIpcResponse<unknown>
+                }
+                syncer: {
+                    settings: {
+                        get: () => DesktopIpcResponse<unknown>
+                        set: (payload: unknown) => DesktopIpcResponse<unknown>
+                    }
+                    namedQueries: {
+                        sync: (payload?: unknown) => DesktopIpcResponse<unknown>
+                    }
                 }
             }
         }
