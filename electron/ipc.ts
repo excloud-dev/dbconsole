@@ -30,6 +30,8 @@ import {
     setShortcutsKeymap,
     setShortcutsOverride,
 } from '@/lib/core/shortcuts-settings'
+import { ElectronUpdater } from '@/lib/updater/electron-updater'
+import type { UpdateSettings as CoreUpdateSettings, TimeWindow } from '@/lib/updater/types'
 
 type IpcResponse = { status: number; body: unknown }
 
@@ -68,6 +70,88 @@ function tryGetDevGitShaShort(): string | undefined {
     } catch {
         return undefined
     }
+}
+
+type UiMaintenanceWindow = {
+    enabled: boolean
+    startTime: string // HH:MM
+    endTime: string // HH:MM
+    timezone: string
+}
+
+type UiUpdateSettings = {
+    autoCheck: boolean
+    autoInstall: boolean
+    checkInterval: number // hours
+    updateChannel: 'latest' | 'prerelease' | 'custom'
+    customTagPattern?: string
+    maintenanceWindow?: UiMaintenanceWindow
+}
+
+function parseHourFromTimeString(time: string): number {
+    const match = /^\s*(\d{1,2})(?::(\d{2}))?\s*$/.exec(time)
+    if (!match) throw new Error(`Invalid time format: ${time}`)
+    const hour = Number(match[1])
+    if (!Number.isInteger(hour) || hour < 0 || hour > 23) throw new Error(`Invalid hour: ${time}`)
+    return hour
+}
+
+function pad2(n: number): string {
+    return String(n).padStart(2, '0')
+}
+
+function hourToTimeString(hour: number): string {
+    return `${pad2(hour)}:00`
+}
+
+function uiMaintenanceToCore(mw: UiMaintenanceWindow | undefined): TimeWindow | undefined {
+    if (!mw || !mw.enabled) return undefined
+    const startHour = parseHourFromTimeString(mw.startTime)
+    const endHour = parseHourFromTimeString(mw.endTime)
+    return {
+        startHour,
+        endHour,
+        // UI currently doesn't expose day selection; default to every day.
+        days: [0, 1, 2, 3, 4, 5, 6]
+    }
+}
+
+function coreMaintenanceToUi(mw: TimeWindow | undefined): UiMaintenanceWindow | undefined {
+    if (!mw) return undefined
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    return {
+        enabled: true,
+        startTime: hourToTimeString(mw.startHour),
+        endTime: hourToTimeString(mw.endHour),
+        timezone
+    }
+}
+
+function coreToUiSettings(settings: CoreUpdateSettings): UiUpdateSettings {
+    return {
+        autoCheck: settings.autoCheck,
+        autoInstall: settings.autoInstall,
+        checkInterval: settings.checkInterval,
+        updateChannel: settings.updateChannel,
+        customTagPattern: settings.customTagPattern,
+        maintenanceWindow: coreMaintenanceToUi(settings.maintenanceWindow)
+    }
+}
+
+function mergeUiPatchIntoCoreSettings(current: CoreUpdateSettings, patch: Partial<UiUpdateSettings>): CoreUpdateSettings {
+    const next: CoreUpdateSettings = {
+        ...current,
+        ...patch,
+        customTagPattern: patch.customTagPattern === '' ? undefined : patch.customTagPattern ?? current.customTagPattern,
+        maintenanceWindow: patch.maintenanceWindow ? uiMaintenanceToCore(patch.maintenanceWindow) : current.maintenanceWindow
+    }
+
+    // If maintenance window patch disables, clear it.
+    if (patch.maintenanceWindow && patch.maintenanceWindow.enabled === false) {
+        next.maintenanceWindow = undefined
+    }
+
+    return next
 }
 
 const PoolModeSchema = z.enum(['single', 'shared', 'per-scope']).optional()
@@ -155,6 +239,9 @@ const SyncResolutionSchema: z.ZodType<NamedQuerySyncResolution> = z.discriminate
 
 const RuntimeSchema = z.enum(['web', 'desktop'])
 
+// Initialize updater (will be set up in registerDesktopIpcHandlers)
+let electronUpdater: ElectronUpdater | null = null
+
 const ShortcutsPayloadSchema = z.object({
     overrides: z
         .object({
@@ -171,6 +258,30 @@ const ShortcutsPayloadSchema = z.object({
 })
 
 export function registerDesktopIpcHandlers(): void {
+    // Initialize the Electron updater
+    // Allow overrides via env vars for forks/private deployments.
+    const repoOwner = (process.env.GITHUB_REPO_OWNER || process.env.DBCONSOLE_GITHUB_OWNER || 'excloud-in').trim()
+    const repoName = (process.env.GITHUB_REPO_NAME || process.env.DBCONSOLE_GITHUB_REPO || 'dbconsole').trim()
+
+    electronUpdater = new ElectronUpdater({
+        owner: repoOwner,
+        repo: repoName,
+        // The current updater flow downloads GitHub release assets directly.
+        // Disable electron-updater integration by default until a publish provider
+        // is configured and we're actually using autoUpdater for downloads.
+        enableElectronUpdater: false,
+        // Don't auto-restart; the installer handoff flow requires the user to complete
+        // the OS-level install and then relaunch the app.
+        quitAndInstall: false,
+        // Respect user intent: only check when invoked from the UI/menu unless enabled later.
+        checkOnStartup: false,
+        autoStart: false
+    })
+
+    // Initialize the updater
+    electronUpdater.initialize().catch(error => {
+        console.error('Failed to initialize updater:', error)
+    })
     ipcMain.handle('dbconsole:app:info', () => {
         const buildInfo = readBuildInfo()
         return ok({
@@ -462,6 +573,218 @@ export function registerDesktopIpcHandlers(): void {
             if (e instanceof z.ZodError) return err(400, { error: 'Invalid sync payload', issues: e.issues })
             const message = e instanceof Error ? e.message : 'Sync failed'
             return err(500, { error: message })
+        }
+    })
+
+    // --- Update System ---
+
+    ipcMain.handle('dbconsole:updater:check', async () => {
+        if (!electronUpdater) {
+            return err(500, { error: 'Updater not initialized' })
+        }
+
+        try {
+            const updateInfo = await electronUpdater.checkForUpdates()
+            return ok(updateInfo)
+        } catch (e) {
+            const message = e instanceof Error ? e.message : 'Update check failed'
+            return err(500, { error: message })
+        }
+    })
+
+    ipcMain.handle('dbconsole:updater:install', async (_evt, payload: unknown) => {
+        if (!electronUpdater) {
+            return err(500, { error: 'Updater not initialized' })
+        }
+
+        const schema = z.object({
+            version: z.string().min(1),
+            releaseNotes: z.string(),
+            downloadUrl: z.string().url(),
+            checksum: z.string(),
+            publishedAt: z.string(),
+            isPrerelease: z.boolean()
+        })
+
+        try {
+            const parsed = schema.parse(payload)
+            const updateInfo = {
+                ...parsed,
+                publishedAt: new Date(parsed.publishedAt)
+            }
+
+            await electronUpdater.downloadAndInstall(updateInfo)
+            return ok({ success: true })
+        } catch (e) {
+            if (e instanceof z.ZodError) return err(400, { error: 'Invalid update info', issues: e.issues })
+            const message = e instanceof Error ? e.message : 'Installation failed'
+            return err(500, { error: message })
+        }
+    })
+
+    ipcMain.handle('dbconsole:updater:state', () => {
+        if (!electronUpdater) {
+            return err(500, { error: 'Updater not initialized' })
+        }
+
+        try {
+            const state = electronUpdater.getState()
+            return ok(state)
+        } catch (e) {
+            const message = e instanceof Error ? e.message : 'Failed to get updater state'
+            return err(500, { error: message })
+        }
+    })
+
+    ipcMain.handle('dbconsole:updater:history', async () => {
+        if (!electronUpdater) {
+            return err(500, { error: 'Updater not initialized' })
+        }
+
+        try {
+            const history = await electronUpdater.getUpdateHistory()
+            return ok(history)
+        } catch (e) {
+            const message = e instanceof Error ? e.message : 'Failed to get update history'
+            return err(500, { error: message })
+        }
+    })
+
+    ipcMain.handle('dbconsole:updater:settings:get', async () => {
+        try {
+            if (!electronUpdater) {
+                // Return defaults with autoCheck disabled by default
+                return ok({
+                    autoCheck: false,
+                    autoInstall: false,
+                    checkInterval: 24,
+                    updateChannel: 'latest'
+                } satisfies UiUpdateSettings)
+            }
+
+            const coreSettings = await electronUpdater.getUpdateSettings()
+            return ok(coreToUiSettings(coreSettings))
+        } catch (e) {
+            return ok({
+                autoCheck: false,
+                autoInstall: false,
+                checkInterval: 24,
+                updateChannel: 'latest'
+            } satisfies UiUpdateSettings)
+        }
+    })
+
+    ipcMain.handle('dbconsole:updater:settings:set', async (_evt, payload: unknown) => {
+        if (!electronUpdater) {
+            return err(500, { error: 'Updater not initialized' })
+        }
+
+        const schema = z.object({
+            autoCheck: z.boolean().optional(),
+            autoInstall: z.boolean().optional(),
+            checkInterval: z.number().int().positive().optional(),
+            updateChannel: z.enum(['latest', 'prerelease', 'custom']).optional(),
+            customTagPattern: z.string().optional(),
+            maintenanceWindow: z
+                .object({
+                    enabled: z.boolean(),
+                    startTime: z.string(),
+                    endTime: z.string(),
+                    timezone: z.string()
+                })
+                .optional()
+        })
+
+        try {
+            const parsed = schema.parse(payload)
+
+            const current = await electronUpdater.getUpdateSettings()
+            const merged = mergeUiPatchIntoCoreSettings(current, parsed)
+            await electronUpdater.setUpdateSettings(merged)
+
+            return ok({ success: true, settings: coreToUiSettings(merged) })
+        } catch (e) {
+            if (e instanceof z.ZodError) return err(400, { error: 'Invalid settings', issues: e.issues })
+            return err(500, { error: e instanceof Error ? e.message : 'Failed to save settings' })
+        }
+    })
+
+    ipcMain.handle('dbconsole:updater:token:validate', async (_evt, payload: unknown) => {
+        const schema = z.object({
+            token: z.string().min(1)
+        })
+
+        try {
+            const parsed = schema.parse(payload)
+
+            // Test the token by making a GitHub API call
+            const response = await fetch('https://api.github.com/user', {
+                headers: {
+                    'Authorization': `Bearer ${parsed.token}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'User-Agent': 'DBConsole-Updater/1.0.0'
+                }
+            })
+
+            if (response.status === 401) {
+                return ok({ valid: false, error: 'Invalid or expired token' })
+            }
+
+            if (!response.ok) {
+                return ok({ valid: false, error: `GitHub API error: ${response.status} ${response.statusText}` })
+            }
+
+            // Check token scopes
+            const scopes = response.headers.get('x-oauth-scopes')
+            const scopeList = scopes ? scopes.split(',').map(s => s.trim()).filter(s => s.length > 0) : []
+            const hasRepoScope = scopeList.includes('repo')
+
+            if (!hasRepoScope) {
+                return ok({
+                    valid: false,
+                    error: 'Token needs "repo" scope for private repository access',
+                    scopes: scopeList
+                })
+            }
+
+            return ok({
+                valid: true,
+                scopes: scopeList,
+                message: 'Token is valid and has required permissions'
+            })
+        } catch (e) {
+            if (e instanceof z.ZodError) return err(400, { error: 'Invalid token format', issues: e.issues })
+            return err(500, { error: 'Failed to validate token' })
+        }
+    })
+
+    ipcMain.handle('dbconsole:updater:token:exists', async () => {
+        try {
+            if (!electronUpdater) return ok({ exists: false })
+            const token = await electronUpdater.getGitHubToken()
+            return ok({ exists: !!token })
+        } catch (e) {
+            return ok({ exists: false })
+        }
+    })
+
+    ipcMain.handle('dbconsole:updater:token:set', async (_evt, payload: unknown) => {
+        const schema = z.object({
+            token: z.string().min(1)
+        })
+
+        try {
+            const parsed = schema.parse(payload)
+
+            if (!electronUpdater) {
+                return err(500, { error: 'Updater not initialized' })
+            }
+
+            await electronUpdater.setGitHubToken(parsed.token)
+            return ok({ success: true })
+        } catch (e) {
+            if (e instanceof z.ZodError) return err(400, { error: 'Invalid token', issues: e.issues })
+            return err(500, { error: e instanceof Error ? e.message : 'Failed to save token' })
         }
     })
 }

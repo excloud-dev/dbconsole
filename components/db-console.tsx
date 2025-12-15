@@ -25,6 +25,8 @@ import { listCommands } from "@/lib/shortcuts/commands"
 import { useShortcutsContext } from "@/components/shortcuts/ShortcutsProvider"
 import { parseBinding } from "@/lib/shortcuts/parse"
 import { formatBinding } from "@/lib/shortcuts/format"
+import { MenuHandler } from "./menu-handler"
+
 
 type PoolMode = "single" | "shared" | "per-scope"
 
@@ -1104,6 +1106,8 @@ export function DbConsole() {
           ))}
         </CommandList>
       </CommandDialog>
+
+      <MenuHandler />
     </>
   )
 }

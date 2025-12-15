@@ -42,6 +42,29 @@ jobs:
       - name: Extract release notes from CHANGELOG
         run: node scripts/extract-release-notes.mjs "${GITHUB_REF_NAME}"
 
+      - name: Append SHA256 checksums (for updater verification)
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          dmgs=(dist/electron-build/*.dmg)
+          if [ ${#dmgs[@]} -eq 0 ]; then
+            echo "No DMG artifacts found in dist/electron-build" >&2
+            exit 1
+          fi
+
+          {
+            echo ""
+            echo "---"
+            echo "SHA256 checksums:"
+            for dmg in "${dmgs[@]}"; do
+              file="$(basename "$dmg")"
+              hash="$(shasum -a 256 "$dmg" | awk '{print $1}')"
+              echo "${hash}  ${file}"
+            done
+          } >> release-notes.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:

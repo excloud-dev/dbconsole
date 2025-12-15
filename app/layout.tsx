@@ -4,6 +4,8 @@ import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from "@/components/ui/toaster"
+import { WebUpdateNotification } from "@/components/web-update-notification"
+import { ServiceWorkerProvider } from "@/components/service-worker-provider"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -23,9 +25,12 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable} h-full overflow-hidden`}>
       <body className={`font-sans antialiased h-full overflow-hidden bg-stone-50`}>
-        {children}
-        <Toaster />
-        <Analytics />
+        <ServiceWorkerProvider>
+          {children}
+          <WebUpdateNotification />
+          <Toaster />
+          <Analytics />
+        </ServiceWorkerProvider>
       </body>
     </html>
   )

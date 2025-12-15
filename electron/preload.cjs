@@ -62,6 +62,21 @@ contextBridge.exposeInMainWorld('dbconsole', {
       set: (payload) => invoke('dbconsole:syncer:settings:set', payload),
       sync: (payload) => invoke('dbconsole:syncer:namedQueries:sync', payload ?? {}),
     },
+    updater: {
+      check: () => invoke('dbconsole:updater:check'),
+      install: (updateInfo) => invoke('dbconsole:updater:install', updateInfo),
+      state: () => invoke('dbconsole:updater:state'),
+      history: () => invoke('dbconsole:updater:history'),
+      settings: {
+        get: () => invoke('dbconsole:updater:settings:get'),
+        set: (settings) => invoke('dbconsole:updater:settings:set', settings),
+      },
+      token: {
+        exists: () => invoke('dbconsole:updater:token:exists'),
+        validate: (token) => invoke('dbconsole:updater:token:validate', { token }),
+        set: (token) => invoke('dbconsole:updater:token:set', { token }),
+      },
+    },
   },
   events: {
     onSqlFileOpen: (handler) => {
@@ -71,6 +86,30 @@ contextBridge.exposeInMainWorld('dbconsole', {
       }
       ipcRenderer.on('dbconsole:sqlFile:open', listener)
       return () => ipcRenderer.removeListener('dbconsole:sqlFile:open', listener)
+    },
+    onMenuAbout: (handler) => {
+      if (typeof handler !== 'function') return () => { }
+      const listener = () => {
+        handler()
+      }
+      ipcRenderer.on('dbconsole:menu:about', listener)
+      return () => ipcRenderer.removeListener('dbconsole:menu:about', listener)
+    },
+    onMenuCheckUpdates: (handler) => {
+      if (typeof handler !== 'function') return () => { }
+      const listener = () => {
+        handler()
+      }
+      ipcRenderer.on('dbconsole:menu:checkUpdates', listener)
+      return () => ipcRenderer.removeListener('dbconsole:menu:checkUpdates', listener)
+    },
+    onMenuUpdateSettings: (handler) => {
+      if (typeof handler !== 'function') return () => { }
+      const listener = () => {
+        handler()
+      }
+      ipcRenderer.on('dbconsole:menu:updateSettings', listener)
+      return () => ipcRenderer.removeListener('dbconsole:menu:updateSettings', listener)
     },
   },
 })

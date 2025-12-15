@@ -5,10 +5,10 @@
   "homepage": "https://excloud.com",
   "repository": {
     "type": "git",
-    "url": "https://github.com/excloud/dbconsole"
+    "url": "https://github.com/excloud-in/dbconsole"
   },
   "bugs": {
-    "url": "https://github.com/excloud/dbconsole/issues"
+    "url": "https://github.com/excloud-in/dbconsole/issues"
   },
   "version": "0.3.0",
   "private": true,
@@ -74,7 +74,9 @@
     "codemirror": "^6.0.2",
     "date-fns": "4.1.0",
     "drizzle-orm": "^0.45.0",
+    "electron-updater": "^6.6.2",
     "embla-carousel-react": "8.5.1",
+    "fast-check": "^4.4.0",
     "geist": "^1.5.1",
     "input-otp": "1.4.1",
     "lucide-react": "^0.454.0",
@@ -87,6 +89,7 @@
     "react-hook-form": "^7.60.0",
     "react-resizable-panels": "^2.1.7",
     "recharts": "2.15.4",
+    "semver": "^7.7.3",
     "sonner": "^1.7.4",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
@@ -101,6 +104,7 @@
     "@types/pg": "^8.15.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/semver": "^7.7.1",
     "electron": "^39.2.6",
     "electron-builder": "^26.0.12",
     "eslint": "^9.39.1",

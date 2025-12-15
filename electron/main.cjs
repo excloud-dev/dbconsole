@@ -176,7 +176,35 @@ function installAppMenu() {
       ? [
         {
           label: app.name,
-          submenu: [{ role: 'about' }, { type: 'separator' }, { role: 'quit' }],
+          submenu: [
+            {
+              label: 'About DBConsole',
+              click: () => {
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                  mainWindow.webContents.send('dbconsole:menu:about')
+                }
+              }
+            },
+            { type: 'separator' },
+            {
+              label: 'Check for Updates…',
+              click: () => {
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                  mainWindow.webContents.send('dbconsole:menu:checkUpdates')
+                }
+              }
+            },
+            {
+              label: 'Update Settings…',
+              click: () => {
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                  mainWindow.webContents.send('dbconsole:menu:updateSettings')
+                }
+              }
+            },
+            { type: 'separator' },
+            { role: 'quit' }
+          ],
         },
       ]
       : []),
@@ -225,6 +253,40 @@ function installAppMenu() {
       label: 'Window',
       submenu: isMac ? [{ role: 'minimize' }, { role: 'zoom' }] : [{ role: 'minimize' }, { role: 'close' }],
     },
+    ...(!isMac
+      ? [
+        {
+          label: 'Help',
+          submenu: [
+            {
+              label: 'About DBConsole',
+              click: () => {
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                  mainWindow.webContents.send('dbconsole:menu:about')
+                }
+              }
+            },
+            { type: 'separator' },
+            {
+              label: 'Check for Updates…',
+              click: () => {
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                  mainWindow.webContents.send('dbconsole:menu:checkUpdates')
+                }
+              }
+            },
+            {
+              label: 'Update Settings…',
+              click: () => {
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                  mainWindow.webContents.send('dbconsole:menu:updateSettings')
+                }
+              }
+            }
+          ],
+        },
+      ]
+      : []),
   ]
 
   const menu = Menu.buildFromTemplate(template)

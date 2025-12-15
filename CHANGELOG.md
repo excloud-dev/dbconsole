@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.4.0 - 2025-12-15
+
+- feat: GitHub-based desktop auto-updater (private repo friendly) wired end-to-end: Electron menu actions → preload bridge → IPC → updater core (`lib/updater/*`) with token storage, settings/policy, update state/progress, download + SHA256 verification, and an installer “handoff” flow (opens the downloaded DMG/installer via the OS and prompts the user to complete install + relaunch).
+- feat: Web update awareness: `/api/app-info` endpoint returns build/version metadata and (optionally) GitHub release update info when a server-side `GITHUB_TOKEN` is configured, enabling a lightweight “update available” banner for hosted deployments.
+- security: harden update UI + web runtime by rendering release notes as plain text (no HTML injection) and by making the service worker intentionally conservative (no blanket navigation caching; update checks are message-based via `/api/app-info` with `no-store`).
+- ci: release workflow improvements for updater verification — append SHA256 checksums for published DMG assets into GitHub Release notes so the desktop updater can validate downloads reliably.
+- tests/docs: add extensive updater test coverage (integration + resilience scenarios) and supporting design/spec docs to make the update system maintainable.
+
 ## v0.3.0 - 2025-12-14
 
 - feat: landed the centralized keyboard shortcut stack (`lib/shortcuts/*`, `ShortcutsProvider`, `useCommand`, `/api/shortcuts` route, desktop IPC/preload bindings, `apiClient` plumbing, `SHORTCUTS.md`) and wired it into both runtimes (`WebShortcutsRoot`, desktop renderer provider) plus the new “Keyboard Shortcuts” dialog off the Connections modal.
