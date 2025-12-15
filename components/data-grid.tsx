@@ -2,15 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
-  useReactTable,
-  getCoreRowModel,
-  flexRender,
-  getSortedRowModel,
-  SortingState,
+  Column,
   ColumnDef,
+  SortingState,
+  flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  useReactTable,
 } from "@tanstack/react-table"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { rowsToCsv } from "@/lib/csv"
 import { CellDetailDialog } from "./cell-detail-dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 
@@ -93,6 +95,23 @@ function calculateColumnWidths(columns: string[], data: Record<string, unknown>[
   return sizing
 }
 
+type ColumnFieldMeta = { field?: string }
+
+function resolveColumnField(column: Column<Record<string, unknown>, unknown>): string {
+  const meta = column.columnDef.meta as ColumnFieldMeta | undefined
+  if (meta?.field) return meta.field
+  const header = column.columnDef.header
+  if (header) return String(header)
+  return column.id
+}
+
+function formatTimestampForFilename(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, "0")
+  const dateSegment = `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}`
+  const timeSegment = `${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`
+  return `${dateSegment}-${timeSegment}`
+}
+
 export function DataGrid({ columns: rawColumns, data, loading, error, executedSql, pagination, onPageChange, onLimitChange }: DataGridProps) {
   const [sorting, setSorting] = useState<SortingState>([])
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -143,8 +162,11 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
     const maxR = Math.max(selection.start.r, selection.end.r)
     const minC = Math.min(selection.start.c, selection.end.c)
     const maxC = Math.max(selection.start.c, selection.end.c)
-    // Row is selected if the selection spans the full row width (all columns)
-    return r >= minR && r <= maxR && minC === 0 && maxC === rawColumns.length - 1
+    const visibleCols = getVisibleColumnFields()
+    if (visibleCols.length === 0) return false
+    const lastVisibleIndex = visibleCols.length - 1
+    // Row is selected if the selection spans the full row width (all visible columns)
+    return r >= minR && r <= maxR && minC === 0 && maxC === lastVisibleIndex
   }
 
   const isAllSelected = () => {
@@ -153,8 +175,10 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
     const maxR = Math.max(selection.start.r, selection.end.r)
     const minC = Math.min(selection.start.c, selection.end.c)
     const maxC = Math.max(selection.start.c, selection.end.c)
-
-    return minR === 0 && maxR === data.length - 1 && minC === 0 && maxC === rawColumns.length - 1
+    const visibleCols = getVisibleColumnFields()
+    if (visibleCols.length === 0) return false
+    const lastVisibleIndex = visibleCols.length - 1
+    return minR === 0 && maxR === data.length - 1 && minC === 0 && maxC === lastVisibleIndex
   }
 
   // Copy helpers
@@ -164,43 +188,127 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
     return String(val)
   }, [])
 
+  // Mouse Handlers for Drag Selection (Global Up)
+  useEffect(() => {
+    const handleGlobalMouseUp = () => setIsDragging(false)
+    window.addEventListener("mouseup", handleGlobalMouseUp)
+    return () => window.removeEventListener("mouseup", handleGlobalMouseUp)
+  }, [])
+
+  const handleMouseDown = (r: number, c: number, e: React.MouseEvent) => {
+    if (e.button !== 0) return // Only left click
+    e.preventDefault()
+    setIsDragging(true)
+
+    const isShift = e.shiftKey
+
+    if (isShift && selection) {
+      setSelection({ ...selection, end: { r, c } })
+    } else if (e.metaKey || e.ctrlKey) {
+      setSelection({ start: { r, c }, end: { r, c } })
+    } else {
+      setSelection({ start: { r, c }, end: { r, c } })
+    }
+    setLastSelectedRow(r)
+  }
+
+  const handleMouseEnter = (r: number, c: number) => {
+    if (isDragging && selection) {
+      setSelection({ ...selection, end: { r, c } })
+    }
+  }
+
+  // Memoize columns definition
+  const columns = useMemo<ColumnDef<Record<string, unknown>>[]>(
+    () =>
+      rawColumns.map((col, index) => ({
+        id: `${col}-${index}`,
+        header: col,
+        size: 100,
+        minSize: 70,
+        maxSize: 600,
+        accessorFn: (row) => row[col],
+        cell: (info) => formatCellValue(info.getValue()),
+        meta: { executedSql, field: col },
+      })),
+    [rawColumns, executedSql],
+  )
+
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const table = useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    onSortingChange: setSorting,
+    onColumnSizingChange: setColumnSizing,
+    columnResizeMode: "onChange",
+    onColumnVisibilityChange: setColumnVisibility, // Enable visibility handler
+    defaultColumn: {
+      size: 100,
+      minSize: 70,
+      maxSize: 600,
+    },
+    state: {
+      sorting,
+      columnSizing,
+      columnVisibility,
+    },
+  })
+
+  const getVisibleColumnFields = useCallback(() => {
+    return table.getVisibleLeafColumns().map((column) => resolveColumnField(column))
+  }, [table])
+
+  const downloadCsv = useCallback(() => {
+    if (data.length === 0) return
+
+    const visibleFields = getVisibleColumnFields()
+    if (visibleFields.length === 0) return
+
+    const csv = rowsToCsv(visibleFields, data)
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `dbconsole-results-${formatTimestampForFilename(new Date())}.csv`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }, [data, getVisibleColumnFields])
+
   const handleSmartCopy = useCallback(() => {
-    // User Logic: "copy button should only copy selected"
-    // If nothing selected, we do NOT copy all.
-    if (!selection || !data || data.length === 0) return
+    if (!selection || data.length === 0) return
+
+    const visibleColumns = getVisibleColumnFields()
+    if (visibleColumns.length === 0) return
 
     const minR = Math.min(selection.start.r, selection.end.r)
     const maxR = Math.max(selection.start.r, selection.end.r)
     const minC = Math.min(selection.start.c, selection.end.c)
     const maxC = Math.max(selection.start.c, selection.end.c)
 
-    const visibleCols = rawColumns
-
     let tsv = ""
     for (let r = minR; r <= maxR; r++) {
       const rowData = data[r]
       const rowVals: string[] = []
       for (let c = minC; c <= maxC; c++) {
-        const colName = visibleCols[c]
-        if (columnVisibility[colName] === false) continue
+        const colName = visibleColumns[c]
+        if (!colName) continue
 
         const val = rowData[colName]
-        // Use stringifyVal to fix [object Object] bug
         rowVals.push(stringifyVal(val))
       }
       tsv += rowVals.join("\t") + "\n"
     }
 
-    // Set UI state immediately so keyboard copy and button click feel identical.
     setIsCopied(true)
     if (copyResetTimerRef.current) clearTimeout(copyResetTimerRef.current)
-    // Best-effort: reset after a moment even if clipboard fails (permissions, etc).
     copyResetTimerRef.current = setTimeout(() => setIsCopied(false), 2000)
 
-    navigator.clipboard.writeText(tsv).catch(() => {
-      // Leave "Copied" feedback short-lived; we don't toast here to avoid noise.
-    })
-  }, [columnVisibility, data, rawColumns, selection, stringifyVal])
+    navigator.clipboard.writeText(tsv).catch(() => { })
+  }, [data, getVisibleColumnFields, selection, stringifyVal])
 
   useCommand("results.copySelection", (e) => {
     if (!selection) return false
@@ -244,74 +352,6 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
     return true
   })
 
-  // Mouse Handlers for Drag Selection (Global Up)
-  useEffect(() => {
-    const handleGlobalMouseUp = () => setIsDragging(false)
-    window.addEventListener("mouseup", handleGlobalMouseUp)
-    return () => window.removeEventListener("mouseup", handleGlobalMouseUp)
-  }, [])
-
-  const handleMouseDown = (r: number, c: number, e: React.MouseEvent) => {
-    if (e.button !== 0) return // Only left click
-    e.preventDefault()
-    setIsDragging(true)
-
-    const isShift = e.shiftKey
-
-    if (isShift && selection) {
-      setSelection({ ...selection, end: { r, c } })
-    } else if (e.metaKey || e.ctrlKey) {
-      setSelection({ start: { r, c }, end: { r, c } })
-    } else {
-      setSelection({ start: { r, c }, end: { r, c } })
-    }
-    setLastSelectedRow(r)
-  }
-
-  const handleMouseEnter = (r: number, c: number) => {
-    if (isDragging && selection) {
-      setSelection({ ...selection, end: { r, c } })
-    }
-  }
-
-  // Memoize columns definition
-  const columns = useMemo<ColumnDef<Record<string, unknown>>[]>(
-    () =>
-      rawColumns.map((col, index) => ({
-        id: `${col}-${index}`,
-        header: col,
-        size: 100,
-        minSize: 70,
-        maxSize: 600,
-        accessorFn: (row) => row[col],
-        cell: (info) => formatCellValue(info.getValue()),
-        meta: { executedSql },
-      })),
-    [rawColumns, executedSql],
-  )
-
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const table = useReactTable({
-    data,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    onSortingChange: setSorting,
-    onColumnSizingChange: setColumnSizing,
-    columnResizeMode: "onChange",
-    onColumnVisibilityChange: setColumnVisibility, // Enable visibility handler
-    defaultColumn: {
-      size: 100,
-      minSize: 70,
-      maxSize: 600,
-    },
-    state: {
-      sorting,
-      columnSizing,
-      columnVisibility,
-    },
-  })
-
   // Loading/Error Checks
   if (loading && data.length === 0) {
     return (
@@ -350,7 +390,8 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
     e.preventDefault()
     e.stopPropagation()
 
-    const colsCount = rawColumns.length
+    const colsCount = getVisibleColumnFields().length
+    if (colsCount === 0) return
 
     if (e.shiftKey && selection) {
       setIsDragging(true)
@@ -428,11 +469,26 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
                       }
                     }}
                   >
-                    <div className={cn(
-                      "h-full w-full flex items-center justify-center text-[10px] font-mono",
-                      isAllSelected() ? "text-stone-700 font-bold" : "text-stone-400"
-                    )}>
-                      ALL
+                    <div
+                      className={cn(
+                        "h-full w-full flex items-center justify-center text-[10px] font-mono select-none gap-2",
+                        isAllSelected() ? "text-stone-700 font-bold" : "text-stone-400"
+                      )}
+                    >
+                      <span>ALL</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-stone-400 hover:text-stone-600 hover:bg-stone-200/70"
+                        disabled={data.length === 0}
+                        title="Download current page CSV"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          downloadCsv()
+                        }}
+                      >
+                        <FileDown className="h-4 w-4" />
+                      </Button>
                     </div>
                   </th>
 
@@ -594,6 +650,17 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
             >
               {isCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
               <span className="text-xs font-medium">{isCopied ? "Copied!" : "Copy Selected"}</span>
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={data.length === 0}
+              className="h-7 gap-1.5 border border-stone-100 text-stone-500 hover:bg-stone-100 hover:text-stone-700 shadow-sm"
+              onClick={downloadCsv}
+            >
+              <FileDown className="h-3.5 w-3.5" />
+              <span className="text-xs font-medium">Download CSV</span>
             </Button>
 
             <div className="h-4 w-px bg-stone-300/60 mx-2" />

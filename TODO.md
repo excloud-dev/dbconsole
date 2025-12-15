@@ -7,7 +7,8 @@
 - [x] Disable/strip sourcemaps in release builds (Vite renderer + IPC bundle) and stop shipping `dist/electron/ipc.cjs.map`.
 - [ ] Explore tauri instead of electron for leaner dmg and maybe perf?
 - [ ] Explore native packaging with native swiftui appkit views. May need to build a custom bridge?? or get rid of ipc.
-- [ ] Updater
+- [x] Updater
+- [ ] Make updater better. Try to get vscode style updates! Currenly its very primitive.
 
 ## API & Backend
 - [x] Syncer api endpoint to allow syncing of named queries. Need to handle conflict resolution properly. Add a diff panel for this.
@@ -26,3 +27,7 @@
 - [ ] Fix setting modal styling, make it consistent with the rest of the app.
 - [x] Shortcuts! But want to do this via a seperate interface if possible so we can remap shortcuts from settings if needed. Disable some for web or have sensible defaults for web vs desktop.
 - [ ] Add support to open sql files in desktop.
+- [ ] Dark mode!
+- [ ] Fix fullscreen datagrid view. 
+- [ ] When cells are highlighed, it looks a little off. investigate.
+- [ ] Fix the toggle columns modal/dialog thing.
