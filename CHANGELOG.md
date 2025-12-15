@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.4.1 - 2025-12-15
+
+- feat: enhance DataGrid functionality with CSV download support, improve selection handling, and refine column visibility logic (d43df95)
+
 ## v0.4.0 - 2025-12-15
 
 - feat: GitHub-based desktop auto-updater (private repo friendly) wired end-to-end: Electron menu actions → preload bridge → IPC → updater core (`lib/updater/*`) with token storage, settings/policy, update state/progress, download + SHA256 verification, and an installer “handoff” flow (opens the downloaded DMG/installer via the OS and prompts the user to complete install + relaunch).
