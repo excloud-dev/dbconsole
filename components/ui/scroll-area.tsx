@@ -5,11 +5,20 @@ import * as ScrollAreaPrimitive from '@radix-ui/react-scroll-area'
 
 import { cn } from '@/lib/utils'
 
+type ScrollAreaProps = React.ComponentProps<typeof ScrollAreaPrimitive.Root> & {
+  /**
+   * When true, render a horizontal scrollbar in addition to the vertical one.
+   * Useful for log-like / checksum / code blocks.
+   */
+  showHorizontalScrollbar?: boolean
+}
+
 function ScrollArea({
   className,
   children,
+  showHorizontalScrollbar = false,
   ...props
-}: React.ComponentProps<typeof ScrollAreaPrimitive.Root>) {
+}: ScrollAreaProps) {
   return (
     <ScrollAreaPrimitive.Root
       data-slot="scroll-area"
@@ -23,6 +32,7 @@ function ScrollArea({
         {children}
       </ScrollAreaPrimitive.Viewport>
       <ScrollBar />
+      {showHorizontalScrollbar && <ScrollBar orientation="horizontal" />}
       <ScrollAreaPrimitive.Corner />
     </ScrollAreaPrimitive.Root>
   )

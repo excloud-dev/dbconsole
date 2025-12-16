@@ -284,8 +284,9 @@ export function registerDesktopIpcHandlers(): void {
     })
     ipcMain.handle('dbconsole:app:info', () => {
         const buildInfo = readBuildInfo()
+        const forcedVersion = (process.env.DBCONSOLE_UPDATER_FORCE_CURRENT_VERSION || '').trim() || undefined
         return ok({
-            version: app.getVersion(),
+            version: forcedVersion ?? app.getVersion(),
             buildSha: buildInfo?.shaShort ?? buildInfo?.sha ?? tryGetDevGitShaShort(),
             buildTime: buildInfo?.time,
             platform: process.platform,

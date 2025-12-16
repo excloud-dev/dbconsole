@@ -122,10 +122,10 @@ export function UpdateProgressDialog({
     }
 
     const formatTime = (seconds: number) => {
-        if (seconds < 60) return `${seconds}s`
+        // Truncate seconds to keep the UI calm/less noisy.
+        if (seconds < 60) return '<1m'
         const minutes = Math.floor(seconds / 60)
-        const remainingSeconds = seconds % 60
-        return `${minutes}m ${remainingSeconds}s`
+        return `${minutes}m`
     }
 
     const formatSpeed = (bytesPerSecond: number) => {

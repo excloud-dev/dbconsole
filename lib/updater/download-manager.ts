@@ -25,6 +25,11 @@ export interface DownloadOptions {
     maxRetries?: number
     chunkSize?: number
     tempDir?: string
+    /**
+     * Optional request headers (e.g. Authorization for private GitHub assets).
+     * These will be merged with any internal headers (like Range).
+     */
+    headers?: Record<string, string>
 }
 
 export interface DownloadResult {
@@ -49,7 +54,9 @@ export class DownloadManager extends EventEmitter {
             maxRetries: 3,
             chunkSize: 1024 * 1024, // 1MB chunks
             tempDir: process.env.TMPDIR || process.env.TEMP || '/tmp',
-            ...options
+            ...options,
+            // Ensure headers is never undefined even after spreading.
+            headers: options.headers ?? {}
         }
     }
 
@@ -80,6 +87,7 @@ export class DownloadManager extends EventEmitter {
         let totalBytes = 0
         let lastProgressTime = Date.now()
         let lastBytesDownloaded = bytesDownloaded
+        let didRestartFromScratch = false
 
         try {
             // Create abort controller for cancellation
@@ -87,18 +95,47 @@ export class DownloadManager extends EventEmitter {
             this.activeDownloads.set(downloadId, abortController)
 
             const result = await this.networkResilience.withRetry(async () => {
-                const headers: Record<string, string> = {}
-
-                // Add range header for resumable downloads
-                if (canResume && existingBytes > 0) {
-                    headers['Range'] = `bytes=${existingBytes}-`
-                    this.log(`Resuming download from byte ${existingBytes}`)
+                // Re-check existing bytes inside retries so we can recover from bad partials.
+                let currentExistingBytes = 0
+                try {
+                    currentExistingBytes = existsSync(destinationPath) ? statSync(destinationPath).size : 0
+                } catch {
+                    currentExistingBytes = 0
                 }
 
-                const response = await fetch(url, {
+                const headers: Record<string, string> = { ...(mergedOptions.headers || {}) }
+
+                // Add range header for resumable downloads
+                if (canResume && currentExistingBytes > 0 && !didRestartFromScratch) {
+                    headers['Range'] = `bytes=${currentExistingBytes}-`
+                    this.log(`Resuming download from byte ${currentExistingBytes}`)
+                }
+
+                let response = await fetch(url, {
                     headers,
                     signal: abortController.signal
                 })
+
+                // If we attempted a range request and the server says it's not satisfiable (416),
+                // the local partial file is inconsistent with the remote. Remove it and restart once.
+                if (response.status === 416 && (headers['Range'] || headers['range']) && !didRestartFromScratch) {
+                    this.log('Received 416 Range Not Satisfiable; restarting download from scratch')
+                    try {
+                        if (existsSync(destinationPath)) {
+                            unlinkSync(destinationPath)
+                        }
+                    } catch {
+                        // ignore
+                    }
+                    didRestartFromScratch = true
+                    bytesDownloaded = 0
+
+                    const retryHeaders: Record<string, string> = { ...(mergedOptions.headers || {}) }
+                    response = await fetch(url, {
+                        headers: retryHeaders,
+                        signal: abortController.signal
+                    })
+                }
 
                 if (!response.ok) {
                     throw new Error(`Download failed: ${response.status} ${response.statusText}`)
@@ -121,7 +158,7 @@ export class DownloadManager extends EventEmitter {
 
                 // Check if server supports resumable downloads
                 const acceptsRanges = response.headers.get('accept-ranges') === 'bytes'
-                if (existingBytes > 0 && !acceptsRanges && response.status !== 206) {
+                if (currentExistingBytes > 0 && !acceptsRanges && response.status !== 206) {
                     this.log('Server does not support range requests, starting fresh download')
                     bytesDownloaded = 0
                     // Remove existing file and start over
@@ -136,7 +173,7 @@ export class DownloadManager extends EventEmitter {
 
                 // Create write stream (append mode for resumable downloads)
                 const writeStream = createWriteStream(destinationPath, {
-                    flags: existingBytes > 0 ? 'a' : 'w'
+                    flags: currentExistingBytes > 0 && !didRestartFromScratch ? 'a' : 'w'
                 })
 
                 // Set up progress tracking

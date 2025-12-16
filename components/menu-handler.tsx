@@ -29,6 +29,7 @@ export function MenuHandler() {
     const [githubToken, setGithubToken] = useState<string>('')
     const [isTokenConfigured, setIsTokenConfigured] = useState(false)
     const [isCheckingForUpdates, setIsCheckingForUpdates] = useState(false)
+    const [isInstallingUpdate, setIsInstallingUpdate] = useState(false)
     const [updateError, setUpdateError] = useState<string | null>(null)
 
     const checkIfTokenExists = useCallback(async (): Promise<boolean> => {
@@ -167,6 +168,7 @@ export function MenuHandler() {
         try {
             setShowUpdateNotificationDialog(false)
             setShowUpdateProgressDialog(true)
+            setIsInstallingUpdate(true)
             setProgressInfo({
                 stage: 'preparing',
                 progress: 0,
@@ -182,6 +184,7 @@ export function MenuHandler() {
                 progress: 100,
                 message: 'Installer opened. Complete installation and relaunch DBConsole.'
             })
+            setIsInstallingUpdate(false)
 
             toast({
                 title: 'Update ready',
@@ -190,6 +193,7 @@ export function MenuHandler() {
         } catch (error: any) {
             console.error('Update installation failed:', error)
             setUpdateError(error.message || 'Installation failed')
+            setIsInstallingUpdate(false)
 
             setProgressInfo({
                 stage: 'error',
@@ -204,6 +208,79 @@ export function MenuHandler() {
             })
         }
     }
+
+    // While the installer is running, poll updater state for progress updates so the UI isn't stuck at 0%.
+    useEffect(() => {
+        if (!showUpdateProgressDialog || !isInstallingUpdate) return
+        if (typeof window === 'undefined' || !(window as any).dbconsole?.api?.updater?.state) return
+
+        let cancelled = false
+        let inFlight = false
+        const pollMs = 500
+
+        const tick = async () => {
+            if (cancelled || inFlight) return
+            inFlight = true
+            try {
+                const state = await (window as any).dbconsole.api.updater.state()
+                if (cancelled || !state) return
+
+                const status: string | undefined = state.status
+                const prog = state.progress
+
+                if (status === 'downloading') {
+                    const pct = typeof prog?.percentage === 'number' ? prog.percentage : 0
+                    setProgressInfo({
+                        stage: 'downloading',
+                        progress: Math.max(0, Math.min(100, pct)),
+                        message: `Downloading... ${Math.round(pct)}%`,
+                        bytesDownloaded: prog?.bytesDownloaded,
+                        totalBytes: prog?.totalBytes,
+                        downloadSpeed: prog?.speed,
+                        estimatedTimeRemaining: prog?.estimatedTimeRemaining,
+                    })
+                } else if (status === 'verifying') {
+                    setProgressInfo(prev => ({
+                        ...prev,
+                        stage: 'verifying',
+                        message: 'Verifying download...',
+                        progress: Math.max(prev.progress, 95),
+                    }))
+                } else if (status === 'installing') {
+                    setProgressInfo(prev => ({
+                        ...prev,
+                        stage: 'installing',
+                        message: 'Opening installer...',
+                        progress: Math.max(prev.progress, 99),
+                    }))
+                } else if (status === 'error') {
+                    const msg = typeof state.error === 'string' ? state.error : 'Update failed'
+                    setUpdateError(msg)
+                    setProgressInfo({
+                        stage: 'error',
+                        progress: 0,
+                        message: 'Update failed',
+                    })
+                    setIsInstallingUpdate(false)
+                }
+            } catch (e: any) {
+                // Don't hard-fail the UI on transient poll issues; keep last known progress.
+                const msg = e?.message
+                if (typeof msg === 'string' && msg) {
+                    setUpdateError(msg)
+                }
+            } finally {
+                inFlight = false
+            }
+        }
+
+        void tick()
+        const id = setInterval(() => void tick(), pollMs)
+        return () => {
+            cancelled = true
+            clearInterval(id)
+        }
+    }, [showUpdateProgressDialog, isInstallingUpdate])
 
     const handleSkipUpdate = () => {
         setShowUpdateNotificationDialog(false)

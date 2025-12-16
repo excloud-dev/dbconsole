@@ -274,10 +274,30 @@ export class UpdateAgentImpl extends EventEmitter implements UpdateAgent {
             const fileName = updateInfo.assetName?.trim() || this.extractFileNameFromUrl(updateInfo.downloadUrl)
             const downloadPath = join(this.options.tempDir, fileName)
 
+            const headers: Record<string, string> = {}
+            try {
+                const urlObj = new URL(updateInfo.downloadUrl)
+                // Only attach auth headers for GitHub API downloads (private repos use API asset URLs).
+                if (urlObj.hostname === 'api.github.com') {
+                    const token = await this.configService.getGitHubToken()
+                    if (token) {
+                        headers['Authorization'] = `Bearer ${token}`
+                    }
+                    // GitHub release asset downloads require this accept header.
+                    if (urlObj.pathname.includes('/releases/assets/')) {
+                        headers['Accept'] = 'application/octet-stream'
+                    }
+                    headers['User-Agent'] = 'DBConsole-Updater/1.0.0'
+                }
+            } catch {
+                // Ignore URL parsing and proceed without extra headers.
+            }
+
             // Start download with progress tracking
             const result = await this.downloadManager.downloadFile(
                 updateInfo.downloadUrl,
-                downloadPath
+                downloadPath,
+                Object.keys(headers).length ? { headers } : undefined
             )
 
             this.log(`Download completed: ${result.filePath}`)
@@ -490,6 +510,13 @@ export class UpdateAgentImpl extends EventEmitter implements UpdateAgent {
     }
 
     private getCurrentVersion(): string {
+        // Dev/test helper: allow forcing the "current version" so you can exercise the update UI
+        // without publishing a new release.
+        const forced = process.env.DBCONSOLE_UPDATER_FORCE_CURRENT_VERSION
+        if (forced && forced.trim()) {
+            return forced.trim()
+        }
+
         // Get version from package.json or app metadata
         if (typeof app !== 'undefined') {
             return app.getVersion()

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
     Dialog,
     DialogContent,
@@ -22,7 +22,7 @@ export interface UpdateInfo {
     downloadUrl: string
     checksum: string
     signature?: string
-    publishedAt: Date
+    publishedAt: Date | string | number
     isPrerelease: boolean
 }
 
@@ -52,8 +52,8 @@ export function UpdateNotificationDialog({
     error
 }: UpdateNotificationProps) {
     const [showReleaseNotes, setShowReleaseNotes] = useState(false)
-
-    if (!updateInfo) return null
+    const [currentVersion, setCurrentVersion] = useState<string | null>(null)
+    const [showErrorDetails, setShowErrorDetails] = useState(false)
 
     const isInProgress = isDownloading || isInstalling
     const currentProgress = isDownloading ? downloadProgress : installationProgress
@@ -62,9 +62,60 @@ export function UpdateNotificationDialog({
     // Security note: render release notes as plain text.
     // GitHub release bodies are user-controlled content and must not be injected as HTML.
 
+    const publishedAtDate: Date | null = useMemo(() => {
+        const v = (updateInfo as any)?.publishedAt
+        if (!v) return null
+        if (v instanceof Date) return isNaN(v.getTime()) ? null : v
+        const d = new Date(v)
+        return isNaN(d.getTime()) ? null : d
+    }, [updateInfo])
+
+    useEffect(() => {
+        let cancelled = false
+
+        async function loadVersion() {
+            try {
+                if (typeof window === 'undefined') return
+                const dbconsole = (window as any).dbconsole
+                if (!dbconsole?.isDesktop || !dbconsole?.api?.app?.info) {
+                    setCurrentVersion(null)
+                    return
+                }
+                const info = await dbconsole.api.app.info()
+                if (!cancelled) {
+                    setCurrentVersion(typeof info?.version === 'string' ? info.version : null)
+                }
+            } catch {
+                if (!cancelled) setCurrentVersion(null)
+            }
+        }
+
+        if (isOpen) {
+            void loadVersion()
+        }
+
+        return () => {
+            cancelled = true
+        }
+    }, [isOpen])
+
+    const errorText = typeof error === 'string' ? error : ''
+    const errorIsLong = errorText.length > 220
+    const errorPreview = errorIsLong ? `${errorText.slice(0, 220)}…` : errorText
+
+    // IMPORTANT: keep hooks order stable. Only return null *after* hooks are declared.
+    if (!updateInfo) return null
+
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="w-[min(95vw,42rem)] max-w-none max-h-[85vh] flex flex-col overflow-hidden">
+            {/* No hard min-width on tiny windows; keep it responsive but prevent overly narrow dialogs on sm+ */}
+            <DialogContent
+                className="w-[min(95vw,48rem)] sm:min-w-[32rem] max-w-none max-h-[85vh] flex flex-col overflow-hidden"
+                onOpenAutoFocus={(e) => {
+                    // Prevent Radix from focusing the first focusable element (which was "Show Details").
+                    e.preventDefault()
+                }}
+            >
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Download className="h-5 w-5" />
@@ -77,9 +128,9 @@ export function UpdateNotificationDialog({
                     </DialogTitle>
                     <DialogDescription>
                         Version {updateInfo.version} is now available
-                        {updateInfo.publishedAt && (
+                        {publishedAtDate && (
                             <span className="text-muted-foreground ml-2">
-                                • Released {updateInfo.publishedAt.toLocaleDateString()}
+                                • Released {publishedAtDate.toLocaleDateString()}
                             </span>
                         )}
                     </DialogDescription>
@@ -88,9 +139,37 @@ export function UpdateNotificationDialog({
                 <div className="flex-1 overflow-y-auto pr-1">
                     <div className="space-y-4">
                         {error && (
-                            <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
-                                <AlertCircle className="h-4 w-4 text-destructive" />
-                                <span className="text-sm text-destructive">{error}</span>
+                            <div className="space-y-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                                <div className="flex items-start gap-2">
+                                    <AlertCircle className="h-4 w-4 text-destructive mt-0.5" />
+                                    <div className="min-w-0 flex-1">
+                                        <div className="text-sm text-destructive break-words">
+                                            {showErrorDetails ? errorText : errorPreview}
+                                        </div>
+                                    </div>
+                                </div>
+                                {errorIsLong && (
+                                    <div className="flex justify-end">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => setShowErrorDetails(!showErrorDetails)}
+                                            className="h-7 px-2 text-destructive"
+                                        >
+                                            {showErrorDetails ? 'Hide' : 'Show'} error details
+                                        </Button>
+                                    </div>
+                                )}
+                                {showErrorDetails && errorIsLong && (
+                                    <ScrollArea
+                                        className="max-h-40 w-full rounded-md border border-destructive/20 bg-background/60 p-2"
+                                        showHorizontalScrollbar
+                                    >
+                                        <pre className="text-xs whitespace-pre-wrap break-words font-mono text-destructive">
+                                            {errorText}
+                                        </pre>
+                                    </ScrollArea>
+                                )}
                             </div>
                         )}
 
@@ -123,7 +202,9 @@ export function UpdateNotificationDialog({
                                 {showReleaseNotes && (
                                     <>
                                         <Separator />
-                                        <ScrollArea className="max-h-48 w-full rounded-md border p-3">
+                                        {/* Keep this compact; enable horizontal scroll for long checksums/filenames. */}
+                                        <ScrollArea className="h-[28vh] w-full rounded-md border p-3" showHorizontalScrollbar>
+                                            {/* Prefer wrapping for readability; horizontal scrollbar still exists for edge-cases. */}
                                             <pre className="text-sm whitespace-pre-wrap break-words font-sans">
                                                 {updateInfo.releaseNotes}
                                             </pre>
@@ -137,10 +218,9 @@ export function UpdateNotificationDialog({
                             <div>
                                 <span className="font-medium">Current Version:</span>
                                 <div className="text-muted-foreground">
-                                    {typeof window !== 'undefined' && (window as any).electronAPI
-                                        ? 'Loading...'
-                                        : 'Web Version'
-                                    }
+                                    {typeof window !== 'undefined' && (window as any).dbconsole?.isDesktop
+                                        ? (currentVersion ?? 'Unknown')
+                                        : 'Web Version'}
                                 </div>
                             </div>
                             <div>
