@@ -64,7 +64,7 @@ export function UpdateNotificationDialog({
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-2xl max-h-[80vh]">
+            <DialogContent className="w-[min(95vw,42rem)] max-w-none max-h-[85vh] flex flex-col overflow-hidden">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Download className="h-5 w-5" />
@@ -85,7 +85,8 @@ export function UpdateNotificationDialog({
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="space-y-4">
+                <div className="flex-1 overflow-y-auto pr-1">
+                    <div className="space-y-4">
                     {error && (
                         <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
                             <AlertCircle className="h-4 w-4 text-destructive" />
@@ -122,8 +123,8 @@ export function UpdateNotificationDialog({
                             {showReleaseNotes && (
                                 <>
                                     <Separator />
-                                    <ScrollArea className="h-48 w-full rounded-md border p-3">
-                                        <pre className="text-sm whitespace-pre-wrap font-sans">
+                                    <ScrollArea className="max-h-48 w-full rounded-md border p-3">
+                                        <pre className="text-sm whitespace-pre-wrap break-words font-sans">
                                             {updateInfo.releaseNotes}
                                         </pre>
                                     </ScrollArea>
@@ -147,9 +148,10 @@ export function UpdateNotificationDialog({
                             <div className="text-muted-foreground">{updateInfo.version}</div>
                         </div>
                     </div>
+                    </div>
                 </div>
 
-                <DialogFooter className="flex-col sm:flex-row gap-2">
+                <DialogFooter className="shrink-0 flex-col sm:flex-row gap-2">
                     <div className="flex gap-2 w-full sm:w-auto">
                         <Button
                             variant="outline"

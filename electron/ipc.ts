@@ -599,19 +599,23 @@ export function registerDesktopIpcHandlers(): void {
 
         const schema = z.object({
             version: z.string().min(1),
-            releaseNotes: z.string(),
+            releaseNotes: z.string().optional().default(''),
             downloadUrl: z.string().url(),
-            checksum: z.string(),
-            publishedAt: z.string(),
-            isPrerelease: z.boolean()
+            assetName: z.string().optional(),
+            checksum: z.string().min(1),
+            signature: z.string().optional(),
+            publishedAt: z.preprocess((v) => {
+                // Electron IPC can round-trip Date objects; accept both Date and ISO strings/numbers.
+                if (v instanceof Date) return v
+                if (typeof v === 'string' || typeof v === 'number') return new Date(v)
+                return v
+            }, z.date()),
+            isPrerelease: z.boolean(),
         })
 
         try {
             const parsed = schema.parse(payload)
-            const updateInfo = {
-                ...parsed,
-                publishedAt: new Date(parsed.publishedAt)
-            }
+            const updateInfo = parsed
 
             await electronUpdater.downloadAndInstall(updateInfo)
             return ok({ success: true })
