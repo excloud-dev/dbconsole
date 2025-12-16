@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.4.3 - 2025-12-16
+
+- feat: enhance query handling in DbConsole, and improve update settings dialog with token configuration feedback (729cf75)
+
 ## v0.4.2 - 2025-12-16
 
 - refactor: update notification dialog styling for improved responsiveness, enhance IPC schema with optional fields, and refine CSV test cases for better readability (7a20c39)
