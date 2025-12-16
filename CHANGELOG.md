@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.4.5 - 2025-12-16
+
+- feat: prevent duplicate view tabs when viewing tables (fb8c731)
+- feat: add support for getting all rows in datagrid, respects LIMIT in query. (0482b7f)
+
 ## v0.4.4 - 2025-12-16
 
 - feat: add update installation progress tracking and improve error handling in update dialogs (d0951b0)
