@@ -23,7 +23,6 @@ import {
     Clock,
     Download,
     AlertTriangle,
-    Info,
     Key,
     Eye,
     EyeOff
@@ -51,6 +50,7 @@ export interface UpdateSettingsProps {
     githubToken?: string
     onSaveGitHubToken: (token: string) => void
     isLoading?: boolean
+    tokenConfigured?: boolean
 }
 
 export function UpdateSettingsDialog({
@@ -60,7 +60,8 @@ export function UpdateSettingsDialog({
     onSaveSettings,
     githubToken,
     onSaveGitHubToken,
-    isLoading = false
+    isLoading = false,
+    tokenConfigured = false
 }: UpdateSettingsProps) {
     const [localSettings, setLocalSettings] = useState<UpdateSettings>(settings)
     const [localToken, setLocalToken] = useState(githubToken || '')
@@ -135,6 +136,11 @@ export function UpdateSettingsDialog({
                         <div className="flex items-center gap-2">
                             <Key className="h-4 w-4" />
                             <h3 className="text-sm font-medium">GitHub Authentication</h3>
+                            {tokenConfigured && (
+                                <Badge variant="secondary" className="text-xs">
+                                    Token Configured
+                                </Badge>
+                            )}
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="github-token">Personal Access Token</Label>
@@ -159,9 +165,21 @@ export function UpdateSettingsDialog({
                                     </Button>
                                 </div>
                             </div>
-                            <p className="text-xs text-muted-foreground">
-                                Required for accessing private repositories. Token should have &apos;repo&apos; permissions.
-                            </p>
+                                <p className="text-xs text-muted-foreground">
+                                    Required for accessing private repositories. Token should have &apos;repo&apos; permissions.
+                                </p>
+                                {tokenConfigured && (
+                                    <div className="flex items-start gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-md text-emerald-900 text-sm">
+                                        <Shield className="h-4 w-4 shrink-0" />
+                                        <div>
+                                            <p className="font-medium leading-tight">Token already configured</p>
+                                            <p className="text-xs text-emerald-700 leading-tight">
+                                                DBConsole is already using a saved GitHub token. Leave this field empty to keep it,
+                                                or enter a new token to replace the stored credentials if needed.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
                         </div>
                     </div>
 

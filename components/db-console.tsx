@@ -612,6 +612,9 @@ export function DbConsole() {
   }
 
   const handleViewTable = (tableName: string) => {
+    const currentTab = tabs.find((t) => t.id === activeTab)
+    const currentQueryEmpty = !currentTab?.query?.trim()
+
     // Find primary key
     let orderByClause = ""
     if (schema?.primaryKeys) {
@@ -622,8 +625,22 @@ export function DbConsole() {
     }
 
     const query = `SELECT * FROM ${tableName}${orderByClause}`
+    const pagination = { limit: 100, offset: 0 }
+
+    if (currentTab && currentQueryEmpty) {
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === currentTab.id ? { ...t, query, pagination, name: `${tableName} (Top 100)` } : t,
+        ),
+      )
+      if (activeConnection) {
+        executeRawQuery(query, currentTab.id, activeConnection, 0, 100)
+      }
+      return
+    }
+
     const newId = `view-${Date.now()}`
-    const newTab = { id: newId, name: `${tableName} (Top 100)`, query, pagination: { limit: 100, offset: 0 }, connectionId: activeConnection ?? undefined }
+    const newTab = { id: newId, name: `${tableName} (Top 100)`, query, pagination, connectionId: activeConnection ?? undefined }
     setTabs([...tabs, newTab])
     setActiveTab(newId)
 

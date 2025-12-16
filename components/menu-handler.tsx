@@ -27,8 +27,31 @@ export function MenuHandler() {
         updateChannel: 'latest'
     })
     const [githubToken, setGithubToken] = useState<string>('')
+    const [isTokenConfigured, setIsTokenConfigured] = useState(false)
     const [isCheckingForUpdates, setIsCheckingForUpdates] = useState(false)
     const [updateError, setUpdateError] = useState<string | null>(null)
+
+    const checkIfTokenExists = useCallback(async (): Promise<boolean> => {
+        try {
+            if (typeof window !== 'undefined' && (window as any).dbconsole?.api?.updater) {
+                const result = await (window as any).dbconsole.api.updater.token.exists()
+                return result.exists
+            }
+            return false
+        } catch (error) {
+            return false
+        }
+    }, [])
+
+    const refreshTokenStatus = useCallback(async () => {
+        try {
+            const exists = await checkIfTokenExists()
+            setIsTokenConfigured(exists)
+        } catch (error) {
+            console.error('Failed to refresh token status:', error)
+            setIsTokenConfigured(false)
+        }
+    }, [checkIfTokenExists])
 
     const handleCheckForUpdates = useCallback(async () => {
         if (isCheckingForUpdates) return
@@ -81,19 +104,24 @@ export function MenuHandler() {
         } finally {
             setIsCheckingForUpdates(false)
         }
-    }, [isCheckingForUpdates, toast])
+    }, [isCheckingForUpdates, toast, checkIfTokenExists])
 
-    const checkIfTokenExists = async (): Promise<boolean> => {
+    useEffect(() => {
+        if (showUpdateSettingsDialog) {
+            refreshTokenStatus()
+        }
+    }, [showUpdateSettingsDialog, refreshTokenStatus])
+
+    const loadUpdateSettings = useCallback(async () => {
         try {
             if (typeof window !== 'undefined' && (window as any).dbconsole?.api?.updater) {
-                const result = await (window as any).dbconsole.api.updater.token.exists()
-                return result.exists
+                const settings = await (window as any).dbconsole.api.updater.settings.get()
+                setUpdateSettings(settings)
             }
-            return false
         } catch (error) {
-            return false
+            console.error('Failed to load update settings:', error)
         }
-    }
+    }, [])
 
     useEffect(() => {
         if (typeof window === 'undefined' || !(window as any).dbconsole?.isDesktop) {
@@ -124,6 +152,7 @@ export function MenuHandler() {
         })
 
         const unsubscribeUpdateSettings = dbconsole.events.onMenuUpdateSettings(() => {
+            refreshTokenStatus()
             setShowUpdateSettingsDialog(true)
         })
 
@@ -132,18 +161,7 @@ export function MenuHandler() {
             unsubscribeCheckUpdates()
             unsubscribeUpdateSettings()
         }
-    }, [handleCheckForUpdates, toast])
-
-    const loadUpdateSettings = async () => {
-        try {
-            if (typeof window !== 'undefined' && (window as any).dbconsole?.api?.updater) {
-                const settings = await (window as any).dbconsole.api.updater.settings.get()
-                setUpdateSettings(settings)
-            }
-        } catch (error) {
-            console.error('Failed to load update settings:', error)
-        }
-    }
+    }, [handleCheckForUpdates, toast, loadUpdateSettings, refreshTokenStatus])
 
     const handleInstallUpdate = async (updateInfo: UpdateInfo) => {
         try {
@@ -234,6 +252,7 @@ export function MenuHandler() {
             if (typeof window !== 'undefined' && (window as any).dbconsole?.api?.updater) {
                 await (window as any).dbconsole.api.updater.token.set(token)
                 setGithubToken(token)
+                setIsTokenConfigured(true)
                 toast({
                     title: "Token Saved",
                     description: "GitHub token has been validated and saved securely."
@@ -297,6 +316,7 @@ export function MenuHandler() {
                 githubToken={githubToken}
                 onSaveGitHubToken={handleSaveGitHubToken}
                 isLoading={isCheckingForUpdates}
+                tokenConfigured={isTokenConfigured}
             />
 
             <UpdateNotificationDialog

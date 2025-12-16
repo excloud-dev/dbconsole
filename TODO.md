@@ -19,7 +19,7 @@
 ## Query & Data Handling
 - [ ] Fix the query info in data grid table to show the actual query executed.
 - [ ] Auto add params to saved query from where clauses and not just :mac things.
-- [ ] Add a way to export the query results to a CSV file.
+- [x] Add a way to export the query results to a CSV file.
 - [ ] Filter/Order in data grid.
 
 ## UI/UX Improvements

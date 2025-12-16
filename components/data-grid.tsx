@@ -476,19 +476,6 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
                       )}
                     >
                       <span>ALL</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-stone-400 hover:text-stone-600 hover:bg-stone-200/70"
-                        disabled={data.length === 0}
-                        title="Download current page CSV"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          downloadCsv()
-                        }}
-                      >
-                        <FileDown className="h-4 w-4" />
-                      </Button>
                     </div>
                   </th>
 

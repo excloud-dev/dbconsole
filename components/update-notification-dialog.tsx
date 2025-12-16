@@ -87,67 +87,67 @@ export function UpdateNotificationDialog({
 
                 <div className="flex-1 overflow-y-auto pr-1">
                     <div className="space-y-4">
-                    {error && (
-                        <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
-                            <AlertCircle className="h-4 w-4 text-destructive" />
-                            <span className="text-sm text-destructive">{error}</span>
-                        </div>
-                    )}
-
-                    {isInProgress && (
-                        <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                                <RefreshCw className="h-4 w-4 animate-spin" />
-                                <span className="text-sm font-medium">{progressLabel}</span>
-                                <span className="text-sm text-muted-foreground">
-                                    {Math.round(currentProgress)}%
-                                </span>
+                        {error && (
+                            <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                                <AlertCircle className="h-4 w-4 text-destructive" />
+                                <span className="text-sm text-destructive">{error}</span>
                             </div>
-                            <Progress value={currentProgress} className="w-full" />
-                        </div>
-                    )}
+                        )}
 
-                    {updateInfo.releaseNotes && (
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <h4 className="text-sm font-medium">Release Notes</h4>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setShowReleaseNotes(!showReleaseNotes)}
-                                >
-                                    {showReleaseNotes ? 'Hide' : 'Show'} Details
-                                </Button>
+                        {isInProgress && (
+                            <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <RefreshCw className="h-4 w-4 animate-spin" />
+                                    <span className="text-sm font-medium">{progressLabel}</span>
+                                    <span className="text-sm text-muted-foreground">
+                                        {Math.round(currentProgress)}%
+                                    </span>
+                                </div>
+                                <Progress value={currentProgress} className="w-full" />
                             </div>
+                        )}
 
-                            {showReleaseNotes && (
-                                <>
-                                    <Separator />
-                                    <ScrollArea className="max-h-48 w-full rounded-md border p-3">
-                                        <pre className="text-sm whitespace-pre-wrap break-words font-sans">
-                                            {updateInfo.releaseNotes}
-                                        </pre>
-                                    </ScrollArea>
-                                </>
-                            )}
-                        </div>
-                    )}
+                        {updateInfo.releaseNotes && (
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-sm font-medium">Release Notes</h4>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setShowReleaseNotes(!showReleaseNotes)}
+                                    >
+                                        {showReleaseNotes ? 'Hide' : 'Show'} Details
+                                    </Button>
+                                </div>
 
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                            <span className="font-medium">Current Version:</span>
-                            <div className="text-muted-foreground">
-                                {typeof window !== 'undefined' && (window as any).electronAPI
-                                    ? 'Loading...'
-                                    : 'Web Version'
-                                }
+                                {showReleaseNotes && (
+                                    <>
+                                        <Separator />
+                                        <ScrollArea className="max-h-48 w-full rounded-md border p-3">
+                                            <pre className="text-sm whitespace-pre-wrap break-words font-sans">
+                                                {updateInfo.releaseNotes}
+                                            </pre>
+                                        </ScrollArea>
+                                    </>
+                                )}
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <span className="font-medium">Current Version:</span>
+                                <div className="text-muted-foreground">
+                                    {typeof window !== 'undefined' && (window as any).electronAPI
+                                        ? 'Loading...'
+                                        : 'Web Version'
+                                    }
+                                </div>
+                            </div>
+                            <div>
+                                <span className="font-medium">New Version:</span>
+                                <div className="text-muted-foreground">{updateInfo.version}</div>
                             </div>
                         </div>
-                        <div>
-                            <span className="font-medium">New Version:</span>
-                            <div className="text-muted-foreground">{updateInfo.version}</div>
-                        </div>
-                    </div>
                     </div>
                 </div>
 

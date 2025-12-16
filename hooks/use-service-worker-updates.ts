@@ -3,7 +3,7 @@
  * Provides seamless update experience with cache invalidation
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { getServiceWorkerManager, isServiceWorkerSupported, type ServiceWorkerUpdateInfo } from '../lib/service-worker'
 
 export interface UseServiceWorkerUpdatesOptions {
@@ -36,6 +36,9 @@ export function useServiceWorkerUpdates(options: UseServiceWorkerUpdatesOptions 
 
     const isSupported = isServiceWorkerSupported()
 
+    const unsubscribeUpdateRef = useRef<null | (() => void)>(null)
+    const unsubscribeReadyRef = useRef<null | (() => void)>(null)
+
     const register = useCallback(async () => {
         if (!isSupported) {
             setError('Service Worker not supported')
@@ -50,18 +53,20 @@ export function useServiceWorkerUpdates(options: UseServiceWorkerUpdatesOptions 
             if (registration) {
                 setIsRegistered(true)
 
+                // Prevent duplicate subscriptions if register is called more than once.
+                unsubscribeUpdateRef.current?.()
+                unsubscribeReadyRef.current?.()
+
                 // Set up event listeners
-                const unsubscribeUpdate = manager.onUpdateAvailable((info) => {
+                unsubscribeUpdateRef.current = manager.onUpdateAvailable((info) => {
                     setUpdateInfo(info)
                     onUpdateAvailable?.(info)
                 })
 
-                const unsubscribeReady = manager.onUpdateReady(() => {
+                unsubscribeReadyRef.current = manager.onUpdateReady(() => {
                     setIsUpdateReady(true)
                     onUpdateReady?.()
                 })
-
-                // Note: cleanup handled by useEffect
             } else {
                 setError('Failed to register service worker')
             }
@@ -144,6 +149,16 @@ export function useServiceWorkerUpdates(options: UseServiceWorkerUpdatesOptions 
             register()
         }
     }, [autoRegister, isSupported, isRegistered, register])
+
+    // Cleanup SW manager subscriptions on unmount.
+    useEffect(() => {
+        return () => {
+            unsubscribeUpdateRef.current?.()
+            unsubscribeUpdateRef.current = null
+            unsubscribeReadyRef.current?.()
+            unsubscribeReadyRef.current = null
+        }
+    }, [])
 
     return {
         isSupported,

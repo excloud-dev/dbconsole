@@ -2,7 +2,7 @@
  * React hook for checking web app updates and managing update notifications
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 export interface UpdateInfo {
     available: boolean
@@ -45,14 +45,20 @@ export function useUpdateChecker(options: UseUpdateCheckerOptions = {}): UseUpda
     const [error, setError] = useState<string | null>(null)
     const [dismissedVersion, setDismissedVersion] = useState<string | null>(null)
 
-    const checkForUpdates = useCallback(async () => {
-        if (isChecking) return
+    // Important: don't put isChecking in the checkForUpdates dependency list.
+    // If checkForUpdates changes on every toggle, effects that depend on it will re-run and can create
+    // an unintended fetch loop.
+    const inFlightRef = useRef(false)
 
+    const checkForUpdates = useCallback(async () => {
+        if (inFlightRef.current) return
+
+        inFlightRef.current = true
         setIsChecking(true)
         setError(null)
 
         try {
-            const response = await fetch('/api/app-info')
+            const response = await fetch('/api/app-info', { cache: 'no-store' })
             if (!response.ok) {
                 throw new Error(`Failed to fetch app info: ${response.status} ${response.statusText}`)
             }
@@ -74,8 +80,9 @@ export function useUpdateChecker(options: UseUpdateCheckerOptions = {}): UseUpda
             console.error('Update check failed:', err)
         } finally {
             setIsChecking(false)
+            inFlightRef.current = false
         }
-    }, [isChecking])
+    }, [])
 
     const dismissUpdate = useCallback(() => {
         if (appInfo?.updateInfo?.latestVersion) {
