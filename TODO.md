@@ -5,32 +5,33 @@
 - [x] Figure out if we need a seperate node_modules and setup for electron
 - [x] Reduce desktop bundle size by packaging Electron from a minimal `dist/electron/app` (own `package.json`) and setting `directories.app` in `electron-builder.yml` so root (Next/web) deps don’t get bundled.
 - [x] Disable/strip sourcemaps in release builds (Vite renderer + IPC bundle) and stop shipping `dist/electron/ipc.cjs.map`.
+- [x] Updater
 - [ ] Explore tauri instead of electron for leaner dmg and maybe perf?
 - [ ] Explore native packaging with native swiftui appkit views. May need to build a custom bridge?? or get rid of ipc.
-- [x] Updater
 - [ ] Make updater better. Try to get vscode style updates! Currenly its very primitive.
 
 ## API & Backend
 - [x] Syncer api endpoint to allow syncing of named queries. Need to handle conflict resolution properly. Add a diff panel for this.
 - [x] Create sort of an SDK lib package for the API. And use that instead of doing fetch everytime. [apiClient]
-- [ ] Explore if we need some sort of auth prob using cloudflare access.
 - [x] Encrypt the connection passwords somehow
+- [x] Explore if we need some sort of auth prob using cloudflare access. -> No
 
 ## Query & Data Handling
+- [x] Add a way to export the query results to a CSV file.
 - [ ] Filter/Order in data grid.
 - [ ] Fix the query info in data grid table to show the actual query executed.
 - [ ] Auto add params to saved query from where clauses and not just :mac things.
-- [x] Add a way to export the query results to a CSV file.
-- [ ] Allow updating of certain DB connections (For eg local)
+- [ ] Allow updating/deleting in certain DB connections (For eg local). So like a readonly toggle for connections.
 - [ ] Allow returning all rows in datagrid. Like NO limit option.
+- [ ] Allow opening+running sql files with a bunch of queries.
 
 ## UI/UX Improvements
 - [x] Fix the sidebar styling. make it consistent with the rest of the app.
-- [ ] Fix setting modal styling, make it consistent with the rest of the app.
+- [x] If i press the view button and a query if the same query exists dont do anything just execute again
 - [x] Shortcuts! But want to do this via a seperate interface if possible so we can remap shortcuts from settings if needed. Disable some for web or have sensible defaults for web vs desktop.
-- [ ] Add support to open sql files in desktop.
+- [x] Add support to open sql files in desktop.
+- [ ] Fix setting modal styling, make it consistent with the rest of the app.
 - [ ] Dark mode!
 - [ ] Fix fullscreen datagrid view. 
 - [ ] When cells are highlighed, it looks a little off. investigate.
 - [ ] Fix the toggle columns modal/dialog thing.
-- [x] If i press the view button and a query if the same query exists dont do anything just execute again

@@ -39,12 +39,12 @@ interface DataGridProps {
   error?: string | null
   executedSql?: string
   pagination?: {
-    limit: number
+    limit?: number
     offset: number
     total?: number
   }
   onPageChange?: (newOffset: number) => void
-  onLimitChange?: (newLimit: number) => void
+  onLimitChange?: (newLimit: number | null) => void
 }
 
 // Helper to format cell values properly
@@ -330,8 +330,11 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
 
   useCommand("results.pageNext", () => {
     if (!onPageChange || !pagination) return false
+    const limit = pagination.limit
+    if (limit === undefined) return false
+    const offset = pagination.offset ?? 0
     const total = pagination.total
-    const next = pagination.offset + pagination.limit
+    const next = offset + limit
     if (total !== undefined && next >= total) return false
     onPageChange(next)
     return true
@@ -339,8 +342,11 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
 
   useCommand("results.pagePrev", () => {
     if (!onPageChange || !pagination) return false
-    const prev = Math.max(0, pagination.offset - pagination.limit)
-    if (prev === pagination.offset) return false
+    const limit = pagination.limit
+    if (limit === undefined) return false
+    const offset = pagination.offset ?? 0
+    const prev = Math.max(0, offset - limit)
+    if (prev === offset) return false
     onPageChange(prev)
     return true
   })
@@ -379,11 +385,22 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
 
   // Pagination vars
   const totalRows = pagination?.total
-  const limit = pagination?.limit || 100
-  const offset = pagination?.offset || 0
-  const currentPage = Math.floor(offset / limit) + 1
-  const totalPages = totalRows ? Math.ceil(totalRows / limit) : undefined
-  const showPagination = pagination && onPageChange
+  const limit = pagination?.limit
+  const offset = pagination?.offset ?? 0
+  const hasLimit = typeof limit === "number"
+  const safeLimit = limit ?? 1
+  const currentPage = hasLimit ? Math.floor(offset / safeLimit) + 1 : 1
+  const totalPages = hasLimit && totalRows !== undefined ? Math.ceil(totalRows / safeLimit) : undefined
+  const showPagination = !!pagination && !!onPageChange
+  const limitValue = hasLimit ? String(limit) : "all"
+  const rowsDescription = hasLimit
+    ? totalRows !== undefined
+      ? `${offset + 1}-${Math.min(offset + data.length, totalRows)} of ${totalRows}`
+      : `${offset + 1}-${offset + data.length} rows`
+    : totalRows !== undefined
+      ? `All ${data.length} rows of ${totalRows}`
+      : `All ${data.length} rows`
+  const navLimit = limit ?? 0
 
   // Handlers for Gutter
   const handleGutterMouseDown = (rowIdx: number, e: React.MouseEvent) => {
@@ -715,20 +732,29 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
             {showPagination && (
               <div className="flex items-center gap-2">
                 <div className="text-xs text-stone-500 font-medium whitespace-nowrap">
-                  {totalRows !== undefined
-                    ? `${offset + 1}-${Math.min(offset + data.length, totalRows)} of ${totalRows}`
-                    : `${data.length} rows`
-                  }
+                  {rowsDescription}
                 </div>
 
                 <div className="h-4 w-px bg-stone-300/60 mx-2" />
 
-                <Select value={String(limit)} onValueChange={(v) => onLimitChange?.(Number(v))}>
+                <Select
+                  value={limitValue}
+                  onValueChange={(v) => {
+                    if (v === "all") {
+                      onLimitChange?.(null)
+                      return
+                    }
+                    const parsed = Number(v)
+                    if (!Number.isFinite(parsed)) return
+                    onLimitChange?.(parsed)
+                  }}
+                >
                   <SelectTrigger className="h-6 w-auto gap-1.5 px-2 text-xs border-transparent bg-transparent hover:bg-stone-200/50 focus:ring-0">
                     <span className="text-stone-400">Limit:</span>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
                     <SelectItem value="100">100</SelectItem>
                     <SelectItem value="200">200</SelectItem>
                     <SelectItem value="500">500</SelectItem>
@@ -737,25 +763,31 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
                 </Select>
 
                 <div className="flex items-center gap-0.5">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    disabled={offset === 0 || loading}
-                    onClick={() => onPageChange(Math.max(0, offset - limit))}
-                  >
-                    <ChevronLeft className="h-3.5 w-3.5" />
-                  </Button>
-                  <span className="text-xs text-stone-500 min-w-[3ch] text-center">{currentPage}</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    disabled={(totalRows !== undefined && offset + limit >= totalRows) || loading}
-                    onClick={() => onPageChange(offset + limit)}
-                  >
-                    <ChevronRight className="h-3.5 w-3.5" />
-                  </Button>
+                  {hasLimit ? (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        disabled={navLimit === 0 || offset === 0 || loading}
+                        onClick={() => onPageChange(Math.max(0, offset - navLimit))}
+                      >
+                        <ChevronLeft className="h-3.5 w-3.5" />
+                      </Button>
+                      <span className="text-xs text-stone-500 min-w-[3ch] text-center">{currentPage}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        disabled={navLimit === 0 || (totalRows !== undefined && offset + navLimit >= totalRows) || loading}
+                        onClick={() => onPageChange(offset + navLimit)}
+                      >
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </Button>
+                    </>
+                  ) : (
+                    <span className="text-xs text-stone-500 font-medium">Showing all rows</span>
+                  )}
                 </div>
               </div>
             )}

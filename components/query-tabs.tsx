@@ -19,7 +19,7 @@ export interface Tab {
   params?: RawParam[]
   namedParams?: Record<string, string>
   pagination?: {
-    limit: number
+    limit?: number
     offset: number
     total?: number
   }

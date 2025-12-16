@@ -7,6 +7,7 @@ const READONLY_PREFIXES = ['select', 'with']
 // valid SELECTs because it saw "create" inside "created_at" and "update" inside
 // "updated_at".
 const FORBIDDEN_PATTERN = /\b(insert|update|delete|alter|drop|truncate|create|grant|revoke|comment)\b/i
+const LIMIT_CLAUSE_PATTERN = /\blimit\b\s+(all\b|\d+|\$\d+|:\w+|\?|\()/i
 
 export function normalizeSql(sql: string): string {
     return sql.replace(/\s+/g, ' ').trim()
@@ -28,4 +29,9 @@ export function isReadOnlySql(sql: string): boolean {
     if (FORBIDDEN_PATTERN.test(first)) return false
 
     return true
+}
+
+export function hasLimitClause(sql: string): boolean {
+    const normalized = normalizeSql(sql)
+    return LIMIT_CLAUSE_PATTERN.test(normalized)
 }

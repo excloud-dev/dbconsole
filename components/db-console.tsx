@@ -17,7 +17,7 @@ import { Settings, PanelLeftClose, PanelLeft } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import type { ClientConnectionMeta } from "@/lib/connections"
 import type { SchemaGraph } from "@/lib/schema-introspection"
-import { isReadOnlySql } from "@/lib/sql/safety"
+import { hasLimitClause, isReadOnlySql } from "@/lib/sql/safety"
 import { ApiError, apiClient, type NamedQuerySyncResolution } from "@/lib/client/apiClient"
 import { useCommand } from "@/components/shortcuts/useCommand"
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator, CommandShortcut } from "@/components/ui/command"
@@ -695,15 +695,13 @@ export function DbConsole() {
 
   // loadSchema defined above with useCallback
 
-  async function executeRawQuery(sqlArg?: string, tabIdArg?: string, connectionIdArg?: string, newOffset: number = 0, newLimit?: number) {
+  async function executeRawQuery(sqlArg?: string, tabIdArg?: string, connectionIdArg?: string, newOffset: number = 0, newLimit?: number | null) {
     const targetTabId = tabIdArg || activeTab
     const targetTab = tabs.find(t => t.id === targetTabId)
     const targetConnectionId = connectionIdArg || targetTab?.connectionId || activeConnection
 
     if (!targetConnectionId) return
 
-    // Use provided limit/offset or fallback to current tab state or defaults
-    const limit = newLimit ?? targetTab?.pagination?.limit ?? 100
     const offset = newOffset
     const paramValues = (targetTab?.params ?? []).map((p) => {
       if (p.type === "number") return Number(p.value)
@@ -737,6 +735,9 @@ export function DbConsole() {
     try {
       // Clean SQL for wrapping (remove trailing semicolon)
       const cleanSql = sqlToRun.trim().replace(/;+$/, "")
+      const hasUserLimit = hasLimitClause(cleanSql)
+      const fallbackLimit = hasUserLimit ? undefined : targetTab?.pagination?.limit ?? 100
+      const limit = newLimit === undefined ? fallbackLimit : newLimit === null ? undefined : newLimit
 
       const shouldIncludeCount = offset === 0 || targetTab?.pagination?.total === undefined
 
@@ -787,11 +788,14 @@ export function DbConsole() {
 
 
 
-  async function executeNamedQuery(query: NamedQuery, params: Record<string, string>, newOffset: number = 0, newLimit?: number) {
+  async function executeNamedQuery(query: NamedQuery, params: Record<string, string>, newOffset: number = 0, newLimit?: number | null) {
     if (!activeConnection) return
     const targetTab = currentTab
-    const limit = newLimit ?? targetTab?.pagination?.limit ?? 100
     const offset = newOffset
+    const paramSql = applyNamedQueryParams(query.query, params)
+    const hasUserLimit = hasLimitClause(paramSql.text)
+    const fallbackLimit = hasUserLimit ? undefined : targetTab?.pagination?.limit ?? 100
+    const limit = newLimit === undefined ? fallbackLimit : newLimit === null ? undefined : newLimit
     setIsRunning(true)
     setError(null)
 
