@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.4.2 - 2025-12-16
+
+- refactor: update notification dialog styling for improved responsiveness, enhance IPC schema with optional fields, and refine CSV test cases for better readability (7a20c39)
+
 ## v0.4.1 - 2025-12-15
 
 - feat: enhance DataGrid functionality with CSV download support, improve selection handling, and refine column visibility logic (d43df95)
