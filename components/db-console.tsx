@@ -639,6 +639,22 @@ export function DbConsole() {
       return
     }
 
+    const normalizedQuery = query.trim()
+    const matchesActiveConnection = (tab: Tab) =>
+      activeConnection === null ? tab.connectionId === undefined : tab.connectionId === activeConnection
+    const existingViewTab = tabs.find(
+      (tab) => tab.query?.trim() === normalizedQuery && matchesActiveConnection(tab),
+    )
+    if (existingViewTab) {
+      if (existingViewTab.id !== activeTab) {
+        setActiveTab(existingViewTab.id)
+      }
+      if (activeConnection) {
+        executeRawQuery(query, existingViewTab.id, activeConnection, 0, pagination.limit)
+      }
+      return
+    }
+
     const newId = `view-${Date.now()}`
     const newTab = { id: newId, name: `${tableName} (Top 100)`, query, pagination, connectionId: activeConnection ?? undefined }
     setTabs([...tabs, newTab])

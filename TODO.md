@@ -17,10 +17,12 @@
 - [x] Encrypt the connection passwords somehow
 
 ## Query & Data Handling
+- [ ] Filter/Order in data grid.
 - [ ] Fix the query info in data grid table to show the actual query executed.
 - [ ] Auto add params to saved query from where clauses and not just :mac things.
 - [x] Add a way to export the query results to a CSV file.
-- [ ] Filter/Order in data grid.
+- [ ] Allow updating of certain DB connections (For eg local)
+- [ ] Allow returning all rows in datagrid. Like NO limit option.
 
 ## UI/UX Improvements
 - [x] Fix the sidebar styling. make it consistent with the rest of the app.
@@ -31,3 +33,4 @@
 - [ ] Fix fullscreen datagrid view. 
 - [ ] When cells are highlighed, it looks a little off. investigate.
 - [ ] Fix the toggle columns modal/dialog thing.
+- [x] If i press the view button and a query if the same query exists dont do anything just execute again
