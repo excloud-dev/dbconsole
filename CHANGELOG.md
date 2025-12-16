@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.4.4 - 2025-12-16
+
+- feat: add update installation progress tracking and improve error handling in update dialogs (d0951b0)
+
 ## v0.4.3 - 2025-12-16
 
 - feat: enhance query handling in DbConsole, and improve update settings dialog with token configuration feedback (729cf75)
