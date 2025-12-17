@@ -10,7 +10,7 @@
   "bugs": {
     "url": "https://github.com/excloud-in/dbconsole/issues"
   },
-  "version": "0.4.5",
+  "version": "0.4.6",
   "private": true,
   "scripts": {
     "build": "next build",

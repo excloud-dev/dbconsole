@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.4.6 - 2025-12-17
+
+- feat: implement sidebar actions hover preference and hopefully fix the named queries reference error (6da2438)
+
 ## v0.4.5 - 2025-12-16
 
 - feat: prevent duplicate view tabs when viewing tables (fb8c731)
