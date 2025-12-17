@@ -77,6 +77,10 @@ contextBridge.exposeInMainWorld('dbconsole', {
         set: (token) => invoke('dbconsole:updater:token:set', { token }),
       },
     },
+    uiPrefs: {
+      get: (key) => invoke('dbconsole:uiPrefs:get', { key }),
+      set: (payload) => invoke('dbconsole:uiPrefs:set', payload),
+    },
   },
   events: {
     onSqlFileOpen: (handler) => {
@@ -110,6 +114,30 @@ contextBridge.exposeInMainWorld('dbconsole', {
       }
       ipcRenderer.on('dbconsole:menu:updateSettings', listener)
       return () => ipcRenderer.removeListener('dbconsole:menu:updateSettings', listener)
+    },
+    onMenuSyncNow: (handler) => {
+      if (typeof handler !== 'function') return () => { }
+      const listener = () => {
+        handler()
+      }
+      ipcRenderer.on('dbconsole:menu:syncNow', listener)
+      return () => ipcRenderer.removeListener('dbconsole:menu:syncNow', listener)
+    },
+    onMenuSyncSettings: (handler) => {
+      if (typeof handler !== 'function') return () => { }
+      const listener = () => {
+        handler()
+      }
+      ipcRenderer.on('dbconsole:menu:syncSettings', listener)
+      return () => ipcRenderer.removeListener('dbconsole:menu:syncSettings', listener)
+    },
+    onMenuSidebarActionsShowOnHover: (handler) => {
+      if (typeof handler !== 'function') return () => { }
+      const listener = (_evt, payload) => {
+        handler(payload)
+      }
+      ipcRenderer.on('dbconsole:menu:sidebarActionsShowOnHover', listener)
+      return () => ipcRenderer.removeListener('dbconsole:menu:sidebarActionsShowOnHover', listener)
     },
   },
 })

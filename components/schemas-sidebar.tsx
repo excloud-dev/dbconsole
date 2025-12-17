@@ -62,6 +62,7 @@ interface SchemasSidebarProps {
   onSyncNamedQueries?: () => void
   onOpenSyncSettings?: () => void
   onRefreshSchema?: () => void
+  showActionsOnHover?: boolean
   schema?: SchemaGraph | null
   activeTab?: "tables" | "queries"
   onActiveTabChange?: (tab: "tables" | "queries") => void
@@ -80,6 +81,7 @@ export function SchemasSidebar({
   onSyncNamedQueries,
   onOpenSyncSettings,
   onRefreshSchema,
+  showActionsOnHover = true,
   schema,
   activeTab: activeTabProp,
   onActiveTabChange,
@@ -300,7 +302,12 @@ export function SchemasSidebar({
                 </Badge>
 
                 {onRefreshSchema && (
-                  <div className="w-0 overflow-hidden opacity-0 group-hover:w-5 group-hover:opacity-100 transition-all duration-300 ease-in-out flex-shrink-0">
+                  <div
+                    className={cn(
+                      "transition-all duration-300 ease-in-out flex-shrink-0",
+                      showActionsOnHover ? "w-0 overflow-hidden opacity-0 group-hover:w-5 group-hover:opacity-100" : "w-5 opacity-100",
+                    )}
+                  >
                     <button
                       onClick={() => onRefreshSchema()}
                       className="p-0.5 hover:bg-stone-200 rounded text-stone-400 hover:text-stone-600 transition-colors outline-none"
@@ -337,7 +344,14 @@ export function SchemasSidebar({
 
                     {/* Actions: animate in like DataGrid hide button */}
                     <div className="flex items-center">
-                      <div className="w-0 overflow-hidden opacity-0 group-hover/row:w-8 group-hover/row:opacity-100 transition-all duration-300 ease-in-out flex-shrink-0">
+                      <div
+                        className={cn(
+                          "transition-all duration-300 ease-in-out flex-shrink-0",
+                          showActionsOnHover
+                            ? "w-0 overflow-hidden opacity-0 group-hover/row:w-8 group-hover/row:opacity-100"
+                            : "w-8 opacity-100",
+                        )}
+                      >
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
@@ -349,7 +363,14 @@ export function SchemasSidebar({
                           <Eye className="h-4 w-4" />
                         </button>
                       </div>
-                      <div className="w-0 overflow-hidden opacity-0 group-hover/row:w-8 group-hover/row:opacity-100 transition-all duration-300 ease-in-out flex-shrink-0">
+                      <div
+                        className={cn(
+                          "transition-all duration-300 ease-in-out flex-shrink-0",
+                          showActionsOnHover
+                            ? "w-0 overflow-hidden opacity-0 group-hover/row:w-8 group-hover/row:opacity-100"
+                            : "w-8 opacity-100",
+                        )}
+                      >
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
@@ -429,7 +450,12 @@ export function SchemasSidebar({
                 </Badge>
 
                 {onOpenSyncSettings && (
-                  <div className="w-0 overflow-hidden opacity-0 group-hover:w-5 group-hover:opacity-100 transition-all duration-300 ease-in-out flex-shrink-0">
+                  <div
+                    className={cn(
+                      "transition-all duration-300 ease-in-out flex-shrink-0",
+                      showActionsOnHover ? "w-0 overflow-hidden opacity-0 group-hover:w-5 group-hover:opacity-100" : "w-5 opacity-100",
+                    )}
+                  >
                     <button
                       onClick={() => onOpenSyncSettings()}
                       className="p-0.5 hover:bg-stone-200 rounded text-stone-400 hover:text-stone-600 transition-colors outline-none"
@@ -441,7 +467,12 @@ export function SchemasSidebar({
                 )}
 
                 {onSyncNamedQueries && (
-                  <div className="w-0 overflow-hidden opacity-0 group-hover:w-5 group-hover:opacity-100 transition-all duration-300 ease-in-out flex-shrink-0">
+                  <div
+                    className={cn(
+                      "transition-all duration-300 ease-in-out flex-shrink-0",
+                      showActionsOnHover ? "w-0 overflow-hidden opacity-0 group-hover:w-5 group-hover:opacity-100" : "w-5 opacity-100",
+                    )}
+                  >
                     <button
                       onClick={() => onSyncNamedQueries()}
                       className="p-0.5 hover:bg-stone-200 rounded text-stone-400 hover:text-stone-600 transition-colors outline-none"
@@ -469,7 +500,14 @@ export function SchemasSidebar({
                     <span className="truncate">{nq.name}</span>
                   </button>
                   {onDeleteNamedQuery && (
-                    <div className="w-0 overflow-hidden opacity-0 group-hover/item:w-8 group-hover/item:opacity-100 transition-all duration-300 ease-in-out flex-shrink-0">
+                    <div
+                      className={cn(
+                        "transition-all duration-300 ease-in-out flex-shrink-0",
+                        showActionsOnHover
+                          ? "w-0 overflow-hidden opacity-0 group-hover/item:w-8 group-hover/item:opacity-100"
+                          : "w-8 opacity-100",
+                      )}
+                    >
                       <button
                         onClick={(e) => {
                           e.stopPropagation()

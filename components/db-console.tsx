@@ -17,6 +17,7 @@ import { Settings, PanelLeftClose, PanelLeft } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import type { ClientConnectionMeta } from "@/lib/connections"
 import type { SchemaGraph } from "@/lib/schema-introspection"
+import { applyNamedQueryParams } from "@/lib/sql/named-query-params"
 import { hasLimitClause, isReadOnlySql } from "@/lib/sql/safety"
 import { ApiError, apiClient, type NamedQuerySyncResolution } from "@/lib/client/apiClient"
 import { useCommand } from "@/components/shortcuts/useCommand"
@@ -104,6 +105,7 @@ export function DbConsole() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [sidebarTab, setSidebarTab] = useState<"tables" | "queries">("tables")
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
+  const [sidebarActionsShowOnHover, setSidebarActionsShowOnHover] = useState(true)
 
   const topPanelRef = useRef<ImperativePanelHandle | null>(null)
   const verticalGroupRef = useRef<HTMLDivElement | null>(null)
@@ -262,6 +264,49 @@ export function DbConsole() {
       setSyncBusy(false)
     }
   }, [reloadNamedQueries, syncBusy, toast])
+
+  // Desktop-only: menu items + persisted UI preference (sidebar action hover behavior)
+  useEffect(() => {
+    const dc = typeof window !== "undefined" ? (window as any).dbconsole : undefined
+    if (!dc?.isDesktop) return
+
+    const api = dc?.api
+    const events = dc?.events
+
+    let cancelled = false
+
+    ;(async () => {
+      try {
+        const res = await api?.uiPrefs?.get?.("sidebarActionsShowOnHover")
+        const value = res?.value
+        if (!cancelled && typeof value === "boolean") {
+          setSidebarActionsShowOnHover(value)
+        }
+      } catch {
+        // ignore (default true)
+      }
+    })()
+
+    const unsubHover = events?.onMenuSidebarActionsShowOnHover?.((payload: any) => {
+      const enabled = payload?.enabled
+      if (typeof enabled === "boolean") setSidebarActionsShowOnHover(enabled)
+    })
+
+    const unsubSyncNow = events?.onMenuSyncNow?.(() => {
+      void handleSyncNamedQueries()
+    })
+
+    const unsubSyncSettings = events?.onMenuSyncSettings?.(() => {
+      setShowSyncSettingsDialog(true)
+    })
+
+    return () => {
+      cancelled = true
+      unsubHover?.()
+      unsubSyncNow?.()
+      unsubSyncSettings?.()
+    }
+  }, [handleSyncNamedQueries])
 
   const scheduleAutoSyncNamedQueries = useCallback(() => {
     if (autoSyncTimerRef.current) clearTimeout(autoSyncTimerRef.current)
@@ -908,12 +953,12 @@ export function DbConsole() {
                 <ResizablePanel defaultSize={15} minSize={15} maxSize={40} className="border-r border-stone-200 bg-stone-50">
                   <div className="h-full flex flex-col">
                     <div className="flex-1 p-3 overflow-hidden">
-                      <SchemasSidebar
-                        connections={connections}
-                        activeConnection={activeConnection}
-                        onConnectionChange={handleConnectionChange}
-                        namedQueries={namedQueries.map((nq) => ({ id: nq.id, name: nq.name }))}
-                        onOpenNamedQuery={openNamedQueryTab}
+	                      <SchemasSidebar
+	                        connections={connections}
+	                        activeConnection={activeConnection}
+	                        onConnectionChange={handleConnectionChange}
+	                        namedQueries={namedQueries.map((nq) => ({ id: nq.id, name: nq.name }))}
+	                        onOpenNamedQuery={openNamedQueryTab}
                         onDeleteNamedQuery={async (id) => {
                           try {
                             await apiClient.namedQueries.delete(id)
@@ -933,12 +978,13 @@ export function DbConsole() {
                         onViewTable={handleViewTable}
                         onOpenSettings={() => setShowConnectionDialog(true)}
                         onOpenSyncSettings={() => setShowSyncSettingsDialog(true)}
-                        onSyncNamedQueries={handleSyncNamedQueries}
-                        onRefreshSchema={() => {
-                          if (activeConnection) {
-                            void loadSchema(activeConnection)
-                          }
-                        }}
+	                        onSyncNamedQueries={handleSyncNamedQueries}
+	                        showActionsOnHover={sidebarActionsShowOnHover}
+	                        onRefreshSchema={() => {
+	                          if (activeConnection) {
+	                            void loadSchema(activeConnection)
+	                          }
+	                        }}
                         schema={schema}
                         activeTab={sidebarTab}
                         onActiveTabChange={setSidebarTab}

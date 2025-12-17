@@ -1,6 +1,7 @@
 import { getConnectionById } from '@/lib/connections'
 import { getNamedQuery, logQueryRun, type LogQueryRunInput } from '@/lib/meta-db'
 import { getPoolForConnection, type PoolMode } from '@/lib/pg-pool'
+import { applyNamedQueryParams } from '@/lib/sql/named-query-params'
 import { isReadOnlySql, normalizeSql } from '@/lib/sql/safety'
 
 export type RawQueryInput = {
@@ -37,7 +38,7 @@ export type QueryResult = {
     totalCount?: number
 }
 
-type ParameterizedSql = { text: string; values: unknown[] }
+export { applyNamedQueryParams } from '@/lib/sql/named-query-params'
 
 export async function runQuery(input: RawQueryInput | NamedQueryInput): Promise<QueryResult> {
     const start = Date.now()
@@ -254,65 +255,6 @@ export function applyLimitOffset(sql: string, limit?: number, offset?: number): 
         return `${wrapped} OFFSET ${safeOffset}`
     }
     return `${wrapped} LIMIT ${safeLimit} OFFSET ${safeOffset}`
-}
-
-export function applyNamedQueryParams(template: string, params: Record<string, unknown>): ParameterizedSql {
-    // Optional parameter handling:
-    // - If a param is missing/empty, we neutralize simple predicates that reference it
-    //   (e.g., "col = :p" / "col LIKE :p" / "col IN (:p)") by replacing them with 1=1.
-    // - We then replace remaining :param occurrences with $1, $2... and collect values.
-
-    let workingSql = template
-
-    const isEmptyParam = (val: unknown) =>
-        val === undefined || val === null || (typeof val === 'string' && val.trim() === '')
-
-    // First pass: remove predicates for empty params
-    for (const [name, val] of Object.entries(params)) {
-        if (!isEmptyParam(val)) continue
-
-        const escaped = name.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')
-        const patterns = [
-            new RegExp(`([\\w."\\\`]+)\\s*=\\s*:${escaped}(::[\\w]+)?`, 'gi'),
-            new RegExp(`:${escaped}\\s*=\\s*([\\w."\\\`]+)`, 'gi'),
-            new RegExp(`([\\w."\\\`]+)\\s+(?:ILIKE|LIKE)\\s*:${escaped}`, 'gi'),
-            new RegExp(`([\\w."\\\`]+)\\s+IN\\s*\\(\\s*:${escaped}\\s*\\)`, 'gi'),
-        ]
-        for (const pat of patterns) {
-            workingSql = workingSql.replace(pat, '1=1')
-        }
-        // Also remove the param so it won't be substituted
-        delete (params as any)[name]
-    }
-
-    // Match :param only when it's not part of an identifier/hex chunk (e.g., MAC 00:11:22:aa:bb:cc).
-    // We require the char before ':' to be start or a non-word char.
-    const placeholderRegex = /(^|[^0-9A-Za-z_]):([a-zA-Z_][a-zA-Z0-9_]*)/g
-    const seen = new Map<string, number>()
-    const values: unknown[] = []
-
-    let index = 0
-    const text = workingSql.replace(placeholderRegex, (_match, prefix: string, name: string) => {
-        const key = name as string
-        let existing = seen.get(key)
-        if (existing === undefined) {
-            existing = ++index
-            seen.set(key, existing)
-            values.push(coerceParamValue(params[key]))
-        }
-        return `${prefix}$${existing}`
-    })
-
-    return { text, values }
-}
-
-function coerceParamValue(value: unknown): unknown {
-    if (value === null || value === undefined) return null
-    if (typeof value === 'string' && value.trim() === '') return null
-    if (typeof value === 'number' || typeof value === 'bigint') return value
-    if (typeof value === 'boolean') return value
-    // Everything else as string
-    return String(value)
 }
 
 // Parse table aliases from simple FROM / JOIN clauses.

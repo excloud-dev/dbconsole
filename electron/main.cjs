@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, shell, Menu, protocol } = require('electron')
+const { app, BrowserWindow, dialog, shell, Menu, protocol, ipcMain } = require('electron')
 const fs = require('node:fs')
 const { registerDesktopIpcHandlers } = require('./ipc-loader.cjs')
 const { setupSqlFileOpen } = require('./sql-file-open.cjs')
@@ -6,6 +6,54 @@ const path = require('node:path')
 
 const isDev = process.env.ELECTRON_DEV === '1' || !app.isPackaged
 const isMac = process.platform === 'darwin'
+
+const UI_PREFS_FILE = 'ui-prefs.json'
+const UI_PREF_KEYS = new Set(['sidebarActionsShowOnHover'])
+
+function getUiPrefsPath() {
+  return path.join(app.getPath('userData'), UI_PREFS_FILE)
+}
+
+function readUiPrefs() {
+  try {
+    const p = getUiPrefsPath()
+    if (!fs.existsSync(p)) return {}
+    const raw = fs.readFileSync(p, 'utf8')
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeUiPrefs(next) {
+  const p = getUiPrefsPath()
+  try {
+    fs.mkdirSync(path.dirname(p), { recursive: true })
+  } catch { }
+  fs.writeFileSync(p, JSON.stringify(next ?? {}, null, 2), 'utf8')
+}
+
+function getUiPrefBool(key, defaultValue) {
+  const prefs = readUiPrefs()
+  const v = prefs && typeof prefs === 'object' ? prefs[key] : undefined
+  return typeof v === 'boolean' ? v : defaultValue
+}
+
+function setUiPref(key, value) {
+  const prefs = readUiPrefs()
+  const next = prefs && typeof prefs === 'object' ? { ...prefs, [key]: value } : { [key]: value }
+  writeUiPrefs(next)
+  return next
+}
+
+function ok(body, status = 200) {
+  return { status, body }
+}
+
+function err(status, body) {
+  return { status, body }
+}
 
 // Ensure our custom scheme behaves like a normal secure origin (so things like localStorage work).
 // IMPORTANT: Must be called before app is ready.
@@ -29,6 +77,42 @@ try {
 
 let mainWindow = null
 let sqlFileOpen = null
+
+function registerUiPrefsIpc() {
+  ipcMain.handle('dbconsole:uiPrefs:get', (_evt, payload) => {
+    try {
+      const key = payload && typeof payload.key === 'string' ? payload.key : null
+      if (!key || !UI_PREF_KEYS.has(key)) return err(400, { error: 'Invalid preference key' })
+      if (key === 'sidebarActionsShowOnHover') {
+        const value = getUiPrefBool(key, true)
+        return ok({ value })
+      }
+      return err(400, { error: 'Unsupported preference key' })
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      return err(500, { error: message || 'Failed to read UI preferences' })
+    }
+  })
+
+  ipcMain.handle('dbconsole:uiPrefs:set', (_evt, payload) => {
+    try {
+      const key = payload && typeof payload.key === 'string' ? payload.key : null
+      if (!key || !UI_PREF_KEYS.has(key)) return err(400, { error: 'Invalid preference key' })
+
+      if (key === 'sidebarActionsShowOnHover') {
+        const value = payload && typeof payload.value === 'boolean' ? payload.value : null
+        if (value === null) return err(400, { error: 'Invalid preference value' })
+        setUiPref(key, value)
+        return ok({ success: true })
+      }
+
+      return err(400, { error: 'Unsupported preference key' })
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      return err(500, { error: message || 'Failed to write UI preferences' })
+    }
+  })
+}
 
 function getRendererUrl() {
   if (process.env.ELECTRON_RENDERER_URL) return process.env.ELECTRON_RENDERER_URL
@@ -171,6 +255,8 @@ function createMainWindow() {
 }
 
 function installAppMenu() {
+  const sidebarActionsShowOnHover = getUiPrefBool('sidebarActionsShowOnHover', true)
+
   const template = [
     ...(isMac
       ? [
@@ -237,10 +323,44 @@ function installAppMenu() {
       ],
     },
     {
+      label: 'Sync',
+      submenu: [
+        {
+          label: 'Sync Now',
+          click: () => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('dbconsole:menu:syncNow')
+            }
+          }
+        },
+        {
+          label: 'Sync Settings…',
+          click: () => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('dbconsole:menu:syncSettings')
+            }
+          }
+        },
+      ],
+    },
+    {
       label: 'View',
       submenu: [
         // Do not include reload: this is an app, not a browser. (CmdOrCtrl+R)
         { role: 'toggleDevTools' },
+        { type: 'separator' },
+        {
+          label: 'Show Sidebar Actions on Hover',
+          type: 'checkbox',
+          checked: sidebarActionsShowOnHover,
+          click: (menuItem) => {
+            const enabled = !!menuItem.checked
+            setUiPref('sidebarActionsShowOnHover', enabled)
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('dbconsole:menu:sidebarActionsShowOnHover', { enabled })
+            }
+          }
+        },
         { type: 'separator' },
         { role: 'resetZoom' },
         { role: 'zoomIn' },
@@ -332,6 +452,7 @@ app
   .whenReady()
   .then(async () => {
     setDefaultDesktopEnv()
+    registerUiPrefsIpc()
     registerDesktopIpcHandlers(app)
     registerRendererProtocol()
 

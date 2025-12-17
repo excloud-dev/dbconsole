@@ -22,4 +22,3 @@ export function listConflicts(bindings: Record<CommandId, KeyBinding[]>): Array<
   }
   return conflicts
 }
-
