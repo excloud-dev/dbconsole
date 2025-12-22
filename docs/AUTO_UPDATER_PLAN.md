@@ -20,7 +20,7 @@ Given we already ship from a private GitHub repo and capture a token in `ConfigS
    - Keep signing/notarization intact so `autoUpdater` can trust the downloaded bundles.
 
 2) **Wire `autoUpdater` into the existing updater surface**
-   - Flip `enableElectronUpdater` to true once the feed is live; set `autoUpdater.requestHeaders.Authorization = Bearer <token>` using the token we already store.
+   - Flip `enableElectronUpdater` to true once the feed is live; set `autoUpdater.requestHeaders.Authorization` using the token we already store (e.g., `Authorization: token ghp_xxx` for classic PATs, `Authorization: token github_pat_xxx` for fine-grained tokens, or `Authorization: Bearer <oauth_token>` for OAuth flows).
    - Let `UpdateController` continue to enforce maintenance windows, auto-check/install flags, and history, but delegate download/install to `autoUpdater` when available; keep the current GitHub-download path as a fallback.
    - Reuse existing UI events (`download-progress`, `update-available`, `update-notification`) and surface `autoUpdater` progress so the renderer dialogs work unchanged.
 
@@ -34,7 +34,9 @@ Given we already ship from a private GitHub repo and capture a token in `ConfigS
    - Maintain the current manual install path during the transition and remove it once CI publishes delta-friendly artifacts for two consecutive releases without regressions.
 
 5) **Next steps to implement**
-   - Extend `electron-builder.yml` with zip/nsis-web targets and publish config; add CI secrets for `GH_TOKEN` with release permissions.
+   - Extend `electron-builder.yml` with zip/nsis-web targets and publish config.
+   - Add CI (e.g., GitHub Actions) secrets for `GH_TOKEN` dedicated to publishing releases.
+   - Grant the minimal scopes for private releases (`contents:write` is required to create releases/upload assets; `metadata:read` alone is insufficient; use `repo` only if broader access is acceptable).
    - Teach `ElectronUpdater` to set `autoUpdater.setFeedURL`/`requestHeaders` using stored owner/repo/token and opt-in via env/feature flag.
    - Add a small capability check so renderer can show “delta enabled” vs. “full download fallback.”
 
