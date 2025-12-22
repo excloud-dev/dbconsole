@@ -25,7 +25,7 @@
     "electron:prepare-native": "node scripts/electron-prepare-native.mjs",
     "electron:prepare": "node scripts/electron-prepare.mjs",
     "electron:dist:mac": "npm run electron:prepare && electron-builder --config electron-builder.yml --mac --publish never",
-    "postinstall": "node scripts/electron-init-app-dir.mjs && electron-builder install-app-deps"
+    "postinstall": "node scripts/postinstall.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.0",

@@ -15,6 +15,7 @@
 - [x] Create sort of an SDK lib package for the API. And use that instead of doing fetch everytime. [apiClient]
 - [x] Encrypt the connection passwords somehow
 - [x] Explore if we need some sort of auth prob using cloudflare access. -> No
+- [ ] Allow for exporting named queries
 
 ## Query & Data Handling
 - [x] Add a way to export the query results to a CSV file.

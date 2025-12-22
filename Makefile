@@ -2,7 +2,7 @@
 # Usage: make install PORT=8080 HOST=100.103.6.96
 
 # Default values
-PORT ?= 30001
+PORT ?= 3001
 HOST ?= 100.103.6.96
 NEW ?= false
 

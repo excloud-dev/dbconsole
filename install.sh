@@ -257,6 +257,7 @@ setup_application() {
     rsync -av --exclude='node_modules' \
               --exclude='.git' \
               --exclude='.next' \
+              --exclude='.env' \
               --exclude='*.sqlite' \
               --exclude='*.sqlite-wal' \
               --exclude='*.sqlite-shm' \
@@ -269,7 +270,8 @@ setup_application() {
     
     # Install npm dependencies
     log_info "Installing npm dependencies..."
-    sudo -u "$SERVICE_USER" bash -c "source /home/$SERVICE_USER/.nvm/nvm.sh && cd $INSTALL_DIR && npm install"
+    # Skip package.json postinstall (Electron-only) during server installs
+    sudo -u "$SERVICE_USER" bash -c "source /home/$SERVICE_USER/.nvm/nvm.sh && cd $INSTALL_DIR && DBCONSOLE_SERVER_INSTALL=1 DBCONSOLE_SKIP_POSTINSTALL=1 npm install"
     
     log_success "npm dependencies installed"
     
@@ -288,6 +290,61 @@ setup_env_file() {
     log_info "Setting up environment file..."
     
     local ENV_FILE="$INSTALL_DIR/.env"
+    # Project env file (optional): a .env next to this install.sh
+    local SCRIPT_DIR
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local PROJECT_ENV_FILE="$SCRIPT_DIR/.env"
+
+    merge_project_env_into_install_env() {
+        local reserved_key
+        if [[ ! -f "$PROJECT_ENV_FILE" ]]; then
+            return 0
+        fi
+
+        log_info "Found project .env at $PROJECT_ENV_FILE"
+        log_info "Merging project .env into $ENV_FILE (only adds missing keys; does not override existing values)"
+
+        local line key value trimmed
+        while IFS= read -r line || [[ -n "$line" ]]; do
+            # Trim whitespace (best-effort, bash-only)
+            trimmed="${line#"${line%%[![:space:]]*}"}"
+            trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
+
+            # Skip blanks and comments
+            if [[ -z "$trimmed" || "$trimmed" == \#* ]]; then
+                continue
+            fi
+
+            # Support "export KEY=VALUE" lines
+            if [[ "$trimmed" == export\ * ]]; then
+                trimmed="${trimmed#export }"
+                trimmed="${trimmed#"${trimmed%%[![:space:]]*}"}"
+            fi
+
+            # Only handle KEY=VALUE
+            if [[ ! "$trimmed" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then
+                continue
+            fi
+
+            key="${trimmed%%=*}"
+            value="${trimmed#*=}"
+
+            # Never take these from project .env (managed by install.sh flags/defaults)
+            case "$key" in
+                NODE_ENV|PORT|BIND_HOST|DBCONSOLE_SYNC_SERVER_ONLY)
+                    continue
+                    ;;
+            esac
+
+            # Only add if missing in install env file
+            if grep -q "^${key}=" "$ENV_FILE"; then
+                continue
+            fi
+
+            echo "${key}=${value}" >> "$ENV_FILE"
+        done < "$PROJECT_ENV_FILE"
+    }
+
     local SYNC_ENV_VALUE="0"
     if [[ "$SYNC_SERVER_ONLY" == "true" ]]; then
         SYNC_ENV_VALUE="1"
@@ -324,6 +381,8 @@ setup_env_file() {
                 log_info "Added DBCONSOLE_SYNC_SERVER_ONLY=$SYNC_ENV_VALUE to existing .env file"
             fi
         fi
+
+        merge_project_env_into_install_env
     else
         # Create a basic .env file (user can customize later)
         cat > "$ENV_FILE" << EOF
@@ -336,11 +395,17 @@ DBCONSOLE_SYNC_SERVER_ONLY=$SYNC_ENV_VALUE
 # Add your database connection strings and other config here
 # DATABASE_URL=postgresql://user:password@localhost:5432/dbname
 EOF
+        merge_project_env_into_install_env
+
         chown "$SERVICE_USER:$SERVICE_GROUP" "$ENV_FILE"
         chmod 600 "$ENV_FILE"
         log_success "Created .env file at $ENV_FILE"
         log_info "Edit $ENV_FILE to configure your database connections"
     fi
+
+    # Ensure consistent ownership/permissions after edits (applies to both create + update paths)
+    chown "$SERVICE_USER:$SERVICE_GROUP" "$ENV_FILE" || true
+    chmod 600 "$ENV_FILE" || true
 }
 
 #-------------------------------------------------------------------------------
