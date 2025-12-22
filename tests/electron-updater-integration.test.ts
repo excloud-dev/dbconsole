@@ -45,6 +45,24 @@ vi.mock('fs/promises', () => ({
 // Import the module under test
 import { ElectronUpdater } from '@/lib/updater/electron-updater'
 
+// Helper function to temporarily mock platform
+function withMockedPlatform<T>(platform: string, fn: () => T): T {
+    const originalPlatform = process.platform
+    Object.defineProperty(process, 'platform', {
+        value: platform,
+        configurable: true
+    })
+    
+    try {
+        return fn()
+    } finally {
+        Object.defineProperty(process, 'platform', {
+            value: originalPlatform,
+            configurable: true
+        })
+    }
+}
+
 describe('ElectronUpdater Capability Detection', () => {
     let updater: ElectronUpdater
     
@@ -65,51 +83,24 @@ describe('ElectronUpdater Capability Detection', () => {
 
     describe('Capability Detection', () => {
         it('should detect differential update support on macOS', () => {
-            const originalPlatform = process.platform
-            Object.defineProperty(process, 'platform', {
-                value: 'darwin',
-                configurable: true
-            })
-            
-            const isDifferentialSupported = updater.isDifferentialUpdateSupported()
+            const isDifferentialSupported = withMockedPlatform('darwin', () => 
+                updater.isDifferentialUpdateSupported()
+            )
             expect(isDifferentialSupported).toBe(true)
-            
-            Object.defineProperty(process, 'platform', {
-                value: originalPlatform,
-                configurable: true
-            })
         })
 
         it('should not support differential updates on Windows', () => {
-            const originalPlatform = process.platform
-            Object.defineProperty(process, 'platform', {
-                value: 'win32',
-                configurable: true
-            })
-            
-            const isDifferentialSupported = updater.isDifferentialUpdateSupported()
+            const isDifferentialSupported = withMockedPlatform('win32', () =>
+                updater.isDifferentialUpdateSupported()
+            )
             expect(isDifferentialSupported).toBe(false)
-            
-            Object.defineProperty(process, 'platform', {
-                value: originalPlatform,
-                configurable: true
-            })
         })
 
         it('should not support differential updates on Linux', () => {
-            const originalPlatform = process.platform
-            Object.defineProperty(process, 'platform', {
-                value: 'linux',
-                configurable: true
-            })
-            
-            const isDifferentialSupported = updater.isDifferentialUpdateSupported()
+            const isDifferentialSupported = withMockedPlatform('linux', () =>
+                updater.isDifferentialUpdateSupported()
+            )
             expect(isDifferentialSupported).toBe(false)
-            
-            Object.defineProperty(process, 'platform', {
-                value: originalPlatform,
-                configurable: true
-            })
         })
 
         it('should return correct capabilities object', () => {

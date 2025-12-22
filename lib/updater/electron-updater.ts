@@ -147,13 +147,24 @@ export class ElectronUpdater extends EventEmitter {
                     if (updateCheckResult && updateCheckResult.updateInfo) {
                         const info = updateCheckResult.updateInfo
                         // Convert ElectronUpdateInfo to our UpdateInfo format
+                        // electron-updater provides these fields but they're not in the type definitions
+                        interface ExtendedUpdateInfo {
+                            version: string
+                            releaseNotes?: string
+                            path?: string
+                            files?: Array<{ url?: string }>
+                            sha512?: string
+                            releaseDate?: string
+                        }
+                        const extendedInfo = info as unknown as ExtendedUpdateInfo
+                        
                         const updateInfo: UpdateInfo = {
-                            version: info.version,
-                            releaseNotes: (info as any).releaseNotes || '',
-                            downloadUrl: (info as any).path || '',
-                            assetName: (info as any).files?.[0]?.url || '',
-                            checksum: (info as any).sha512 || '',
-                            publishedAt: new Date((info as any).releaseDate || Date.now()),
+                            version: extendedInfo.version,
+                            releaseNotes: extendedInfo.releaseNotes || '',
+                            downloadUrl: extendedInfo.path || '',
+                            assetName: extendedInfo.files?.[0]?.url || '',
+                            checksum: extendedInfo.sha512 || '',
+                            publishedAt: new Date(extendedInfo.releaseDate || Date.now()),
                             isPrerelease: false
                         }
                         
@@ -450,8 +461,8 @@ export class ElectronUpdater extends EventEmitter {
                 
                 if (token) {
                     // Set up feed URL for GitHub releases
-                    const owner = this.updateController['options'].owner
-                    const repo = this.updateController['options'].repo
+                    const owner = this.updateController.getOwner()
+                    const repo = this.updateController.getRepo()
                     const feedUrl = `https://github.com/${owner}/${repo}`
                     
                     // Configure autoUpdater with GitHub settings

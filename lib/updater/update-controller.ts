@@ -411,6 +411,20 @@ export class UpdateControllerImpl extends EventEmitter implements UpdateControll
     }
 
     /**
+     * Get repository owner
+     */
+    getOwner(): string {
+        return this.options.owner
+    }
+
+    /**
+     * Get repository name
+     */
+    getRepo(): string {
+        return this.options.repo
+    }
+
+    /**
      * Display release notes in a formatted way
      */
     async displayReleaseNotes(version: string, format: 'markdown' | 'plain' | 'html' = 'markdown'): Promise<string> {
