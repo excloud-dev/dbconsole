@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.4.7 - 2025-12-22
+
+- feat: enhance installation script to merge project environment variables and update npm install process (3c3f76c)
+- fix: update route types import path/remove applyNamedQueryParams (cef2b09)
+
 ## v0.4.6 - 2025-12-17
 
 - feat: implement sidebar actions hover preference and hopefully fix the named queries reference error (6da2438)
