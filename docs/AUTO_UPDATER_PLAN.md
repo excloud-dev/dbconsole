@@ -8,16 +8,15 @@
 ## Feasibility (Electron autoUpdater)
 Electron’s `autoUpdater` (per https://www.electronjs.org/docs/latest/api/auto-updater) plus `electron-updater` from electron-builder supports:
 - In-place updates with `quitAndInstall`, storing downloads under the user cache and swapping the app bundle.
-- Differential/blockmap downloads for macOS zip and Windows NSIS/NSIS-web targets to move only changed chunks instead of full DMGs/installers.
-- Private GitHub releases when provided an access token (`requestHeaders` / `GH_TOKEN`) and publish config that points to the private repo.
+- Differential/blockmap downloads for macOS zip targets to move only changed chunks instead of full DMGs.
+- Private GitHub releases using the existing token workflow already wired into `ConfigService` (no new secrets needed).
 
-Given we already ship from a private GitHub repo and capture a token in `ConfigService`, we can wire the feed URL + headers into `autoUpdater` while keeping existing policy/maintenance-window checks in `UpdateController`.
+Given we already ship from a private GitHub repo and capture a token in `ConfigService`, we can wire the feed URL + headers into `autoUpdater` while keeping existing policy/maintenance-window checks in `UpdateController`, without adding signing/notarization or Windows targets.
 
 ## Proposed Plan of Action
 1) **Publish artifacts suitable for in-place/differential updates**
-   - Update `electron-builder.yml` targets to include macOS `zip` (in addition to `dmg`) and Windows `nsis`/`nsis-web` so blockmap files get generated.
+   - Update `electron-builder.yml` targets to include macOS `zip` (alongside `dmg`) so blockmap files get generated.
    - Add a `publish` section (GitHub provider, owner/repo from env, `private: true`, `releaseType` per channel) and ensure CI uploads `.yml`/`.blockmap` metadata alongside binaries.
-   - Keep signing/notarization intact so `autoUpdater` can trust the downloaded bundles.
 
 2) **Wire `autoUpdater` into the existing updater surface**
    - Flip `enableElectronUpdater` to true once the feed is live; set `autoUpdater.requestHeaders.Authorization` using the token we already store (e.g., `Authorization: token ghp_xxx` for classic PATs, `Authorization: token github_pat_xxx` for fine-grained tokens, or `Authorization: Bearer <oauth_token>` for OAuth flows).
@@ -28,16 +27,13 @@ Given we already ship from a private GitHub repo and capture a token in `ConfigS
    - Rely on electron-builder blockmap artifacts so `autoUpdater` performs chunked downloads; keep a feature flag to fall back to full installers if blockmap fails.
    - Cache location and cleanup are handled by `autoUpdater`; retain our checksum verification as a post-download guard for parity with today’s flow.
 
-4) **Rollout and safety**
+4) **Rollout**
    - Start with a single channel (latest) and add prerelease/custom tag support by mapping our existing `updateChannel` setting to the feed URL or GitHub release filter.
-   - Add telemetry/logging hooks (we already emit structured logs) for success/failure of `autoUpdater` paths to gate rollout.
-   - Maintain the current manual install path during the transition and remove it once CI publishes delta-friendly artifacts for two consecutive releases without regressions.
+   - Add telemetry/logging hooks (we already emit structured logs) for success/failure of `autoUpdater` paths.
 
 5) **Next steps to implement**
-   - Extend `electron-builder.yml` with zip/nsis-web targets and publish config.
-   - Add CI (e.g., GitHub Actions) secrets for `GH_TOKEN` dedicated to publishing releases.
-   - Grant the minimal scopes for private releases (`contents:write` is required to create releases/upload assets; `metadata:read` alone is insufficient; use `repo` only if broader access is acceptable).
-   - Teach `ElectronUpdater` to set `autoUpdater.setFeedURL`/`requestHeaders` using stored owner/repo/token and opt-in via env/feature flag.
+   - Extend `electron-builder.yml` with macOS zip target and publish config.
+   - Use the existing updater token flow to set `autoUpdater.setFeedURL`/`requestHeaders` with stored owner/repo/token and opt-in via env/feature flag.
    - Add a small capability check so renderer can show “delta enabled” vs. “full download fallback.”
 
-This plan keeps the existing policy and token plumbing, adds official Electron in-place updates with differential downloads, and preserves the custom path as a fallback while we validate the new pipeline.
+This plan keeps the existing policy and token plumbing while adding Electron in-place updates with differential downloads on macOS using the current workflow.
