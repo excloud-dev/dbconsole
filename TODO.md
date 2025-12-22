@@ -36,3 +36,5 @@
 - [ ] Fix fullscreen datagrid view. 
 - [ ] When cells are highlighed, it looks a little off. investigate.
 - [ ] Fix the toggle columns modal/dialog thing.
+- [ ] Add an option to generate/create INSERT and UPDATE queries to run.
+- [x] Selecting another connection and running should run the query using that connection!

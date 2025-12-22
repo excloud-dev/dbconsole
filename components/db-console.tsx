@@ -1024,7 +1024,7 @@ export function DbConsole() {
                         <QueryEditor
                           query={currentTab?.query || ""}
                           onChange={(q) => currentTab && updateQuery(currentTab.id, q)}
-                          onRun={() => executeRawQuery(undefined, undefined, undefined, 0)}
+                          onRun={() => executeRawQuery(undefined, undefined, activeConnection ?? undefined, 0)}
                           onSaveAsNamed={() => setShowSaveNamedDialog(true)}
                           schema={schema}
                           params={currentTab?.params}
