@@ -1,6 +1,6 @@
 "use client"
 
-import { Plus, X, Bookmark } from "lucide-react"
+import { Plus, X, Bookmark, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -14,10 +14,28 @@ export interface Tab {
   name: string
   query: string
   isNamedQuery?: boolean
+  isGenerator?: boolean
   namedQueryId?: string
   connectionId?: string
   params?: RawParam[]
   namedParams?: Record<string, string>
+  generator?: {
+    mode: "insert" | "update"
+    table: { schema: string; name: string }
+    params: Array<{
+      name: string
+      dataType: string
+      inputType: "string" | "number" | "boolean"
+      isNullable: boolean
+      isAuto: boolean
+      isPk: boolean
+      role?: "set" | "where"
+      overrideAuto?: boolean
+      isNull?: boolean
+      value: string
+    }>
+    allowUnsafeUpdate?: boolean
+  }
   pagination?: {
     limit?: number
     offset: number
@@ -49,7 +67,11 @@ export function QueryTabs({ tabs, activeTab, onTabChange, onTabClose, onAddTab }
           )}
           onClick={() => onTabChange(tab.id)}
         >
-          {tab.isNamedQuery && <Bookmark className="h-3 w-3 text-accent-foreground fill-accent" />}
+          {tab.isGenerator ? (
+            <Sparkles className="h-3 w-3 text-emerald-600" />
+          ) : (
+            tab.isNamedQuery && <Bookmark className="h-3 w-3 text-accent-foreground fill-accent" />
+          )}
           <span className="truncate max-w-24">{tab.name}</span>
           {tabs.length > 1 && (
             <button

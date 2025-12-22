@@ -156,7 +156,17 @@ export type NamedQuerySyncOkResult = {
 
 export type SchemaGraph = {
     tables: { schema: string; name: string }[]
-    columns: { table: { schema: string; name: string }; name: string; dataType: string; isNullable: boolean }[]
+    columns: {
+        table: { schema: string; name: string }
+        name: string
+        dataType: string
+        isNullable: boolean
+        defaultValue?: string | null
+        isIdentity?: boolean
+        identityGeneration?: string | null
+        isGenerated?: boolean
+        generationExpression?: string | null
+    }[]
     foreignKeys: {
         from: { schema: string; name: string }
         fromColumn: string

@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Play, BookmarkPlus } from "lucide-react"
 import { SqlEditor } from "@/components/sql-editor"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Check, X } from "lucide-react"
 
 interface SchemaInfo {
   tables: { name: string; schema: string }[]
@@ -87,12 +88,33 @@ export function QueryEditor({ query, onChange, onRun, onSaveAsNamed, isNamedQuer
               <div className="h-4 w-px bg-stone-100 shrink-0" />
 
               {/* Value Input */}
-              <input
-                className="flex-1 bg-transparent border-none text-xs focus:ring-0 p-0 text-stone-800 placeholder:text-stone-300 min-w-0 outline-none font-mono"
-                value={param.value}
-                onChange={(e) => updateParam(idx, { value: e.target.value })}
-                placeholder="Value..."
-              />
+              {param.type === "boolean" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = param.value === "" ? "true" : param.value === "true" ? "false" : ""
+                    updateParam(idx, { value: next })
+                  }}
+                  className={`h-5 w-6 flex items-center justify-center rounded border text-[10px] font-mono ${param.value === "true"
+                    ? "border-emerald-300 text-emerald-700 bg-emerald-50"
+                    : param.value === "false"
+                      ? "border-rose-300 text-rose-700 bg-rose-50"
+                      : "border-stone-200 text-stone-400 bg-white hover:bg-stone-50"
+                    }`}
+                  title={param.value === "" ? "Unset" : param.value === "true" ? "True" : "False"}
+                  aria-pressed={param.value !== ""}
+                >
+                  {param.value === "true" && <Check className="h-3 w-3" />}
+                  {param.value === "false" && <X className="h-3 w-3" />}
+                </button>
+              ) : (
+                <input
+                  className="flex-1 bg-transparent border-none text-xs focus:ring-0 p-0 text-stone-800 placeholder:text-stone-300 min-w-0 outline-none font-mono"
+                  value={param.value}
+                  onChange={(e) => updateParam(idx, { value: e.target.value })}
+                  placeholder="Value..."
+                />
+              )}
 
               {/* Label Hint (if distinct from value) */}
               {paramLabels[idx] && (

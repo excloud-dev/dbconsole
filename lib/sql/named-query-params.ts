@@ -33,6 +33,8 @@ export function applyNamedQueryParams(template: string, params: Record<string, u
         delete filteredParams[name]
     }
 
+    workingSql = cleanupTrivialPredicates(workingSql)
+
     // Match :param only when it's not part of an identifier/hex chunk (e.g., MAC 00:11:22:aa:bb:cc).
     // We require the char before ':' to be start or a non-word char.
     const placeholderRegex = /(^|[^0-9A-Za-z_]):([a-zA-Z_][a-zA-Z0-9_]*)/g
@@ -52,6 +54,23 @@ export function applyNamedQueryParams(template: string, params: Record<string, u
     })
 
     return { text, values }
+}
+
+export function cleanupTrivialPredicates(sql: string): string {
+    let cleaned = sql
+
+    // Collapse parenthesized 1=1
+    cleaned = cleaned.replace(/\(\s*1\s*=\s*1\s*\)/gi, '1=1')
+
+    // Remove AND-linked neutral predicates
+    cleaned = cleaned.replace(/\bWHERE\s+1\s*=\s*1\s+AND\b/gi, 'WHERE')
+    cleaned = cleaned.replace(/\bAND\s+1\s*=\s*1\b/gi, '')
+    cleaned = cleaned.replace(/\b1\s*=\s*1\s+AND\b/gi, '')
+
+    // If WHERE is left with only 1=1, drop it entirely
+    cleaned = cleaned.replace(/\bWHERE\s+1\s*=\s*1\b/gi, '')
+
+    return cleaned
 }
 
 function coerceParamValue(value: unknown): unknown {

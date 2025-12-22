@@ -8,6 +8,11 @@ export type ColumnInfo = {
     name: string
     dataType: string
     isNullable: boolean
+    defaultValue?: string | null
+    isIdentity?: boolean
+    identityGeneration?: string | null
+    isGenerated?: boolean
+    generationExpression?: string | null
 }
 
 export type ForeignKeyEdge = {
@@ -41,7 +46,8 @@ export async function loadSchemaGraph(connectionId: string): Promise<SchemaGraph
        ORDER BY table_schema, table_name`,
         ),
         pool.query(
-            `SELECT table_schema, table_name, column_name, data_type, is_nullable
+            `SELECT table_schema, table_name, column_name, data_type, is_nullable,
+                    column_default, is_identity, identity_generation, is_generated, generation_expression
        FROM information_schema.columns
        WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
        ORDER BY table_schema, table_name, ordinal_position`,
@@ -94,6 +100,11 @@ export async function loadSchemaGraph(connectionId: string): Promise<SchemaGraph
         name: r.column_name as string,
         dataType: r.data_type as string,
         isNullable: String(r.is_nullable).toLowerCase() === 'yes',
+        defaultValue: r.column_default as string | null | undefined,
+        isIdentity: String(r.is_identity).toLowerCase() === 'yes',
+        identityGeneration: r.identity_generation as string | null | undefined,
+        isGenerated: String(r.is_generated).toLowerCase() === 'yes',
+        generationExpression: r.generation_expression as string | null | undefined,
     }))
 
     const foreignKeys: ForeignKeyEdge[] = fksRes.rows.map((r) => ({

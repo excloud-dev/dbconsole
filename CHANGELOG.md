@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.5.0 - 2025-12-22
+
+- feat: add write-query generator UI for INSERT/UPDATE with a searchable table picker, generator tabs, and DataGrid output preview
+- feat: detect auto-generated columns (identity/generated/defaults like now/uuid) and surface AUTO badges in schema sidebar
+- feat: generator params skip empty fields, support explicit NULLs, and default to PKs for UPDATE WHERE
+- feat: tri-state boolean inputs for named queries and raw param tabs
+- fix: improve optional-param cleanup to remove redundant 1=1 fragments (client/server aligned)
+- feat: ensure query execution uses the selected connection (defa11d)
+
 ## v0.4.7 - 2025-12-22
 
 - feat: enhance installation script to merge project environment variables and update npm install process (3c3f76c)
