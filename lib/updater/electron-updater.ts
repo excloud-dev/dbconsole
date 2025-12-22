@@ -148,24 +148,36 @@ export class ElectronUpdater extends EventEmitter {
                         const info = updateCheckResult.updateInfo
                         // Convert ElectronUpdateInfo to our UpdateInfo format
                         // electron-updater provides these fields but they're not in the type definitions
+                        // This is a known limitation of the electron-updater types
                         interface ExtendedUpdateInfo {
                             version: string
                             releaseNotes?: string
+                            // path: download URL for the update file
                             path?: string
+                            // files: array of downloadable files in the release
                             files?: Array<{ url?: string }>
                             sha512?: string
                             releaseDate?: string
+                            prerelease?: boolean
                         }
+                        
+                        // Safe cast: we know autoUpdater provides these fields at runtime
                         const extendedInfo = info as unknown as ExtendedUpdateInfo
                         
                         const updateInfo: UpdateInfo = {
                             version: extendedInfo.version,
                             releaseNotes: extendedInfo.releaseNotes || '',
+                            // path is the main download URL
                             downloadUrl: extendedInfo.path || '',
+                            // Use first file URL as asset name (typically the zip file)
                             assetName: extendedInfo.files?.[0]?.url || '',
                             checksum: extendedInfo.sha512 || '',
-                            publishedAt: new Date(extendedInfo.releaseDate || Date.now()),
-                            isPrerelease: false
+                            // Use current time only if release date is truly unavailable
+                            publishedAt: extendedInfo.releaseDate 
+                                ? new Date(extendedInfo.releaseDate) 
+                                : new Date(),
+                            // Preserve prerelease status from electron-updater
+                            isPrerelease: extendedInfo.prerelease || false
                         }
                         
                         this.emitTelemetry('update-check-success-electron', {
@@ -700,18 +712,19 @@ export class ElectronUpdater extends EventEmitter {
         }
 
         // In production, this would integrate with a proper logging system
+        const dataStr = data ? JSON.stringify(data, null, 2) : ''
         switch (level) {
             case 'error':
-                console.error(`[ElectronUpdater] ${message}`, data || '')
+                console.error(`[ElectronUpdater] ${message}`, dataStr)
                 break
             case 'warn':
-                console.warn(`[ElectronUpdater] ${message}`, data || '')
+                console.warn(`[ElectronUpdater] ${message}`, dataStr)
                 break
             case 'info':
-                console.info(`[ElectronUpdater] ${message}`, data || '')
+                console.info(`[ElectronUpdater] ${message}`, dataStr)
                 break
             default:
-                console.debug(`[ElectronUpdater] ${message}`, data || '')
+                console.debug(`[ElectronUpdater] ${message}`, dataStr)
         }
 
         this.emit('log', logEntry)
