@@ -17,7 +17,6 @@ import { Settings, PanelLeftClose, PanelLeft } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import type { ClientConnectionMeta } from "@/lib/connections"
 import type { SchemaGraph } from "@/lib/schema-introspection"
-import { applyNamedQueryParams } from "@/lib/sql/named-query-params"
 import { hasLimitClause, isReadOnlySql } from "@/lib/sql/safety"
 import { ApiError, apiClient, type NamedQuerySyncResolution } from "@/lib/client/apiClient"
 import { useCommand } from "@/components/shortcuts/useCommand"
@@ -275,17 +274,17 @@ export function DbConsole() {
 
     let cancelled = false
 
-    ;(async () => {
-      try {
-        const res = await api?.uiPrefs?.get?.("sidebarActionsShowOnHover")
-        const value = res?.value
-        if (!cancelled && typeof value === "boolean") {
-          setSidebarActionsShowOnHover(value)
+      ; (async () => {
+        try {
+          const res = await api?.uiPrefs?.get?.("sidebarActionsShowOnHover")
+          const value = res?.value
+          if (!cancelled && typeof value === "boolean") {
+            setSidebarActionsShowOnHover(value)
+          }
+        } catch {
+          // ignore (default true)
         }
-      } catch {
-        // ignore (default true)
-      }
-    })()
+      })()
 
     const unsubHover = events?.onMenuSidebarActionsShowOnHover?.((payload: any) => {
       const enabled = payload?.enabled
@@ -837,8 +836,10 @@ export function DbConsole() {
     if (!activeConnection) return
     const targetTab = currentTab
     const offset = newOffset
-    const paramSql = applyNamedQueryParams(query.query, params)
-    const hasUserLimit = hasLimitClause(paramSql.text)
+    // We only need to know whether the user's SQL already has a LIMIT clause to decide
+    // whether to apply our own pagination limit. This can be determined from the template
+    // itself; parameter substitution happens server-side.
+    const hasUserLimit = hasLimitClause(query.query)
     const fallbackLimit = hasUserLimit ? undefined : targetTab?.pagination?.limit ?? 100
     const limit = newLimit === undefined ? fallbackLimit : newLimit === null ? undefined : newLimit
     setIsRunning(true)
@@ -953,12 +954,12 @@ export function DbConsole() {
                 <ResizablePanel defaultSize={15} minSize={15} maxSize={40} className="border-r border-stone-200 bg-stone-50">
                   <div className="h-full flex flex-col">
                     <div className="flex-1 p-3 overflow-hidden">
-	                      <SchemasSidebar
-	                        connections={connections}
-	                        activeConnection={activeConnection}
-	                        onConnectionChange={handleConnectionChange}
-	                        namedQueries={namedQueries.map((nq) => ({ id: nq.id, name: nq.name }))}
-	                        onOpenNamedQuery={openNamedQueryTab}
+                      <SchemasSidebar
+                        connections={connections}
+                        activeConnection={activeConnection}
+                        onConnectionChange={handleConnectionChange}
+                        namedQueries={namedQueries.map((nq) => ({ id: nq.id, name: nq.name }))}
+                        onOpenNamedQuery={openNamedQueryTab}
                         onDeleteNamedQuery={async (id) => {
                           try {
                             await apiClient.namedQueries.delete(id)
@@ -978,13 +979,13 @@ export function DbConsole() {
                         onViewTable={handleViewTable}
                         onOpenSettings={() => setShowConnectionDialog(true)}
                         onOpenSyncSettings={() => setShowSyncSettingsDialog(true)}
-	                        onSyncNamedQueries={handleSyncNamedQueries}
-	                        showActionsOnHover={sidebarActionsShowOnHover}
-	                        onRefreshSchema={() => {
-	                          if (activeConnection) {
-	                            void loadSchema(activeConnection)
-	                          }
-	                        }}
+                        onSyncNamedQueries={handleSyncNamedQueries}
+                        showActionsOnHover={sidebarActionsShowOnHover}
+                        onRefreshSchema={() => {
+                          if (activeConnection) {
+                            void loadSchema(activeConnection)
+                          }
+                        }}
                         schema={schema}
                         activeTab={sidebarTab}
                         onActiveTabChange={setSidebarTab}
