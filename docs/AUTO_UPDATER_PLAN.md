@@ -16,7 +16,7 @@ Given we already ship from a private GitHub repo and capture a token in `ConfigS
 ## Proposed Plan of Action
 1) **Publish artifacts suitable for in-place/differential updates**
    - Update `electron-builder.yml` targets to include macOS `zip` (alongside `dmg`) so blockmap files get generated.
-   - Add a `publish` section (GitHub provider, owner/repo from env, `private: true`, `releaseType` per channel) and ensure CI uploads `.yml`/`.blockmap` metadata alongside binaries.
+   - Reuse the existing release workflow to upload the zip + blockmap metadata; skip adding an `electron-builder` publish tag/provider block.
 
 2) **Wire `autoUpdater` into the existing updater surface**
    - Flip `enableElectronUpdater` to true once the feed is live; set `autoUpdater.requestHeaders.Authorization` using the token we already store (e.g., `Authorization: token ghp_xxx` for classic PATs, `Authorization: token github_pat_xxx` for fine-grained tokens, or `Authorization: Bearer <oauth_token>` for OAuth flows).
@@ -32,8 +32,8 @@ Given we already ship from a private GitHub repo and capture a token in `ConfigS
    - Add telemetry/logging hooks (we already emit structured logs) for success/failure of `autoUpdater` paths.
 
 5) **Next steps to implement**
-   - Extend `electron-builder.yml` with macOS zip target and publish config.
-   - Use the existing updater token flow to set `autoUpdater.setFeedURL`/`requestHeaders` with stored owner/repo/token and opt-in via env/feature flag.
+   - Extend `electron-builder.yml` with a macOS zip target (no additional publish tag/config needed).
+   - Use the existing updater token flow to set `autoUpdater.setFeedURL`/`requestHeaders` with stored owner/repo/token and opt-in via env/feature flag (no new GH token management).
    - Add a small capability check so renderer can show “delta enabled” vs. “full download fallback.”
 
 This plan keeps the existing policy and token plumbing while adding Electron in-place updates with differential downloads on macOS using the current workflow.
