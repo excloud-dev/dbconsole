@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.4.8 - 2025-12-22
+
+- feat: ensure query execution uses the selected connection (defa11d)
+- feat: add a new generator UI for generating INSERT/UPDATE queries (d99618e)
+
 ## v0.5.0 - 2025-12-22
 
 - feat: add write-query generator UI for INSERT/UPDATE with a searchable table picker, generator tabs, and DataGrid output preview
