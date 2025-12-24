@@ -172,10 +172,10 @@ export class ElectronUpdater extends EventEmitter {
                             // Use first file URL as asset name (typically the zip file)
                             assetName: extendedInfo.files?.[0]?.url || '',
                             checksum: extendedInfo.sha512 || '',
-                            // Use current time only if release date is truly unavailable
-                            publishedAt: extendedInfo.releaseDate 
-                                ? new Date(extendedInfo.releaseDate) 
-                                : new Date(),
+                            // If release date is unavailable, represent it explicitly as null
+                            publishedAt: extendedInfo.releaseDate
+                                ? new Date(extendedInfo.releaseDate)
+                                : null,
                             // Preserve prerelease status from electron-updater
                             isPrerelease: extendedInfo.prerelease || false
                         }
