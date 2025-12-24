@@ -1,8 +1,26 @@
 "use client"
 
-import { Plus, X, Bookmark, Sparkles } from "lucide-react"
+import { useEffect, useRef } from "react"
+import { Plus } from "lucide-react"
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragOverlay,
+} from "@dnd-kit/core"
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  horizontalListSortingStrategy,
+} from "@dnd-kit/sortable"
+import { restrictToHorizontalAxis, restrictToParentElement } from "@dnd-kit/modifiers"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import { SortableTab } from "./sortable-tab"
 
 export type RawParam = {
   type: 'string' | 'number' | 'boolean'
@@ -51,42 +69,96 @@ interface QueryTabsProps {
   onTabChange: (id: string) => void
   onTabClose: (id: string) => void
   onAddTab: () => void
+  onTabReorder: (tabs: Tab[]) => void
 }
 
-export function QueryTabs({ tabs, activeTab, onTabChange, onTabClose, onAddTab }: QueryTabsProps) {
+export function QueryTabs({ tabs, activeTab, onTabChange, onTabClose, onAddTab, onTabReorder }: QueryTabsProps) {
+  const tabRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  // Set up drag-and-drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Drag must move 8px before activating
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  // Auto-scroll to active tab when it changes
+  useEffect(() => {
+    const activeTabElement = tabRefs.current.get(activeTab)
+    if (activeTabElement && scrollContainerRef.current) {
+      activeTabElement.scrollIntoView({
+        behavior: 'smooth',
+        inline: 'nearest',
+        block: 'nearest'
+      })
+    }
+  }, [activeTab])
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (over && active.id !== over.id) {
+      const oldIndex = tabs.findIndex((tab) => tab.id === active.id)
+      const newIndex = tabs.findIndex((tab) => tab.id === over.id)
+
+      const reorderedTabs = arrayMove(tabs, oldIndex, newIndex)
+      onTabReorder(reorderedTabs)
+    }
+  }
+
   return (
-    <div className="flex items-center gap-1">
-      {tabs.map((tab) => (
-        <div
-          key={tab.id}
-          className={cn(
-            "group flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm cursor-pointer transition-all duration-150",
-            activeTab === tab.id
-              ? "bg-white text-stone-900 border border-stone-200 font-medium"
-              : "text-stone-500 hover:bg-stone-200/50 hover:text-stone-700",
-          )}
-          onClick={() => onTabChange(tab.id)}
+    <div className="flex items-center gap-1 flex-1 min-w-0">
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+        modifiers={[restrictToHorizontalAxis]}
+      >
+        <SortableContext
+          items={tabs.map((tab) => tab.id)}
+          strategy={horizontalListSortingStrategy}
         >
-          {tab.isGenerator ? (
-            <Sparkles className="h-3 w-3 text-emerald-600" />
-          ) : (
-            tab.isNamedQuery && <Bookmark className="h-3 w-3 text-accent-foreground fill-accent" />
-          )}
-          <span className="truncate max-w-24">{tab.name}</span>
-          {tabs.length > 1 && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onTabClose(tab.id)
-              }}
-              className="opacity-0 group-hover:opacity-100 hover:bg-stone-200 rounded p-0.5 transition-opacity"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          )}
-        </div>
-      ))}
-      <Button variant="ghost" size="icon" className="h-7 w-7 text-stone-400 hover:text-stone-600" onClick={onAddTab}>
+          <div
+            ref={scrollContainerRef}
+            className="flex items-center gap-1 overflow-x-auto overflow-y-hidden flex-1 min-w-0 scrollbar-hide"
+            style={{
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+            }}
+          >
+            {tabs.map((tab) => (
+              <SortableTab
+                key={tab.id}
+                ref={(el) => {
+                  if (el) {
+                    tabRefs.current.set(tab.id, el)
+                  } else {
+                    tabRefs.current.delete(tab.id)
+                  }
+                }}
+                tab={tab}
+                isActive={activeTab === tab.id}
+                isOnlyTab={tabs.length === 1}
+                onTabChange={onTabChange}
+                onTabClose={onTabClose}
+                width={107}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7 text-stone-400 hover:text-stone-600 flex-shrink-0"
+        onClick={onAddTab}
+      >
         <Plus className="h-4 w-4" />
       </Button>
     </div>

@@ -492,6 +492,10 @@ export function DbConsole() {
     }
   }
 
+  const reorderTabs = useCallback((reorderedTabs: Tab[]) => {
+    setTabs(reorderedTabs)
+  }, [])
+
   useCommand("tabs.newQuery", () => addTab())
 
   useCommand("tabs.close", () => {
@@ -1187,11 +1191,11 @@ export function DbConsole() {
       <div className="h-full w-full bg-stone-50 flex flex-col overflow-hidden">
         {/* Header with tabs and settings */}
         <div className="flex items-center justify-between border-b border-stone-200 bg-stone-50 px-2 py-2">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-stone-500 hover:text-stone-700"
+              className="h-8 w-8 text-stone-500 hover:text-stone-700 flex-shrink-0"
               onClick={() => setSidebarOpen(!sidebarOpen)}
             >
               <PanelLeft className="h-4 w-4" />
@@ -1202,9 +1206,10 @@ export function DbConsole() {
               onTabChange={setActiveTab}
               onTabClose={closeTab}
               onAddTab={addTab}
+              onTabReorder={reorderTabs}
             />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <Button
               variant="ghost"
               size="sm"
