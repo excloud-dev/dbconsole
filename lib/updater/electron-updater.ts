@@ -191,7 +191,12 @@ export class ElectronUpdater extends EventEmitter {
                         return updateInfo
                     }
                 } catch (autoUpdaterError) {
-                    this.log(`Electron autoUpdater check failed, falling back to custom updater: ${autoUpdaterError}`, 'warn')
+                    this.log(
+                        `Electron autoUpdater check failed, falling back to custom updater: ${
+                            autoUpdaterError instanceof Error ? autoUpdaterError.message : String(autoUpdaterError)
+                        }`,
+                        'warn'
+                    )
                     this.emitTelemetry('update-check-fallback', {
                         reason: 'electron-auto-updater-failed',
                         error: autoUpdaterError instanceof Error ? autoUpdaterError.message : String(autoUpdaterError)
