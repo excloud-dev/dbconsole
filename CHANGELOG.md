@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.5.1 - 2025-12-24
+
+- Add macOS in-place Electron auto-updater design for private GitHub releases (#1) (af2601f)
+- feat: integrate drag-and-drop functionality for tab reordering using @dnd-kit + add tooltips and tab scrolling (d3af1d9)
+
 ## v0.5.0 - 2025-12-22
 
 - feat: add write-query generator UI for INSERT/UPDATE with a searchable table picker, generator tabs, and DataGrid output preview
