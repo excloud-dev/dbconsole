@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.6.1 - 2025-12-25
+
+- fix: update Electron protocol handler to use modern protocol.handle() API for Electron 39 (e795b67)
+- fix: use correct session partition for protocol handler to match BrowserWindow partition (8f82148)
+
 ## v0.6.0 - 2025-12-25
 
 - feat: persist and restore last used connection across sessions (92fbae7)
