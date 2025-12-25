@@ -1044,6 +1044,12 @@ export function DbConsole() {
       const sqlDisplay = renderSqlWithParams(cleanSql, paramValues)
       setResultsByTab((prev) => ({ ...prev, [targetTabId]: { ...data, sqlDisplay } }))
 
+      // Show success toast with metrics
+      toast({
+        title: "Query executed",
+        description: `${data.rows.length} rows • ${data.durationMs}ms`,
+      })
+
       // Update tab pagination state
       setTabs(prev => prev.map(t => {
         if (t.id === targetTabId) {
@@ -1113,6 +1119,13 @@ export function DbConsole() {
           return acc.replace(pattern, (_m, prefix) => `${prefix}${literal}`)
         }, query.query)
         setResultsByTab((prev) => ({ ...prev, [currentTab.id]: { ...data, sqlDisplay } }))
+
+        // Show success toast with metrics
+        toast({
+          title: "Query executed",
+          description: `${data.rows.length} rows • ${data.durationMs}ms`,
+        })
+
         setTabs(prev => prev.map(t => {
           if (t.id === currentTab.id) {
             return {

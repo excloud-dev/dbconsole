@@ -1,11 +1,12 @@
 "use client"
 
 import { useState, useMemo, useCallback } from "react"
-import { GitMerge, Plus, X, ChevronRight, ArrowRight, Database } from "lucide-react"
+import { GitMerge, Plus, X, ChevronRight, ArrowRight, Database, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 
 interface TableInfo {
@@ -38,6 +39,7 @@ interface JoinBuilderDialogProps {
 
 export function JoinBuilderDialog({ open, onOpenChange, baseTable, tables, onCreateJoin }: JoinBuilderDialogProps) {
   const [joins, setJoins] = useState<JoinConfig[]>([])
+  const [searchQuery, setSearchQuery] = useState("")
 
   // Get FK relationships for a table (both directions, 2 levels deep)
   const getFkRelationships = useCallback((
@@ -115,6 +117,19 @@ export function JoinBuilderDialog({ open, onOpenChange, baseTable, tables, onCre
     })
   }, [baseTable, getFkRelationships, joins])
 
+  // Filter relationships based on search query
+  const filteredRelationships = useMemo(() => {
+    if (!searchQuery.trim()) return availableRelationships
+
+    const search = searchQuery.toLowerCase()
+    return availableRelationships.filter((rel) =>
+      rel.toTable.toLowerCase().includes(search) ||
+      rel.fromTable.toLowerCase().includes(search) ||
+      rel.toCol.toLowerCase().includes(search) ||
+      rel.fromCol.toLowerCase().includes(search)
+    )
+  }, [availableRelationships, searchQuery])
+
   const addJoin = (rel: { fromTable: string; toTable: string; fromCol: string; toCol: string }) => {
     setJoins([
       ...joins,
@@ -140,11 +155,13 @@ export function JoinBuilderDialog({ open, onOpenChange, baseTable, tables, onCre
   const handleCreate = () => {
     onCreateJoin(baseTable, joins)
     setJoins([])
+    setSearchQuery("")
     onOpenChange(false)
   }
 
   const handleClose = () => {
     setJoins([])
+    setSearchQuery("")
     onOpenChange(false)
   }
 
@@ -191,8 +208,27 @@ export function JoinBuilderDialog({ open, onOpenChange, baseTable, tables, onCre
                 <span>Available Relationships</span>
                 <span className="text-[10px] text-stone-400 font-normal normal-case">Click to add</span>
               </div>
+
+              {/* Conditional search bar - only show when 5+ relationships */}
+              {availableRelationships.length >= 5 && (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-stone-400" />
+                  <Input
+                    placeholder="Search tables or columns..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="h-8 pl-9 text-xs bg-white border-stone-200 focus:border-stone-400 focus:ring-stone-400/20"
+                  />
+                  {searchQuery && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-stone-400">
+                      {filteredRelationships.length} of {availableRelationships.length}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto overflow-x-hidden pr-1">
-                {availableRelationships.map((rel, i) => (
+                {filteredRelationships.map((rel, i) => (
                   <button
                     key={i}
                     onClick={() => addJoin(rel)}
@@ -227,6 +263,13 @@ export function JoinBuilderDialog({ open, onOpenChange, baseTable, tables, onCre
                   </button>
                 ))}
               </div>
+
+              {/* No search results */}
+              {filteredRelationships.length === 0 && searchQuery && (
+                <div className="text-center py-6 text-xs text-stone-400">
+                  No relationships match &quot;{searchQuery}&quot;
+                </div>
+              )}
             </div>
           )}
 

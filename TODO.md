@@ -39,7 +39,7 @@
 - [x] Add an option to generate/create INSERT and UPDATE queries to run.
 - [ ] Explore allowing for both SET and WHERE for same column in UPDATE queries
 - [x] Selecting another connection and running should run the query using that connection!
-- [ ] Remember last used connection
+- [x] Remember last used connection
 - [x] Allow rearranging tabs
 - [x] Tabs not scrolling properly. cannot scroll em and generate button goes out of view if too many tabs.
 - [ ] Need a confirmation that query has run. Everytime i run it.
