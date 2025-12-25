@@ -185,16 +185,18 @@ main() {
   local bump="patch"
   local explicit_version=""
   local push_flag=false
+  local force_flag=false
 
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'EOF'
 Usage:
-  ./release.sh [--push]                 # bumps patch from last reachable v* tag
-  ./release.sh [--push] patch|minor|major
-  ./release.sh [--push] X.Y.Z           # explicit version
+  ./release.sh [options]                 # bumps patch from last reachable v* tag
+  ./release.sh [options] patch|minor|major
+  ./release.sh [options] X.Y.Z           # explicit version
 
 Options:
-  --push    Automatically push commit and tag to origin (without prompting)
+  --push         Automatically push commit and tag to origin
+  --force, -f    Allow dirty working tree (stages all changes with git add -A)
 
 What it does:
   - Fetches tags from origin (best-effort)
@@ -214,6 +216,10 @@ EOF
         push_flag=true
         shift
         ;;
+      --force|-f)
+        force_flag=true
+        shift
+        ;;
       patch|minor|major)
         bump="${1}"
         shift
@@ -223,13 +229,17 @@ EOF
           explicit_version="${1}"
           shift
         else
-          die "unknown argument: ${1} (expected --push, patch|minor|major, or X.Y.Z)"
+          die "unknown argument: ${1} (expected --push, --force/-f, patch|minor|major, or X.Y.Z)"
         fi
         ;;
     esac
   done
 
-  ensure_clean_tree
+  if [[ "${force_flag}" != true ]]; then
+    ensure_clean_tree
+  else
+    info "Running with --force; will stage all changes"
+  fi
 
   if git remote get-url origin >/dev/null 2>&1; then
     info "Fetching tags from origin…"
@@ -315,7 +325,12 @@ EOF
   add_changelog_section_if_missing "${tag}" "${last_tag}"
 
   if [[ -n "$(git status --porcelain)" ]]; then
-    git add CHANGELOG.md package.json package-lock.json 2>/dev/null || true
+    if [[ "${force_flag}" == true ]]; then
+      info "Staging all changes (git add -A)"
+      git add -A
+    else
+      git add CHANGELOG.md package.json package-lock.json 2>/dev/null || true
+    fi
     if ! git diff --cached --quiet; then
       git commit -m "release: ${tag}"
     else
