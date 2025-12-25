@@ -108,11 +108,11 @@ export function GenerateWriteQueryDialog({ open, onOpenChange, tables, onGenerat
             }}
           />
 
-          <div className="max-h-[420px] overflow-y-auto rounded-md border border-stone-200" ref={listRef}>
+          <div className="max-h-[420px] overflow-y-auto rounded-md border border-border" ref={listRef}>
             {entries.length === 0 ? (
-              <div className="px-3 py-6 text-center text-sm text-stone-400">No tables found</div>
+              <div className="px-3 py-6 text-center text-sm text-muted-foreground">No tables found</div>
             ) : (
-              <div className="divide-y divide-stone-200">
+              <div className="divide-y divide-border">
                 {entries.map((entry, index) => {
                   const isSelected = effectiveSelected?.schema === entry.table.schema && effectiveSelected?.name === entry.table.name
                   const isHighlighted = index === effectiveHighlightIndex
@@ -121,9 +121,9 @@ export function GenerateWriteQueryDialog({ open, onOpenChange, tables, onGenerat
                       key={entry.label}
                       data-index={index}
                       className={cn(
-                        "w-full px-3 py-2 text-left text-sm font-mono hover:bg-stone-50",
-                        isHighlighted && "bg-stone-100",
-                        isSelected && "text-stone-900",
+                        "w-full px-3 py-2 text-left text-sm font-mono hover:bg-secondary",
+                        isHighlighted && "bg-secondary",
+                        isSelected && "text-foreground",
                       )}
                       onClick={() => {
                         setSelected(entry.table)

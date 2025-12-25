@@ -50,10 +50,10 @@ interface DataGridProps {
 // Helper to format cell values properly
 function formatCellValue(value: unknown): React.ReactNode {
   if (value === null) {
-    return <span className="text-stone-300 italic">NULL</span>
+    return <span className="text-muted-foreground/50 italic">NULL</span>
   }
   if (value === undefined) {
-    return <span className="text-stone-300 italic">—</span>
+    return <span className="text-muted-foreground/50 italic">—</span>
   }
   if (typeof value === "object") {
     // Handle objects and arrays by JSON stringifying them
@@ -361,8 +361,8 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
   // Loading/Error Checks
   if (loading && data.length === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 text-stone-400">
-        <Loader2 className="h-6 w-6 animate-spin text-stone-300" />
+      <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/70" />
         <span className="text-sm">Running query...</span>
       </div>
     )
@@ -370,16 +370,16 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
 
   if (error) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 text-red-500 p-4 text-center">
+      <div className="flex h-full flex-col items-center justify-center gap-2 text-destructive p-4 text-center">
         <div className="text-sm font-medium">Query Failed</div>
-        <div className="text-xs font-mono bg-red-50 p-2 rounded">{error}</div>
+        <div className="text-xs font-mono bg-destructive/10 p-2 rounded">{error}</div>
       </div>
     )
   }
 
   if (rawColumns.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center text-stone-400 text-sm">Run a query to see results</div>
+      <div className="flex h-full items-center justify-center text-muted-foreground text-sm">Run a query to see results</div>
     )
   }
 
@@ -440,7 +440,7 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
   return (
     <>
       {isFullscreen && (
-        <div className="h-full w-full rounded-lg border border-dashed border-stone-200 bg-stone-50/50 flex items-center justify-center text-sm text-stone-400">
+        <div className="h-full w-full rounded-lg border border-dashed border-border bg-secondary/50 flex items-center justify-center text-sm text-muted-foreground">
           Viewing in fullscreen
         </div>
       )}
@@ -452,10 +452,10 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
       )}
       <div
         className={cn(
-          "flex flex-col bg-white transition-all duration-300 ease-in-out",
+          "flex flex-col bg-card transition-all duration-300 ease-in-out",
           isFullscreen
-            ? "fixed inset-0 sm:inset-6 z-50 rounded-xl border border-stone-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-[0.98] slide-in-from-bottom-2 duration-300"
-            : "h-full w-full bg-white",
+            ? "fixed inset-0 sm:inset-6 z-50 rounded-xl border border-border shadow-2xl overflow-hidden animate-in fade-in zoom-in-[0.98] slide-in-from-bottom-2 duration-300"
+            : "h-full w-full bg-card",
         )}
       >
         <div className="flex-1 overflow-auto relative select-none" onMouseLeave={() => setIsDragging(false)}>
@@ -463,17 +463,17 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
             className="w-full border-collapse text-sm"
             style={{ width: table.getTotalSize() + 40 }} // Extra width for gutter
           >
-            <thead className="sticky top-0 bg-stone-100 z-20 shadow-sm">
+            <thead className="sticky top-0 bg-secondary z-20 shadow-sm">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
                   {/* Gutter Header: Select All */}
                   <th
                     className={cn(
-                      "sticky left-0 z-30 w-10 min-w-[40px] px-0 border-b border-r border-stone-200 cursor-pointer transition-colors",
+                      "sticky left-0 z-30 w-10 min-w-[40px] px-0 border-b border-r border-border cursor-pointer transition-colors",
                       // Fix: if all selected, using standard hover might look bad.
                       isAllSelected()
-                        ? "bg-stone-100 hover:bg-stone-200"
-                        : "bg-stone-100 hover:bg-stone-200"
+                        ? "bg-secondary hover:bg-secondary/80"
+                        : "bg-secondary hover:bg-secondary/80"
                     )}
                     onClick={() => {
                       if (isAllSelected()) {
@@ -489,7 +489,7 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
                     <div
                       className={cn(
                         "h-full w-full flex items-center justify-center text-[10px] font-mono select-none gap-2",
-                        isAllSelected() ? "text-stone-700 font-bold" : "text-stone-400"
+                        isAllSelected() ? "text-foreground font-bold" : "text-muted-foreground"
                       )}
                     >
                       <span>ALL</span>
@@ -501,7 +501,7 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
                       key={header.id}
                       colSpan={header.colSpan}
                       style={{ width: header.getSize() }}
-                      className="relative px-3 py-2 text-left text-xs font-semibold text-stone-700 border-b border-r border-stone-200 bg-stone-100 select-none group"
+                      className="relative px-3 py-2 text-left text-xs font-semibold text-foreground border-b border-r border-border bg-secondary select-none group"
                     >
                       <div className="flex items-center justify-between gap-1 w-full">
                         <div className="flex items-center flex-1 min-w-0 gap-2">
@@ -510,7 +510,7 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
                               ? null
                               : flexRender(header.column.columnDef.header, header.getContext())}
                           </span>
-                          <span className="ml-auto text-[10px] text-stone-500 font-mono select-none flex-shrink-0">
+                          <span className="ml-auto text-[10px] text-muted-foreground font-mono select-none flex-shrink-0">
                             {header.index + 1}
                           </span>
                         </div>
@@ -522,7 +522,7 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
                               e.stopPropagation()
                               header.column.toggleVisibility(false)
                             }}
-                            className="p-0.5 hover:bg-stone-200 rounded text-stone-400 hover:text-stone-600 transition-colors outline-none"
+                            className="p-0.5 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors outline-none"
                             title="Hide Column"
                           >
                             <EyeOff className="h-3.5 w-3.5" />
@@ -555,8 +555,8 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
                         }}
                         className={cn(
                           "absolute right-0 top-0 h-full w-1.5 cursor-col-resize touch-none select-none transition-colors",
-                          "hover:bg-stone-400 group-hover:bg-stone-300",
-                          header.column.getIsResizing() && "bg-stone-500",
+                          "hover:bg-muted-foreground/50 group-hover:bg-muted-foreground/30",
+                          header.column.getIsResizing() && "bg-muted-foreground/60",
                         )}
                       />
                     </th>
@@ -569,20 +569,20 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
                 <tr
                   key={row.id}
                   className={cn(
-                    "border-b border-stone-100 transition-colors",
-                    rowIdx % 2 === 0 ? "bg-white" : "bg-stone-50/50",
+                    "border-b border-border/50 transition-colors",
+                    rowIdx % 2 === 0 ? "bg-card" : "bg-muted/30",
                     // We remove hover effect on row to focus on cell selection? Or keep it?
-                    "hover:bg-stone-50/50"
+                    "hover:bg-muted/50"
                   )}
                 >
                   {/* Gutter Cell */}
                   <td
-                    className="sticky left-0 z-10 w-10 min-w-[40px] bg-stone-50 border-r border-stone-200 text-center text-[10px] text-stone-400 cursor-pointer hover:bg-stone-200 user-select-none font-mono"
+                    className="sticky left-0 z-10 w-10 min-w-[40px] bg-secondary border-r border-border text-center text-[10px] text-muted-foreground cursor-pointer hover:bg-muted user-select-none font-mono"
                     onMouseDown={(e) => handleGutterMouseDown(rowIdx, e)}
                     onMouseEnter={(e) => {
                       if (isDragging) {
                         // Update selection to span to this row
-                        // We need access to current selection start. 
+                        // We need access to current selection start.
                         // Fortunately 'selection' is in closure but might be stale if using handleMouseEnter?
                         // Actually it's fine since we render on every change.
                         if (selection) {
@@ -605,12 +605,10 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
                         key={cell.id}
                         style={{
                           width: cell.column.getSize(),
-                          backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.1)' : undefined,
-                          boxShadow: isSelected ? 'inset 0 0 0 1px rgba(59, 130, 246, 0.3)' : undefined
                         }}
                         className={cn(
-                          "px-3 py-1.5 text-stone-700 font-mono text-sm border-r border-stone-100 whitespace-nowrap overflow-hidden text-ellipsis max-w-0 cursor-default",
-                          isSelected && "selection-highlight"
+                          "px-3 py-1.5 text-foreground font-mono text-sm border-r border-border/50 whitespace-nowrap overflow-hidden text-ellipsis max-w-0 cursor-default",
+                          isSelected && "bg-primary/10 ring-1 ring-inset ring-primary/30"
                         )}
                         onMouseDown={(e) => handleMouseDown(rowIdx, colIdx, e)}
                         onMouseEnter={() => handleMouseEnter(rowIdx, colIdx)}
@@ -633,7 +631,7 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
         </div>
 
         <div
-          className="flex items-center justify-between px-3 py-2 bg-stone-50 border-t border-stone-200 select-none"
+          className="flex items-center justify-between px-3 py-2 bg-secondary border-t border-border select-none"
           onDoubleClick={() => setIsFullscreen(!isFullscreen)}
         >
           {/* LEFT: Actions */}
@@ -646,9 +644,9 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
               className={cn(
                 "h-7 gap-1.5 transition-all duration-300 border",
                 isCopied
-                  ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-                  : "bg-white text-emerald-700 hover:bg-emerald-100 border-emerald-100 hover:border-emerald-200/50 shadow-sm",
-                !selection && "opacity-50 grayscale cursor-not-allowed bg-stone-100 border-stone-200 text-stone-400 shadow-none"
+                  ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
+                  : "bg-card text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-950 border-emerald-100 dark:border-emerald-900 hover:border-emerald-200/50 shadow-sm",
+                !selection && "opacity-50 grayscale cursor-not-allowed bg-secondary border-border text-muted-foreground shadow-none"
               )}
               onClick={handleSmartCopy}
             >
@@ -660,20 +658,20 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
               variant="ghost"
               size="sm"
               disabled={data.length === 0}
-              className="h-7 gap-1.5 border border-stone-100 text-stone-500 hover:bg-stone-100 hover:text-stone-700 shadow-sm"
+              className="h-7 gap-1.5 border border-border text-muted-foreground hover:bg-muted hover:text-foreground shadow-sm"
               onClick={downloadCsv}
             >
               <FileDown className="h-3.5 w-3.5" />
               <span className="text-xs font-medium">Download CSV</span>
             </Button>
 
-            <div className="h-4 w-px bg-stone-300/60 mx-2" />
+            <div className="h-4 w-px bg-border mx-2" />
 
             {executedSql && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 text-stone-500 hover:text-stone-700"
+                className="h-7 w-7 text-muted-foreground hover:text-foreground"
                 title="Show executed SQL"
                 onClick={() => executedSql && setDetailCell({ content: executedSql, column: "Executed SQL", executedSql })}
               >
@@ -684,7 +682,7 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-stone-500 hover:text-stone-700 hover:bg-stone-200/50"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted"
               onClick={() => setIsFullscreen(!isFullscreen)}
               title="Toggle Fullscreen"
             >
@@ -694,19 +692,19 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
             {/* View/Columns Options */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-stone-500 hover:text-stone-700 hover:bg-stone-200/50" title="View Options">
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted" title="View Options">
                   <SlidersHorizontal className="h-3.5 w-3.5" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56 max-h-[300px] overflow-auto p-1">
-                <div className="px-2 py-1.5 text-xs font-semibold text-stone-500">
+                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
                   Toggle Columns
                 </div>
                 {table.getAllLeafColumns().map(column => {
                   return (
                     <DropdownMenuItem
                       key={column.id}
-                      className="text-xs gap-2 cursor-pointer focus:bg-stone-100"
+                      className="text-xs gap-2 cursor-pointer focus:bg-secondary"
                       onSelect={(e) => {
                         e.preventDefault()
                         column.toggleVisibility(!column.getIsVisible())
@@ -715,7 +713,7 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
                       <Checkbox
                         checked={column.getIsVisible()}
                         onCheckedChange={(val) => column.toggleVisibility(!!val)}
-                        className="data-[state=checked]:bg-emerald-100 data-[state=checked]:text-emerald-700 data-[state=checked]:border-emerald-200 border-stone-300"
+                        className="data-[state=checked]:bg-emerald-100 dark:data-[state=checked]:bg-emerald-950 data-[state=checked]:text-emerald-700 dark:data-[state=checked]:text-emerald-400 data-[state=checked]:border-emerald-200 dark:data-[state=checked]:border-emerald-800 border-border"
                       />
                       <span className="truncate flex-1">{column.id}</span>
                     </DropdownMenuItem>
@@ -727,15 +725,15 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
 
           {/* RIGHT: Pagination */}
           <div className="flex items-center gap-4" onDoubleClick={(e) => e.stopPropagation()}>
-            {loading && <Loader2 className="h-3.5 w-3.5 animate-spin text-stone-400" />}
+            {loading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
 
             {showPagination && (
               <div className="flex items-center gap-2">
-                <div className="text-xs text-stone-500 font-medium whitespace-nowrap">
+                <div className="text-xs text-muted-foreground font-medium whitespace-nowrap">
                   {rowsDescription}
                 </div>
 
-                <div className="h-4 w-px bg-stone-300/60 mx-2" />
+                <div className="h-4 w-px bg-border mx-2" />
 
                 <Select
                   value={limitValue}
@@ -749,8 +747,8 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
                     onLimitChange?.(parsed)
                   }}
                 >
-                  <SelectTrigger className="h-6 w-auto gap-1.5 px-2 text-xs border-transparent bg-transparent hover:bg-stone-200/50 focus:ring-0">
-                    <span className="text-stone-400">Limit:</span>
+                  <SelectTrigger className="h-6 w-auto gap-1.5 px-2 text-xs border-transparent bg-transparent hover:bg-muted focus:ring-0">
+                    <span className="text-muted-foreground">Limit:</span>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -774,7 +772,7 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
                       >
                         <ChevronLeft className="h-3.5 w-3.5" />
                       </Button>
-                      <span className="text-xs text-stone-500 min-w-[3ch] text-center">{currentPage}</span>
+                      <span className="text-xs text-muted-foreground min-w-[3ch] text-center">{currentPage}</span>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -786,7 +784,7 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
                       </Button>
                     </>
                   ) : (
-                    <span className="text-xs text-stone-500 font-medium">Showing all rows</span>
+                    <span className="text-xs text-muted-foreground font-medium">Showing all rows</span>
                   )}
                 </div>
               </div>

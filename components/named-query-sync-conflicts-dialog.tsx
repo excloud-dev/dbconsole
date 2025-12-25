@@ -141,21 +141,21 @@ export function NamedQuerySyncConflictsDialog({ open, onOpenChange, conflicts, o
 
                 <div className="flex-1 min-h-0 grid grid-cols-12 gap-4">
                     <div className="col-span-4 border rounded-md overflow-auto">
-                        <div className="p-2 text-xs text-stone-500 border-b">Conflicts ({conflicts.length})</div>
+                        <div className="p-2 text-xs text-muted-foreground border-b">Conflicts ({conflicts.length})</div>
                         <div className="p-1">
                             {conflicts.map((c) => (
                                 <button
                                     key={c.conflictKey}
                                     onClick={() => setSelectedKey(c.conflictKey)}
                                     className={cn(
-                                        "w-full text-left px-2 py-2 rounded-md hover:bg-stone-100",
-                                        selected?.conflictKey === c.conflictKey && "bg-stone-100",
+                                        "w-full text-left px-2 py-2 rounded-md hover:bg-secondary",
+                                        selected?.conflictKey === c.conflictKey && "bg-secondary",
                                     )}
                                 >
-                                    <div className="text-sm font-medium text-stone-900 truncate">
+                                    <div className="text-sm font-medium text-foreground truncate">
                                         {c.kind === "name" ? `Name conflict: ${c.name}` : `Modified: ${c.local.name}`}
                                     </div>
-                                    <div className="text-xs text-stone-500 truncate">
+                                    <div className="text-xs text-muted-foreground truncate">
                                         Local: {c.local.id} • Remote: {c.remote.id}
                                     </div>
                                 </button>
@@ -168,10 +168,10 @@ export function NamedQuerySyncConflictsDialog({ open, onOpenChange, conflicts, o
                             <>
                                 <div className="flex items-center justify-between gap-2 mb-2">
                                     <div>
-                                        <div className="text-sm font-medium text-stone-900">
+                                        <div className="text-sm font-medium text-foreground">
                                             {selected.kind === "name" ? `Name conflict: ${selected.name}` : `Query changed: ${selected.local.name}`}
                                         </div>
-                                        <div className="text-xs text-stone-500">Choose how to resolve, then apply.</div>
+                                        <div className="text-xs text-muted-foreground">Choose how to resolve, then apply.</div>
                                     </div>
 
                                     <div className="flex items-center gap-2">
@@ -222,25 +222,25 @@ export function NamedQuerySyncConflictsDialog({ open, onOpenChange, conflicts, o
 
                                 <div className="grid grid-cols-2 gap-3 flex-1 min-h-0">
                                     <div className="border rounded-md overflow-hidden flex flex-col min-h-0">
-                                        <div className="px-2 py-1 text-xs border-b bg-stone-50">Local</div>
+                                        <div className="px-2 py-1 text-xs border-b bg-secondary">Local</div>
                                         <div className="flex-1 min-h-0 flex flex-col">
                                             <div className="flex-1 min-h-0">
                                                 <SqlEditor value={selected.local.sqlTemplate} onChange={() => { }} readOnly className="h-full" />
                                             </div>
                                             <div className="border-t">
-                                                <div className="px-2 py-1 text-xs bg-stone-50">
+                                                <div className="px-2 py-1 text-xs bg-secondary">
                                                     Parameters ({localParams.params.length})
-                                                    {!localParams.ok && <span className="text-red-600 ml-2">Invalid</span>}
+                                                    {!localParams.ok && <span className="text-destructive ml-2">Invalid</span>}
                                                 </div>
-                                                <div className="px-2 py-2 text-xs text-stone-700 max-h-28 overflow-auto">
+                                                <div className="px-2 py-2 text-xs text-foreground max-h-28 overflow-auto">
                                                     {localParams.params.length === 0 ? (
-                                                        <div className="text-stone-500">No parameters</div>
+                                                        <div className="text-muted-foreground">No parameters</div>
                                                     ) : (
                                                         <div className="space-y-1">
                                                             {localParams.params.map((p) => (
                                                                 <div key={`${p.name}:${p.type}`} className="flex items-center justify-between gap-3">
                                                                     <div className="font-mono truncate">{p.name}</div>
-                                                                    <div className="text-stone-500 whitespace-nowrap">
+                                                                    <div className="text-muted-foreground whitespace-nowrap">
                                                                         {p.type}
                                                                         {p.defaultValue ? ` = ${p.defaultValue}` : ""}
                                                                     </div>
@@ -254,25 +254,25 @@ export function NamedQuerySyncConflictsDialog({ open, onOpenChange, conflicts, o
                                     </div>
 
                                     <div className="border rounded-md overflow-hidden flex flex-col min-h-0">
-                                        <div className="px-2 py-1 text-xs border-b bg-stone-50">Remote</div>
+                                        <div className="px-2 py-1 text-xs border-b bg-secondary">Remote</div>
                                         <div className="flex-1 min-h-0 flex flex-col">
                                             <div className="flex-1 min-h-0">
                                                 <SqlEditor value={selected.remote.sqlTemplate} onChange={() => { }} readOnly className="h-full" />
                                             </div>
                                             <div className="border-t">
-                                                <div className="px-2 py-1 text-xs bg-stone-50">
+                                                <div className="px-2 py-1 text-xs bg-secondary">
                                                     Parameters ({remoteParams.params.length})
-                                                    {!remoteParams.ok && <span className="text-red-600 ml-2">Invalid</span>}
+                                                    {!remoteParams.ok && <span className="text-destructive ml-2">Invalid</span>}
                                                 </div>
-                                                <div className="px-2 py-2 text-xs text-stone-700 max-h-28 overflow-auto">
+                                                <div className="px-2 py-2 text-xs text-foreground max-h-28 overflow-auto">
                                                     {remoteParams.params.length === 0 ? (
-                                                        <div className="text-stone-500">No parameters</div>
+                                                        <div className="text-muted-foreground">No parameters</div>
                                                     ) : (
                                                         <div className="space-y-1">
                                                             {remoteParams.params.map((p) => (
                                                                 <div key={`${p.name}:${p.type}`} className="flex items-center justify-between gap-3">
                                                                     <div className="font-mono truncate">{p.name}</div>
-                                                                    <div className="text-stone-500 whitespace-nowrap">
+                                                                    <div className="text-muted-foreground whitespace-nowrap">
                                                                         {p.type}
                                                                         {p.defaultValue ? ` = ${p.defaultValue}` : ""}
                                                                     </div>
@@ -287,7 +287,7 @@ export function NamedQuerySyncConflictsDialog({ open, onOpenChange, conflicts, o
                                 </div>
                             </>
                         ) : (
-                            <div className="text-sm text-stone-500">No conflicts.</div>
+                            <div className="text-sm text-muted-foreground">No conflicts.</div>
                         )}
                     </div>
                 </div>

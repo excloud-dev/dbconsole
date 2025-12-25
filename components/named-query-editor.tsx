@@ -111,23 +111,23 @@ export function NamedQueryEditor({
 
   useCommand("query.run", () => handleExecute())
   return (
-    <div key={valuesKey} className="flex flex-col h-full bg-white relative group/editor">
+    <div key={valuesKey} className="flex flex-col h-full bg-card relative group/editor">
       {/* Editor Area (Read-only/Visual) - scrollable */}
       <div className="flex-1 min-h-0 overflow-auto p-4">
         <div className="flex items-start justify-between gap-4 mb-4">
           <div className="flex items-center gap-2">
             <div>
-              <h3 className="text-lg font-semibold text-stone-900 leading-none tracking-tight">{namedQuery.name}</h3>
-              {namedQuery.description && <p className="text-sm text-stone-500 mt-1 leading-snug">{namedQuery.description}</p>}
+              <h3 className="text-lg font-semibold text-foreground leading-none tracking-tight">{namedQuery.name}</h3>
+              {namedQuery.description && <p className="text-sm text-muted-foreground mt-1 leading-snug">{namedQuery.description}</p>}
             </div>
           </div>
           <div className="flex items-center gap-2">
             {mode === "named" ? (
               <>
-                <Button variant="ghost" size="sm" className="h-6 text-xs text-stone-400 hover:text-stone-700" onClick={onEdit}>
+                <Button variant="ghost" size="sm" className="h-6 text-xs text-muted-foreground hover:text-foreground" onClick={onEdit}>
                   Edit
                 </Button>
-                <Button variant="ghost" size="sm" className="h-6 text-xs text-stone-400 hover:text-stone-700 gap-1" onClick={() => setShowQueryModal(true)}>
+                <Button variant="ghost" size="sm" className="h-6 text-xs text-muted-foreground hover:text-foreground gap-1" onClick={() => setShowQueryModal(true)}>
                   <FileCode className="h-3 w-3" />
                   View SQL
                 </Button>
@@ -135,12 +135,12 @@ export function NamedQueryEditor({
             ) : (
               <>
                 {onSaveGenerator && (
-                  <Button variant="ghost" size="sm" className="h-6 text-xs text-stone-400 hover:text-stone-700" onClick={onSaveGenerator}>
+                  <Button variant="ghost" size="sm" className="h-6 text-xs text-muted-foreground hover:text-foreground" onClick={onSaveGenerator}>
                     Save
                   </Button>
                 )}
                 {generatedSql && onCopyGeneratedSql && (
-                  <Button variant="ghost" size="sm" className="h-6 text-xs text-stone-400 hover:text-stone-700 gap-1" onClick={onCopyGeneratedSql}>
+                  <Button variant="ghost" size="sm" className="h-6 text-xs text-muted-foreground hover:text-foreground gap-1" onClick={onCopyGeneratedSql}>
                     <ClipboardCopy className="h-3 w-3" />
                     Copy SQL
                   </Button>
@@ -149,7 +149,7 @@ export function NamedQueryEditor({
             )}
             <Button
               size="sm"
-              className="h-6 gap-1 bg-stone-800 hover:bg-stone-900 text-white text-xs"
+              className="h-6 gap-1 text-xs"
               data-named-query-run="1"
               onClick={handleExecute}
             >
@@ -161,12 +161,12 @@ export function NamedQueryEditor({
       </div>
       {/* Parameters Footer - collapsible when >6 params (2 rows with 3 columns) */}
       {namedQuery.parameters.length > 0 && (
-        <div className="shrink-0 border-t border-stone-200 bg-stone-50/50 z-10 relative">
+        <div className="shrink-0 border-t border-border bg-secondary/50 z-10 relative">
           {/* Header - only show expand/collapse toggle when >6 params */}
           {namedQuery.parameters.length > 6 ? (
             <button
               onClick={() => onParamsExpandChange?.(!paramsExpanded)}
-              className="w-full flex items-center justify-between px-3 py-1.5 text-xs font-medium text-stone-500 hover:text-stone-700 transition-colors"
+              className="w-full flex items-center justify-between px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
             >
               <span>Parameters ({namedQuery.parameters.length})</span>
               <span className="flex items-center gap-1">
@@ -178,7 +178,7 @@ export function NamedQueryEditor({
               </span>
             </button>
           ) : (
-            <div className="px-3 py-1.5 text-xs font-medium text-stone-500">
+            <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground">
               Parameters ({namedQuery.parameters.length})
             </div>
           )}
@@ -203,24 +203,24 @@ export function NamedQueryEditor({
               const boolState = boolValue === "true" ? "true" : boolValue === "false" ? "false" : "none"
 
               return (
-                <div key={index} className="flex items-center gap-1.5 bg-white border border-stone-200 rounded-md px-2 py-1.5 shadow-sm group hover:border-stone-300 transition-colors">
+                <div key={index} className="flex items-center gap-1.5 bg-card border border-border rounded-md px-2 py-1.5 shadow-sm group hover:border-border/80 transition-colors">
                   {/* Parameter Name Chip */}
-                  <div className="flex items-center justify-center h-5 px-2 rounded bg-stone-100 text-[10px] font-mono font-medium text-stone-500 border border-stone-200 shrink-0" title={param.name}>
+                  <div className="flex items-center justify-center h-5 px-2 rounded bg-secondary text-[10px] font-mono font-medium text-muted-foreground border border-border shrink-0" title={param.name}>
                     {param.name}
                   </div>
 
                   {/* Type Indicator (Subtle) */}
-                  <div className="h-4 w-px bg-stone-100 shrink-0" />
+                  <div className="h-4 w-px bg-border shrink-0" />
 
                   {mode === "generator" && role && (
                     <ToggleGroup
                       type="single"
                       value={role}
                       onValueChange={(v) => v && onParamMetaChange?.(param.name, { role: v as "set" | "where" })}
-                      className="bg-stone-50 border border-stone-200 rounded-md p-0.5 h-5"
+                      className="bg-secondary border border-border rounded-md p-0.5 h-5"
                     >
-                      <ToggleGroupItem value="set" tabIndex={-1} className="text-[10px] px-1.5 h-4 data-[state=on]:bg-stone-200 data-[state=on]:text-stone-700">SET</ToggleGroupItem>
-                      <ToggleGroupItem value="where" tabIndex={-1} className="text-[10px] px-1.5 h-4 data-[state=on]:bg-stone-200 data-[state=on]:text-stone-700">WHERE</ToggleGroupItem>
+                      <ToggleGroupItem value="set" tabIndex={-1} className="text-[10px] px-1.5 h-4 data-[state=on]:bg-muted data-[state=on]:text-foreground">SET</ToggleGroupItem>
+                      <ToggleGroupItem value="where" tabIndex={-1} className="text-[10px] px-1.5 h-4 data-[state=on]:bg-muted data-[state=on]:text-foreground">WHERE</ToggleGroupItem>
                     </ToggleGroup>
                   )}
 
@@ -237,12 +237,12 @@ export function NamedQueryEditor({
                         updateParamValues({ ...effectiveParamValues, [param.name]: next })
                       }}
                       className={`h-5 w-6 flex items-center justify-center rounded border text-[10px] font-mono ${inputDisabled
-                        ? "border-stone-200 text-stone-300 bg-stone-50 cursor-not-allowed"
+                        ? "border-border text-muted-foreground/50 bg-secondary cursor-not-allowed"
                         : boolState === "true"
-                          ? "border-emerald-300 text-emerald-700 bg-emerald-50"
+                          ? "border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950"
                           : boolState === "false"
-                            ? "border-rose-300 text-rose-700 bg-rose-50"
-                            : "border-stone-200 text-stone-400 bg-white hover:bg-stone-50"
+                            ? "border-rose-300 dark:border-rose-700 text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950"
+                            : "border-border text-muted-foreground bg-card hover:bg-secondary"
                         }`}
                       title={boolState === "none" ? "Unset" : boolState === "true" ? "True" : "False"}
                       aria-pressed={boolState !== "none"}
@@ -259,20 +259,20 @@ export function NamedQueryEditor({
                       onChange={(e) => updateParamValues({ ...effectiveParamValues, [param.name]: e.target.value })}
                       placeholder={inputDisabled ? (isAuto ? "auto" : "disabled") : param.type}
                       disabled={inputDisabled}
-                      className="flex-1 h-5 bg-transparent border-none text-xs focus-visible:ring-0 p-0 text-stone-800 placeholder:text-stone-300 min-w-0 font-mono shadow-none"
+                      className="flex-1 h-5 bg-transparent border-none text-xs focus-visible:ring-0 p-0 text-foreground placeholder:text-muted-foreground/50 min-w-0 font-mono shadow-none"
                     />
                   )}
 
                   {mode === "generator" && (
                     <div className="flex items-center gap-1 pl-1">
                       {isPk && (
-                        <span className="text-[9px] uppercase text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 py-0.5">
+                        <span className="text-[9px] uppercase text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded px-1 py-0.5">
                           PK
                         </span>
                       )}
                       {isAuto && role !== "where" && (
                         <button
-                          className={`text-[9px] uppercase rounded px-1 py-0.5 border ${overrideAuto ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-stone-50 text-stone-400 border-stone-200"}`}
+                          className={`text-[9px] uppercase rounded px-1 py-0.5 border ${overrideAuto ? "bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800" : "bg-secondary text-muted-foreground border-border"}`}
                           onClick={() => onParamMetaChange?.(param.name, { overrideAuto: !overrideAuto })}
                           type="button"
                           tabIndex={-1}
@@ -282,7 +282,7 @@ export function NamedQueryEditor({
                         </button>
                       )}
                     <button
-                      className={`text-[9px] uppercase rounded px-1 py-0.5 border ${isNull ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-stone-50 text-stone-400 border-stone-200"} ${nullDisabled ? "opacity-40 cursor-not-allowed" : ""}`}
+                      className={`text-[9px] uppercase rounded px-1 py-0.5 border ${isNull ? "bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800" : "bg-secondary text-muted-foreground border-border"} ${nullDisabled ? "opacity-40 cursor-not-allowed" : ""}`}
                       onClick={() => {
                         if (nullDisabled) return
                         onParamMetaChange?.(param.name, { isNull: !isNull })
@@ -295,7 +295,7 @@ export function NamedQueryEditor({
                       NULL
                     </button>
                       {isNullable === false && (
-                        <span className="text-[9px] text-rose-600">NOT NULL</span>
+                        <span className="text-[9px] text-rose-600 dark:text-rose-400">NOT NULL</span>
                       )}
                     </div>
                   )}
@@ -309,15 +309,15 @@ export function NamedQueryEditor({
 
       <Dialog open={showQueryModal} onOpenChange={setShowQueryModal}>
         <DialogContent className="sm:max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
-          <DialogHeader className="px-4 py-3 border-b border-stone-100 flex-shrink-0">
+          <DialogHeader className="px-4 py-3 border-b border-border flex-shrink-0">
             <div className="flex items-center justify-between">
               <DialogTitle className="flex items-center gap-2 text-base font-medium">
-                <Expand className="h-4 w-4 text-stone-500" />
+                <Expand className="h-4 w-4 text-muted-foreground" />
                 {namedQuery.name}
               </DialogTitle>
             </div>
           </DialogHeader>
-          <div className="flex-1 min-h-0 bg-stone-50 relative group/view-sql">
+          <div className="flex-1 min-h-0 bg-secondary relative group/view-sql">
             {queryView === "template" ? (
               <SqlEditor
                 value={namedQuery.query}
@@ -338,21 +338,21 @@ export function NamedQueryEditor({
                 type="single"
                 value={queryView}
                 onValueChange={(v) => v && setQueryView(v as "template" | "rendered")}
-                className="bg-white/90 backdrop-blur-sm border border-stone-200 rounded-md p-0.5 shadow-sm"
+                className="bg-card/90 backdrop-blur-sm border border-border rounded-md p-0.5 shadow-sm"
               >
-                <ToggleGroupItem value="template" className="text-xs px-2 h-6 data-[state=on]:bg-stone-100 data-[state=on]:text-stone-900 data-[state=on]:shadow-none">Template</ToggleGroupItem>
-                <ToggleGroupItem value="rendered" className="text-xs px-2 h-6 data-[state=on]:bg-stone-100 data-[state=on]:text-stone-900 data-[state=on]:shadow-none">Rendered</ToggleGroupItem>
+                <ToggleGroupItem value="template" className="text-xs px-2 h-6 data-[state=on]:bg-secondary data-[state=on]:text-foreground data-[state=on]:shadow-none">Template</ToggleGroupItem>
+                <ToggleGroupItem value="rendered" className="text-xs px-2 h-6 data-[state=on]:bg-secondary data-[state=on]:text-foreground data-[state=on]:shadow-none">Rendered</ToggleGroupItem>
               </ToggleGroup>
             </div>
           </div>
-          <div className="p-3 border-t border-stone-100 flex justify-end bg-stone-50/50 rounded-b-lg">
+          <div className="p-3 border-t border-border flex justify-end bg-secondary/50 rounded-b-lg">
             <Button
               variant="outline"
               size="sm"
               onClick={handleCopy}
               className={`h-7 text-xs gap-1.5 transition-all duration-300 border ${isCopied
-                ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-                : "bg-emerald-50/50 text-emerald-700 hover:bg-emerald-100 border-emerald-100 hover:border-emerald-200"
+                ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
+                : "bg-emerald-50/50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900 border-emerald-100 dark:border-emerald-800 hover:border-emerald-200 dark:hover:border-emerald-700"
                 }`}
             >
               {isCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}

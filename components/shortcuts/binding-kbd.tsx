@@ -54,9 +54,9 @@ export function BindingKbd({ binding, isMac }: { binding: KeyBinding; isMac: boo
 }
 
 export function BindingDisplay({ raw, isMac }: { raw: string | undefined; isMac: boolean }) {
-    if (!raw) return <span className="text-stone-400">Unbound</span>
+    if (!raw) return <span className="text-muted-foreground">Unbound</span>
     const parsed = parseBinding(raw)
-    if (!parsed) return <span className="font-mono text-stone-800 whitespace-nowrap">{raw}</span>
+    if (!parsed) return <span className="font-mono text-foreground whitespace-nowrap">{raw}</span>
     return <BindingKbd binding={parsed} isMac={isMac} />
 }
 

@@ -34,20 +34,20 @@ function highlightJson(json: string) {
 
         if (part.endsWith(':')) {
             // Key
-            elements.push(<span key={index} className="text-blue-600 font-semibold">{part.slice(0, -1)}</span>);
-            elements.push(<span key={index + '_c'} className="text-stone-400">:</span>);
+            elements.push(<span key={index} className="text-blue-600 dark:text-blue-400 font-semibold">{part.slice(0, -1)}</span>);
+            elements.push(<span key={index + '_c'} className="text-muted-foreground">:</span>);
         } else if (part.startsWith('"')) {
             // String value
-            elements.push(<span key={index} className="text-green-600">{part}</span>);
+            elements.push(<span key={index} className="text-green-600 dark:text-green-400">{part}</span>);
         } else if (part === 'true' || part === 'false') {
-            elements.push(<span key={index} className="text-purple-600 font-semibold">{part}</span>);
+            elements.push(<span key={index} className="text-purple-600 dark:text-purple-400 font-semibold">{part}</span>);
         } else if (part === 'null') {
-            elements.push(<span key={index} className="text-stone-400 italic">{part}</span>);
+            elements.push(<span key={index} className="text-muted-foreground italic">{part}</span>);
         } else if (/^-?\d/.test(part)) {
-            elements.push(<span key={index} className="text-orange-600">{part}</span>);
+            elements.push(<span key={index} className="text-orange-600 dark:text-orange-400">{part}</span>);
         } else {
             // Punctuation
-            elements.push(<span key={index} className="text-stone-500">{part}</span>);
+            elements.push(<span key={index} className="text-muted-foreground">{part}</span>);
         }
 
         lastIndex = regex.lastIndex;
@@ -71,10 +71,10 @@ export function CellDetailDialog({ open, onOpenChange, content, columnName }: Ce
         const identifiers = /"[^\"]*"|`[^`]*`/g
 
         const tokens: { regex: RegExp; className: string }[] = [
-            { regex: strings, className: "text-emerald-600" },
-            { regex: identifiers, className: "text-blue-600" },
-            { regex: keywords, className: "text-purple-700 font-semibold" },
-            { regex: numbers, className: "text-orange-600" },
+            { regex: strings, className: "text-emerald-600 dark:text-emerald-400" },
+            { regex: identifiers, className: "text-blue-600 dark:text-blue-400" },
+            { regex: keywords, className: "text-purple-700 dark:text-purple-400 font-semibold" },
+            { regex: numbers, className: "text-orange-600 dark:text-orange-400" },
         ]
 
         let output: React.ReactNode[] = []
@@ -114,7 +114,7 @@ export function CellDetailDialog({ open, onOpenChange, content, columnName }: Ce
     const { formattedContent, rawText, isJson } = useMemo(() => {
         if (content === null) {
             return {
-                formattedContent: <span className="text-stone-400 italic">NULL</span>,
+                formattedContent: <span className="text-muted-foreground italic">NULL</span>,
                 rawText: "NULL",
                 isJson: false,
             }
@@ -178,30 +178,30 @@ export function CellDetailDialog({ open, onOpenChange, content, columnName }: Ce
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
-                <DialogHeader className="px-4 py-3 border-b border-stone-100 flex-shrink-0">
+                <DialogHeader className="px-4 py-3 border-b border-border flex-shrink-0">
                     <DialogTitle className="flex items-center gap-2 text-base font-medium">
-                        <Expand className="h-4 w-4 text-stone-500" />
+                        <Expand className="h-4 w-4 text-muted-foreground" />
                         {columnName}
-                        {isJson && <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-mono border border-blue-100 uppercase tracking-wider">JSON</span>}
+                        {isJson && <span className="text-[10px] bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded font-mono border border-blue-100 dark:border-blue-800 uppercase tracking-wider">JSON</span>}
                     </DialogTitle>
                 </DialogHeader>
 
                 <ScrollArea className="flex-1 p-4">
-                    <div className="rounded-md border border-stone-200 bg-stone-50/80 shadow-inner px-3 py-2">
-                        <div className="font-mono text-xs leading-relaxed whitespace-pre-wrap break-words text-stone-800">
+                    <div className="rounded-md border border-border bg-secondary/50 shadow-inner px-3 py-2">
+                        <div className="font-mono text-xs leading-relaxed whitespace-pre-wrap break-words text-foreground">
                             {formattedContent}
                         </div>
                     </div>
                 </ScrollArea>
 
-                <div className="p-3 border-t border-stone-100 flex justify-end bg-stone-50/50 rounded-b-lg">
+                <div className="p-3 border-t border-border flex justify-end bg-secondary/50 rounded-b-lg">
                     <Button
                         variant="outline"
                         size="sm"
                         onClick={handleCopy}
                         className={`h-7 text-xs gap-1.5 transition-all duration-300 border ${isCopied
-                                ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-                                : "bg-emerald-50/50 text-emerald-700 hover:bg-emerald-100 border-emerald-100 hover:border-emerald-200"
+                                ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
+                                : "bg-emerald-50/50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900 border-emerald-100 dark:border-emerald-800 hover:border-emerald-200 dark:hover:border-emerald-700"
                             }`}
                     >
                         {isCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}

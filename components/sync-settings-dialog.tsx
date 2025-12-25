@@ -106,7 +106,7 @@ export function SyncSettingsDialog({ open, onOpenChange, onSaved, onCleared }: S
                             placeholder="https://your-dbconsole-server.example"
                             disabled={loading || saving}
                         />
-                        <p className="text-xs text-stone-500">
+                        <p className="text-xs text-muted-foreground">
                             This is the central server that stores encrypted snapshots.
                         </p>
                     </div>
@@ -121,15 +121,15 @@ export function SyncSettingsDialog({ open, onOpenChange, onSaved, onCleared }: S
                             placeholder="Enter your sync phrase"
                             disabled={loading || saving}
                         />
-                        <p className="text-xs text-stone-500">
+                        <p className="text-xs text-muted-foreground">
                             Stored locally encrypted-at-rest. Anyone with this phrase can join the sync chain.
                         </p>
                     </div>
 
-                    <div className="flex items-center justify-between gap-3 rounded-md border border-stone-200 bg-white px-3 py-2">
+                    <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2">
                         <div className="min-w-0">
-                            <div className="text-sm text-stone-800">Sync deletions</div>
-                            <div className="text-xs text-stone-500">
+                            <div className="text-sm text-foreground">Sync deletions</div>
+                            <div className="text-xs text-muted-foreground">
                                 If off, deleting locally won&apos;t delete on the server (and remote deletes won&apos;t delete locally).
                             </div>
                         </div>
@@ -141,7 +141,7 @@ export function SyncSettingsDialog({ open, onOpenChange, onSaved, onCleared }: S
                     </div>
 
                     {error && (
-                        <div className="text-sm text-red-600">{error}</div>
+                        <div className="text-sm text-red-600 dark:text-red-400">{error}</div>
                     )}
 
                     <div className="flex justify-end gap-2">

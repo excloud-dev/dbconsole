@@ -56,7 +56,7 @@ export function SaveGeneratorDialog({ open, onOpenChange, initialValues, onSave,
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Insert User Row"
-              className="border-stone-200"
+              className="border-border"
             />
           </div>
 
@@ -67,7 +67,7 @@ export function SaveGeneratorDialog({ open, onOpenChange, initialValues, onSave,
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Short reminder for this generator"
-              className="border-stone-200"
+              className="border-border"
             />
           </div>
         </div>
@@ -76,7 +76,7 @@ export function SaveGeneratorDialog({ open, onOpenChange, initialValues, onSave,
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={!name.trim()} className="bg-stone-800 hover:bg-stone-900 text-white">
+          <Button onClick={handleSave} disabled={!name.trim()}>
             {mode === "edit" ? "Update" : "Save"}
           </Button>
         </DialogFooter>

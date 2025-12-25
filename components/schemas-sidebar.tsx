@@ -163,7 +163,7 @@ export function SchemasSidebar({
       case "connecting":
         return "bg-amber-400"
       default:
-        return "bg-stone-300"
+        return "bg-muted-foreground/40"
     }
   }
 
@@ -180,9 +180,9 @@ export function SchemasSidebar({
           <DropdownMenuTrigger asChild>
             <button
               className={cn(
-                "group flex h-9 w-full items-center gap-2 rounded-md border border-stone-200 bg-white/60 px-2 text-left text-sm text-stone-700 shadow-xs backdrop-blur",
-                "hover:bg-white hover:text-stone-900",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-300/60",
+                "group flex h-9 w-full items-center gap-2 rounded-md border border-border bg-background/60 px-2 text-left text-sm text-foreground shadow-xs backdrop-blur",
+                "hover:bg-background hover:text-foreground",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
               )}
             >
               <span
@@ -192,16 +192,16 @@ export function SchemasSidebar({
                 )}
               />
               <span className="truncate font-medium">{activeConn?.label || "No connection"}</span>
-              <ChevronDown className="ml-auto h-4 w-4 text-stone-400 transition-colors group-hover:text-stone-600" />
+              <ChevronDown className="ml-auto h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56">
             {connections.length === 0 ? (
               <div className="px-3 py-4 text-center">
-                <div className="text-xs text-stone-500 mb-2">No connections yet</div>
+                <div className="text-xs text-muted-foreground mb-2">No connections yet</div>
                 <DropdownMenuItem
                   onClick={onOpenSettings}
-                  className="text-xs justify-center bg-stone-100 hover:bg-stone-200"
+                  className="text-xs justify-center bg-secondary hover:bg-secondary/80"
                 >
                   <Plus className="h-3 w-3 mr-1.5" />
                   Add connection
@@ -215,7 +215,7 @@ export function SchemasSidebar({
                     onClick={() => onConnectionChange(conn.id)}
                     className={cn(
                       "text-sm gap-2 cursor-pointer",
-                      activeConnection === conn.id && "bg-stone-100",
+                      activeConnection === conn.id && "bg-secondary",
                     )}
                   >
                     <span
@@ -228,7 +228,7 @@ export function SchemasSidebar({
                   </DropdownMenuItem>
                 ))}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onOpenSettings} className="text-sm text-stone-600">
+                <DropdownMenuItem onClick={onOpenSettings} className="text-sm text-muted-foreground">
                   <Plus className="h-4 w-4 mr-2" />
                   Manage connections...
                 </DropdownMenuItem>
@@ -238,21 +238,21 @@ export function SchemasSidebar({
         </DropdownMenu>
 
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
+          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             id="schema-sidebar-search"
             placeholder="Search tables & queries..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className={cn(
-              "h-9 pl-9 pr-9 bg-white/60 border-stone-200 shadow-xs backdrop-blur",
-              "focus-visible:ring-stone-300/60",
+              "h-9 pl-9 pr-9 bg-background/60 border-border shadow-xs backdrop-blur",
+              "focus-visible:ring-ring/60",
             )}
           />
           {search && (
             <button
               onClick={() => setSearch("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               aria-label="Clear search"
             >
               <X className="h-4 w-4" />
@@ -261,18 +261,18 @@ export function SchemasSidebar({
         </div>
       </div>
 
-      <Separator className="my-3 bg-stone-200" />
+      <Separator className="my-3 bg-border" />
 
       {/* Lists */}
       <div className="min-h-0 flex-1 overflow-auto">
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "tables" | "queries")} className="gap-3 pr-1">
-          <TabsList className="w-full flex bg-stone-100/70 text-stone-600">
+          <TabsList className="w-full flex bg-secondary/70 text-muted-foreground">
             <TabsTrigger value="tables" className="text-xs flex-1 min-w-0">
               <Table2 className="h-3.5 w-3.5 flex-shrink-0" />
               <span className="truncate">Tables</span>
               <Badge
                 variant="secondary"
-                className="ml-1 h-4 px-1.5 text-[10px] tabular-nums text-stone-600 bg-white border-stone-200 flex-shrink-0"
+                className="ml-1 h-4 px-1.5 text-[10px] tabular-nums text-muted-foreground bg-background border-border flex-shrink-0"
               >
                 {filteredTables.length}
               </Badge>
@@ -282,7 +282,7 @@ export function SchemasSidebar({
               <span className="truncate">Saved</span>
               <Badge
                 variant="secondary"
-                className="ml-1 h-4 px-1.5 text-[10px] tabular-nums text-stone-600 bg-white border-stone-200 flex-shrink-0"
+                className="ml-1 h-4 px-1.5 text-[10px] tabular-nums text-muted-foreground bg-background border-border flex-shrink-0"
               >
                 {filteredQueries.length}
               </Badge>
@@ -291,7 +291,7 @@ export function SchemasSidebar({
 
           <TabsContent value="tables" className="m-0 outline-none">
             {/* Tables header row with refresh (animated like DataGrid hide icon) */}
-            <div className="group flex items-center gap-2 rounded-md px-2 py-1 text-xs font-medium text-stone-600 hover:bg-stone-100">
+            <div className="group flex items-center gap-2 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-secondary">
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <span className="uppercase tracking-wide">Tables</span>
               </div>
@@ -299,7 +299,7 @@ export function SchemasSidebar({
               <div className="flex items-center gap-1">
                 <Badge
                   variant="secondary"
-                  className="h-5 px-1.5 text-[11px] tabular-nums text-stone-600 bg-stone-100 border-stone-200"
+                  className="h-5 px-1.5 text-[11px] tabular-nums text-muted-foreground bg-secondary border-border"
                 >
                   {filteredTables.length}
                 </Badge>
@@ -313,7 +313,7 @@ export function SchemasSidebar({
                   >
                     <button
                       onClick={() => onRefreshSchema()}
-                      className="p-0.5 hover:bg-stone-200 rounded text-stone-400 hover:text-stone-600 transition-colors outline-none"
+                      className="p-0.5 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors outline-none"
                       title="Refresh schema"
                     >
                       <RotateCcw className="h-3.5 w-3.5" />
@@ -331,14 +331,14 @@ export function SchemasSidebar({
                       onClick={() => toggleTable(table.name)}
                       aria-expanded={expandedTables.has(table.name)}
                       className={cn(
-                        "flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-left text-sm text-stone-700",
-                        "hover:bg-stone-100 hover:text-stone-900",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-300/60",
+                        "flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-left text-sm text-foreground",
+                        "hover:bg-secondary hover:text-foreground",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
                       )}
                     >
                       <ChevronRight
                         className={cn(
-                          "h-4 w-4 text-stone-400 transition-transform flex-shrink-0",
+                          "h-4 w-4 text-muted-foreground transition-transform flex-shrink-0",
                           expandedTables.has(table.name) && "rotate-90",
                         )}
                       />
@@ -360,7 +360,7 @@ export function SchemasSidebar({
                             e.stopPropagation()
                             onViewTable(table.name)
                           }}
-                          className="p-1 hover:bg-stone-200 rounded text-stone-400 hover:text-stone-600 transition-colors outline-none"
+                          className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-foreground transition-colors outline-none"
                           title="View top 100 rows"
                         >
                           <Eye className="h-4 w-4" />
@@ -379,7 +379,7 @@ export function SchemasSidebar({
                             e.stopPropagation()
                             openJoinBuilder(table.qualifiedName)
                           }}
-                          className="p-1 hover:bg-stone-200 rounded text-stone-400 hover:text-stone-600 transition-colors outline-none"
+                          className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-foreground transition-colors outline-none"
                           title="Join with..."
                         >
                           <GitMerge className="h-4 w-4" />
@@ -389,43 +389,43 @@ export function SchemasSidebar({
                   </div>
 
                   {expandedTables.has(table.name) && (
-                    <div className="ml-4 mt-1 border-l border-stone-200 pl-3">
+                    <div className="ml-4 mt-1 border-l border-border pl-3">
                       <div className="space-y-0.5 pb-1">
                         {table.columns.map((col) => (
                           <div
                             key={col.name}
                             className={cn(
-                              "rounded-md px-2 py-1 text-xs text-stone-700",
-                              "hover:bg-stone-100/70",
+                              "rounded-md px-2 py-1 text-xs text-foreground",
+                              "hover:bg-secondary/70",
                             )}
                           >
                             <div className="flex items-center gap-2 min-w-0">
                               <span
                                 className={cn(
                                   "truncate",
-                                  col.isPk && "text-amber-700 font-medium",
-                                  col.isFk && "text-blue-700 font-medium",
+                                  col.isPk && "text-amber-700 dark:text-amber-400 font-medium",
+                                  col.isFk && "text-blue-700 dark:text-blue-400 font-medium",
                                 )}
                               >
                                 {col.name}
                               </span>
                               {col.isPk && (
-                                <Badge className="h-4 rounded-sm px-1 text-[10px] bg-amber-100 text-amber-800 border-amber-200">
+                                <Badge className="h-4 rounded-sm px-1 text-[10px] bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-400 border-amber-200 dark:border-amber-800">
                                   PK
                                 </Badge>
                               )}
                               {col.isFk && (
-                                <Badge className="h-4 rounded-sm px-1 text-[10px] bg-blue-100 text-blue-800 border-blue-200">
+                                <Badge className="h-4 rounded-sm px-1 text-[10px] bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-400 border-blue-200 dark:border-blue-800">
                                   FK
                                 </Badge>
                               )}
                               {col.isAuto && (
-                                <Badge className="h-4 rounded-sm px-1 text-[10px] bg-emerald-100 text-emerald-800 border-emerald-200">
+                                <Badge className="h-4 rounded-sm px-1 text-[10px] bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800">
                                   AUTO
                                 </Badge>
                               )}
                             </div>
-                            <div className="mt-0.5 truncate font-mono text-[10px] text-stone-400">
+                            <div className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
                               {col.type}
                             </div>
                           </div>
@@ -437,14 +437,14 @@ export function SchemasSidebar({
               ))}
 
               {filteredTables.length === 0 && search && (
-                <div className="px-2 py-3 text-sm text-stone-400 text-center">No tables found</div>
+                <div className="px-2 py-3 text-sm text-muted-foreground text-center">No tables found</div>
               )}
             </div>
           </TabsContent>
 
           <TabsContent value="queries" className="m-0 outline-none">
             {/* Queries header row with sync controls */}
-            <div className="group flex items-center gap-2 rounded-md px-2 py-1 text-xs font-medium text-stone-600 hover:bg-stone-100">
+            <div className="group flex items-center gap-2 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-secondary">
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <span className="uppercase tracking-wide">Saved queries</span>
               </div>
@@ -452,7 +452,7 @@ export function SchemasSidebar({
               <div className="flex items-center gap-1">
                 <Badge
                   variant="secondary"
-                  className="h-5 px-1.5 text-[11px] tabular-nums text-stone-600 bg-stone-100 border-stone-200"
+                  className="h-5 px-1.5 text-[11px] tabular-nums text-muted-foreground bg-secondary border-border"
                 >
                   {filteredQueries.length}
                 </Badge>
@@ -466,7 +466,7 @@ export function SchemasSidebar({
                   >
                     <button
                       onClick={() => onOpenSyncSettings()}
-                      className="p-0.5 hover:bg-stone-200 rounded text-stone-400 hover:text-stone-600 transition-colors outline-none"
+                      className="p-0.5 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors outline-none"
                       title="Sync settings"
                     >
                       <KeyRound className="h-3.5 w-3.5" />
@@ -483,7 +483,7 @@ export function SchemasSidebar({
                   >
                     <button
                       onClick={() => onSyncNamedQueries()}
-                      className="p-0.5 hover:bg-stone-200 rounded text-stone-400 hover:text-stone-600 transition-colors outline-none"
+                      className="p-0.5 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors outline-none"
                       title="Sync saved queries"
                     >
                       <RotateCcw className="h-3.5 w-3.5" />
@@ -499,12 +499,12 @@ export function SchemasSidebar({
                   <button
                     onClick={() => onOpenNamedQuery(nq.id)}
                     className={cn(
-                      "flex h-8 flex-1 items-center gap-2 rounded-md px-2 text-left text-sm text-stone-700",
-                      "hover:bg-stone-100 hover:text-stone-900",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-300/60",
+                      "flex h-8 flex-1 items-center gap-2 rounded-md px-2 text-left text-sm text-foreground",
+                      "hover:bg-secondary hover:text-foreground",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
                     )}
                   >
-                    <Bookmark className="h-4 w-4 text-stone-400 group-hover/item:text-stone-600" />
+                    <Bookmark className="h-4 w-4 text-muted-foreground group-hover/item:text-foreground" />
                     <span className="truncate">{nq.name}</span>
                   </button>
                   {onDeleteNamedQuery && (
@@ -521,7 +521,7 @@ export function SchemasSidebar({
                           e.stopPropagation()
                           onDeleteNamedQuery(nq.id)
                         }}
-                        className="p-1 hover:bg-red-50 rounded text-stone-400 hover:text-red-600 transition-colors outline-none"
+                        className="p-1 hover:bg-destructive/10 rounded text-muted-foreground hover:text-destructive transition-colors outline-none"
                         title="Delete saved query"
                       >
                         <X className="h-4 w-4" />
@@ -532,10 +532,10 @@ export function SchemasSidebar({
               ))}
 
               {filteredQueries.length === 0 && search && (
-                <div className="px-2 py-3 text-sm text-stone-400 text-center">No queries found</div>
+                <div className="px-2 py-3 text-sm text-muted-foreground text-center">No queries found</div>
               )}
               {filteredQueries.length === 0 && !search && (
-                <div className="px-2 py-3 text-sm text-stone-400 text-center">No saved queries yet</div>
+                <div className="px-2 py-3 text-sm text-muted-foreground text-center">No saved queries yet</div>
               )}
             </div>
           </TabsContent>

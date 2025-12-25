@@ -6,9 +6,11 @@ import { UpdateSettingsDialog, UpdateSettings } from './update-settings-dialog'
 import { UpdateNotificationDialog, UpdateInfo } from './update-notification-dialog'
 import { UpdateProgressDialog, ProgressInfo } from './update-progress-dialog'
 import { useToast } from '@/hooks/use-toast'
+import { useTheme } from 'next-themes'
 
 export function MenuHandler() {
     const { toast } = useToast()
+    const { setTheme } = useTheme()
     const [showAboutDialog, setShowAboutDialog] = useState(false)
     const [showUpdateSettingsDialog, setShowUpdateSettingsDialog] = useState(false)
     const [showUpdateNotificationDialog, setShowUpdateNotificationDialog] = useState(false)
@@ -157,12 +159,39 @@ export function MenuHandler() {
             setShowUpdateSettingsDialog(true)
         })
 
+        const unsubscribeTheme = dbconsole.events.onMenuTheme((payload: any) => {
+            if (payload?.theme) {
+                setTheme(payload.theme)
+            }
+        })
+
         return () => {
             unsubscribeAbout()
             unsubscribeCheckUpdates()
             unsubscribeUpdateSettings()
+            unsubscribeTheme()
         }
-    }, [handleCheckForUpdates, toast, loadUpdateSettings, refreshTokenStatus])
+    }, [handleCheckForUpdates, toast, loadUpdateSettings, refreshTokenStatus, setTheme])
+
+    // Load persisted theme on startup
+    useEffect(() => {
+        if (typeof window === 'undefined' || !(window as any).dbconsole?.isDesktop) {
+            return
+        }
+
+        const loadTheme = async () => {
+            try {
+                const result = await (window as any).dbconsole.api.uiPrefs.get('theme')
+                if (result?.value) {
+                    setTheme(result.value)
+                }
+            } catch (error) {
+                console.error('Failed to load theme preference:', error)
+            }
+        }
+
+        loadTheme()
+    }, [setTheme])
 
     const handleInstallUpdate = async (updateInfo: UpdateInfo) => {
         try {

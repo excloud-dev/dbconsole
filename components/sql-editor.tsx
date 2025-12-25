@@ -26,18 +26,18 @@ interface SqlEditorProps {
     domId?: string
 }
 
-// Custom highlighting for SQL
+// Custom highlighting for SQL - uses CSS variables for dark mode support
 const sqlHighlighting = HighlightStyle.define([
-    { tag: tags.keyword, color: "#5c6bc0", fontWeight: "bold" },
-    { tag: tags.string, color: "#43a047" },
-    { tag: tags.number, color: "#e65100" },
-    { tag: tags.comment, color: "#78909c", fontStyle: "italic" },
-    { tag: tags.operator, color: "#6d4c41" },
-    { tag: tags.propertyName, color: "#00796b" },
-    { tag: tags.typeName, color: "#7b1fa2" },
+    { tag: tags.keyword, class: "sql-keyword" },
+    { tag: tags.string, class: "sql-string" },
+    { tag: tags.number, class: "sql-number" },
+    { tag: tags.comment, class: "sql-comment" },
+    { tag: tags.operator, class: "sql-operator" },
+    { tag: tags.propertyName, class: "sql-property" },
+    { tag: tags.typeName, class: "sql-type" },
 ])
 
-// Theme for the editor
+// Theme for the editor - uses CSS variables for dark mode support
 const editorTheme = EditorView.theme({
     "&": {
         fontSize: "13px",
@@ -52,6 +52,7 @@ const editorTheme = EditorView.theme({
     ".cm-content": {
         padding: "6px 8px",
         paddingBottom: "40px", // Space for floating buttons
+        caretColor: "var(--sql-caret, currentColor)",
     },
     ".cm-focused": {
         outline: "none",
@@ -63,14 +64,14 @@ const editorTheme = EditorView.theme({
         padding: "0",
     },
     ".cm-placeholder": {
-        color: "#a8a29e",
+        color: "var(--sql-placeholder, #a8a29e)",
         fontStyle: "italic",
     },
     ".cm-tooltip.cm-tooltip-autocomplete": {
-        backgroundColor: "#fff",
-        border: "1px solid #e7e5e4",
+        backgroundColor: "var(--sql-tooltip-bg, #fff)",
+        border: "1px solid var(--sql-tooltip-border, #e7e5e4)",
         borderRadius: "6px",
-        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
         padding: "4px 0",
     },
     ".cm-tooltip-autocomplete ul li": {
@@ -78,8 +79,8 @@ const editorTheme = EditorView.theme({
         fontSize: "12px",
     },
     ".cm-tooltip-autocomplete ul li[aria-selected]": {
-        backgroundColor: "#f5f5f4",
-        color: "#1c1917",
+        backgroundColor: "var(--sql-tooltip-selected-bg, #f5f5f4)",
+        color: "var(--sql-tooltip-selected-text, #1c1917)",
     },
     ".cm-completionIcon": {
         marginRight: "8px",
@@ -90,9 +91,33 @@ const editorTheme = EditorView.theme({
     },
     ".cm-completionDetail": {
         marginLeft: "12px",
-        color: "#78716c",
+        color: "var(--sql-completion-detail, #78716c)",
         fontStyle: "italic",
         fontSize: "11px",
+    },
+    // Syntax highlighting classes
+    ".sql-keyword": {
+        color: "var(--sql-keyword, #5c6bc0)",
+        fontWeight: "bold",
+    },
+    ".sql-string": {
+        color: "var(--sql-string, #43a047)",
+    },
+    ".sql-number": {
+        color: "var(--sql-number, #e65100)",
+    },
+    ".sql-comment": {
+        color: "var(--sql-comment, #78909c)",
+        fontStyle: "italic",
+    },
+    ".sql-operator": {
+        color: "var(--sql-operator, #6d4c41)",
+    },
+    ".sql-property": {
+        color: "var(--sql-property, #00796b)",
+    },
+    ".sql-type": {
+        color: "var(--sql-type, #7b1fa2)",
     },
 })
 

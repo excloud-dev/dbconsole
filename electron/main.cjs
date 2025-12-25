@@ -8,7 +8,7 @@ const isDev = process.env.ELECTRON_DEV === '1' || !app.isPackaged
 const isMac = process.platform === 'darwin'
 
 const UI_PREFS_FILE = 'ui-prefs.json'
-const UI_PREF_KEYS = new Set(['sidebarActionsShowOnHover'])
+const UI_PREF_KEYS = new Set(['sidebarActionsShowOnHover', 'theme'])
 
 function getUiPrefsPath() {
   return path.join(app.getPath('userData'), UI_PREFS_FILE)
@@ -38,6 +38,13 @@ function getUiPrefBool(key, defaultValue) {
   const prefs = readUiPrefs()
   const v = prefs && typeof prefs === 'object' ? prefs[key] : undefined
   return typeof v === 'boolean' ? v : defaultValue
+}
+
+function getThemePref(defaultValue) {
+  const prefs = readUiPrefs()
+  const v = prefs && typeof prefs === 'object' ? prefs['theme'] : undefined
+  const valid = ['system', 'light', 'dark']
+  return typeof v === 'string' && valid.includes(v) ? v : defaultValue
 }
 
 function setUiPref(key, value) {
@@ -87,6 +94,10 @@ function registerUiPrefsIpc() {
         const value = getUiPrefBool(key, true)
         return ok({ value })
       }
+      if (key === 'theme') {
+        const value = getThemePref('system')
+        return ok({ value })
+      }
       return err(400, { error: 'Unsupported preference key' })
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)
@@ -103,6 +114,14 @@ function registerUiPrefsIpc() {
         const value = payload && typeof payload.value === 'boolean' ? payload.value : null
         if (value === null) return err(400, { error: 'Invalid preference value' })
         setUiPref(key, value)
+        return ok({ success: true })
+      }
+
+      if (key === 'theme') {
+        const value = payload && typeof payload.value === 'string' ? payload.value : null
+        const valid = ['system', 'light', 'dark']
+        if (!value || !valid.includes(value)) return err(400, { error: 'Invalid theme value' })
+        setUiPref('theme', value)
         return ok({ success: true })
       }
 
@@ -192,6 +211,7 @@ function createMainWindow() {
       // NOTE: sandbox + file:// module scripts can be problematic in packaged builds (blank window).
       // We keep contextIsolation + no nodeIntegration for safety, but disable sandbox for reliability.
       sandbox: false,
+      partition: 'persist:dbconsole',
     },
   })
 
@@ -256,6 +276,7 @@ function createMainWindow() {
 
 function installAppMenu() {
   const sidebarActionsShowOnHover = getUiPrefBool('sidebarActionsShowOnHover', true)
+  const currentTheme = getThemePref('system')
 
   const template = [
     ...(isMac
@@ -360,6 +381,48 @@ function installAppMenu() {
               mainWindow.webContents.send('dbconsole:menu:sidebarActionsShowOnHover', { enabled })
             }
           }
+        },
+        { type: 'separator' },
+        {
+          label: 'Appearance',
+          submenu: [
+            {
+              label: 'System',
+              type: 'radio',
+              checked: currentTheme === 'system',
+              click: () => {
+                setUiPref('theme', 'system')
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                  mainWindow.webContents.send('dbconsole:menu:theme', { theme: 'system' })
+                }
+                installAppMenu()
+              }
+            },
+            {
+              label: 'Light',
+              type: 'radio',
+              checked: currentTheme === 'light',
+              click: () => {
+                setUiPref('theme', 'light')
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                  mainWindow.webContents.send('dbconsole:menu:theme', { theme: 'light' })
+                }
+                installAppMenu()
+              }
+            },
+            {
+              label: 'Dark',
+              type: 'radio',
+              checked: currentTheme === 'dark',
+              click: () => {
+                setUiPref('theme', 'dark')
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                  mainWindow.webContents.send('dbconsole:menu:theme', { theme: 'dark' })
+                }
+                installAppMenu()
+              }
+            }
+          ]
         },
         { type: 'separator' },
         { role: 'resetZoom' },

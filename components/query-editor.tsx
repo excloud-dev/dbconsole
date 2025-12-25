@@ -32,7 +32,7 @@ export function QueryEditor({ query, onChange, onRun, onSaveAsNamed, isNamedQuer
     onParamsChange(next)
   }
   return (
-    <div className="flex flex-col h-full bg-white overflow-hidden relative group/editor">
+    <div className="flex flex-col h-full bg-card overflow-hidden relative group/editor">
       <div className="flex-1 min-h-0 relative">
         <SqlEditor
           value={query}
@@ -50,14 +50,14 @@ export function QueryEditor({ query, onChange, onRun, onSaveAsNamed, isNamedQuer
             <Button
               size="sm"
               variant="outline"
-              className="h-7 gap-1.5 text-stone-600 border-stone-200 hover:bg-white hover:text-stone-900 bg-white/90 backdrop-blur shadow-sm"
+              className="h-7 gap-1.5 text-muted-foreground border-border hover:bg-card hover:text-foreground bg-card/90 backdrop-blur shadow-sm"
               onClick={onSaveAsNamed}
             >
               <BookmarkPlus className="h-3.5 w-3.5" />
               Save
             </Button>
           )}
-          <Button size="sm" className="h-7 gap-1.5 bg-stone-800 hover:bg-stone-900 text-white shadow-md transition-transform active:scale-95" onClick={onRun}>
+          <Button size="sm" className="h-7 gap-1.5 shadow-md transition-transform active:scale-95" onClick={onRun}>
             <Play className="h-3.5 w-3.5" />
             Run
           </Button>
@@ -65,17 +65,17 @@ export function QueryEditor({ query, onChange, onRun, onSaveAsNamed, isNamedQuer
       </div>
 
       {!isNamedQuery && onParamsChange && params.length > 0 && (
-        <div className="border-t border-stone-200 bg-stone-50/50 p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto max-h-[160px]">
+        <div className="border-t border-border bg-secondary/50 p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto max-h-[160px]">
           {params.map((param, idx) => (
-            <div key={idx} className="flex items-center gap-1.5 bg-white border border-stone-200 rounded-md px-2 py-1.5 shadow-sm group hover:border-stone-300 transition-colors">
+            <div key={idx} className="flex items-center gap-1.5 bg-card border border-border rounded-md px-2 py-1.5 shadow-sm group hover:border-border/80 transition-colors">
               {/* Index Chip */}
-              <div className="flex items-center justify-center h-5 w-6 rounded bg-stone-100 text-[10px] font-mono font-medium text-stone-500 border border-stone-200 shrink-0" title={`Parameter $${idx + 1}`}>
+              <div className="flex items-center justify-center h-5 w-6 rounded bg-secondary text-[10px] font-mono font-medium text-muted-foreground border border-border shrink-0" title={`Parameter $${idx + 1}`}>
                 ${idx + 1}
               </div>
 
               {/* Type Select */}
               <Select value={param.type} onValueChange={(v) => updateParam(idx, { type: v as "string" | "number" | "boolean" })}>
-                <SelectTrigger className="h-5 w-[42px] border-none bg-transparent p-0 text-[10px] text-stone-400 font-medium hover:text-stone-700 focus:ring-0 shadow-none data-[placeholder]:text-stone-400">
+                <SelectTrigger className="h-5 w-[42px] border-none bg-transparent p-0 text-[10px] text-muted-foreground font-medium hover:text-foreground focus:ring-0 shadow-none data-[placeholder]:text-muted-foreground">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -85,7 +85,7 @@ export function QueryEditor({ query, onChange, onRun, onSaveAsNamed, isNamedQuer
                 </SelectContent>
               </Select>
 
-              <div className="h-4 w-px bg-stone-100 shrink-0" />
+              <div className="h-4 w-px bg-border shrink-0" />
 
               {/* Value Input */}
               {param.type === "boolean" ? (
@@ -96,10 +96,10 @@ export function QueryEditor({ query, onChange, onRun, onSaveAsNamed, isNamedQuer
                     updateParam(idx, { value: next })
                   }}
                   className={`h-5 w-6 flex items-center justify-center rounded border text-[10px] font-mono ${param.value === "true"
-                    ? "border-emerald-300 text-emerald-700 bg-emerald-50"
+                    ? "border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950"
                     : param.value === "false"
-                      ? "border-rose-300 text-rose-700 bg-rose-50"
-                      : "border-stone-200 text-stone-400 bg-white hover:bg-stone-50"
+                      ? "border-rose-300 dark:border-rose-700 text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950"
+                      : "border-border text-muted-foreground bg-card hover:bg-secondary"
                     }`}
                   title={param.value === "" ? "Unset" : param.value === "true" ? "True" : "False"}
                   aria-pressed={param.value !== ""}
@@ -109,7 +109,7 @@ export function QueryEditor({ query, onChange, onRun, onSaveAsNamed, isNamedQuer
                 </button>
               ) : (
                 <input
-                  className="flex-1 bg-transparent border-none text-xs focus:ring-0 p-0 text-stone-800 placeholder:text-stone-300 min-w-0 outline-none font-mono"
+                  className="flex-1 bg-transparent border-none text-xs focus:ring-0 p-0 text-foreground placeholder:text-muted-foreground/50 min-w-0 outline-none font-mono"
                   value={param.value}
                   onChange={(e) => updateParam(idx, { value: e.target.value })}
                   placeholder="Value..."
@@ -118,7 +118,7 @@ export function QueryEditor({ query, onChange, onRun, onSaveAsNamed, isNamedQuer
 
               {/* Label Hint (if distinct from value) */}
               {paramLabels[idx] && (
-                <span className="text-[9px] text-stone-400 truncate max-w-[60px] select-none" title={paramLabels[idx]}>
+                <span className="text-[9px] text-muted-foreground truncate max-w-[60px] select-none" title={paramLabels[idx]}>
                   {paramLabels[idx]}
                 </span>
               )}

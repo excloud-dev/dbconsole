@@ -1230,14 +1230,14 @@ export function DbConsole() {
 
   return (
     <>
-      <div className="h-full w-full bg-stone-50 flex flex-col overflow-hidden">
+      <div className="h-full w-full bg-background flex flex-col overflow-hidden">
         {/* Header with tabs and settings */}
-        <div className="flex items-center justify-between border-b border-stone-200 bg-stone-50 px-2 py-2">
+        <div className="flex items-center justify-between border-b border-border bg-background px-2 py-2">
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-stone-500 hover:text-stone-700 flex-shrink-0"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground flex-shrink-0"
               onClick={() => setSidebarOpen(!sidebarOpen)}
             >
               <PanelLeft className="h-4 w-4" />
@@ -1255,7 +1255,7 @@ export function DbConsole() {
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 gap-1.5 text-stone-600 hover:text-stone-900"
+              className="h-8 gap-1.5 text-muted-foreground hover:text-foreground"
               onClick={() => setShowGenerateDialog(true)}
             >
               <Sparkles className="h-4 w-4 text-emerald-600" />
@@ -1264,7 +1264,7 @@ export function DbConsole() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-stone-500 hover:text-stone-700"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
               onClick={() => setShowConnectionDialog(true)}
             >
               <Settings className="h-4 w-4" />
@@ -1278,7 +1278,7 @@ export function DbConsole() {
             {/* Collapsible sidebar */}
             {sidebarOpen && (
               <>
-                <ResizablePanel defaultSize={15} minSize={15} maxSize={40} className="border-r border-stone-200 bg-stone-50">
+                <ResizablePanel defaultSize={15} minSize={15} maxSize={40} className="border-r border-border bg-background">
                   <div className="h-full flex flex-col">
                     <div className="flex-1 p-3 overflow-hidden">
                       <SchemasSidebar
@@ -1394,11 +1394,11 @@ export function DbConsole() {
                     </div>
                   </ResizablePanel>
 
-                  <ResizableHandle className="h-px bg-stone-200" />
+                  <ResizableHandle className="h-px bg-border" />
 
                   {/* Data grid section */}
                   <ResizablePanel defaultSize={60} minSize={20}>
-                    <div className="h-full overflow-hidden border-t border-stone-200 flex flex-col">
+                    <div className="h-full overflow-hidden border-t border-border flex flex-col">
                       {currentResult ? (
                         currentTab && (
                           <DataGrid
@@ -1431,15 +1431,15 @@ export function DbConsole() {
                           />
                         )
                       ) : (
-                        <div className="flex h-full flex-col items-center justify-center text-stone-400 gap-2">
+                        <div className="flex h-full flex-col items-center justify-center text-muted-foreground gap-2">
                           {/* Empty state content */}
-                          <div className="h-10 w-10 rounded-full bg-stone-100 flex items-center justify-center">
-                            <svg className="h-5 w-5 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center">
+                            <svg className="h-5 w-5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776" />
                             </svg>
                           </div>
                           <span className="text-sm font-medium">{isRunning ? "Running query..." : "Run a query to see results"}</span>
-                          <span className="text-xs text-stone-400">Press ⌘+Enter to execute</span>
+                          <span className="text-xs text-muted-foreground">Press ⌘+Enter to execute</span>
                         </div>
                       )}
                     </div>

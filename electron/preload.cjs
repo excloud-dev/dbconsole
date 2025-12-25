@@ -139,5 +139,13 @@ contextBridge.exposeInMainWorld('dbconsole', {
       ipcRenderer.on('dbconsole:menu:sidebarActionsShowOnHover', listener)
       return () => ipcRenderer.removeListener('dbconsole:menu:sidebarActionsShowOnHover', listener)
     },
+    onMenuTheme: (handler) => {
+      if (typeof handler !== 'function') return () => { }
+      const listener = (_evt, payload) => {
+        handler(payload)
+      }
+      ipcRenderer.on('dbconsole:menu:theme', listener)
+      return () => ipcRenderer.removeListener('dbconsole:menu:theme', listener)
+    },
   },
 })

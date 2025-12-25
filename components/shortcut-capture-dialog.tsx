@@ -101,13 +101,13 @@ export function ShortcutCaptureDialog({
                     <DialogTitle>Press new shortcut</DialogTitle>
                 </DialogHeader>
                 <div className="py-4 flex flex-col gap-2">
-                    <div className="rounded-md border border-dashed border-stone-300 bg-stone-50 px-3 py-4 text-center text-sm text-stone-600">
+                    <div className="rounded-md border border-dashed border-border bg-secondary px-3 py-4 text-center text-sm text-muted-foreground">
                         {formatted ? (
                             <div className="flex justify-center">
                                 <BindingKbd binding={formatted} isMac={isMac} />
                             </div>
                         ) : (
-                            <span className="text-stone-500">Press keys to capture</span>
+                            <span className="text-muted-foreground">Press keys to capture</span>
                         )}
                     </div>
                     {warning && <p className="text-xs text-amber-600">{warning}</p>}

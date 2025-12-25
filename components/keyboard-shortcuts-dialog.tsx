@@ -77,9 +77,9 @@ export function KeyboardShortcutsDialog({
                             </Button>
                         </div>
 
-                        <div className="max-h-[55vh] overflow-y-auto overflow-x-auto rounded-lg border border-stone-200">
+                        <div className="max-h-[55vh] overflow-y-auto overflow-x-auto rounded-lg border border-border">
                             <table className="min-w-[900px] w-full text-sm table-fixed">
-                                <thead className="bg-stone-50 text-stone-600 uppercase text-xs">
+                                <thead className="bg-secondary text-muted-foreground uppercase text-xs">
                                     <tr>
                                         <th className="px-3 py-2 text-left">Command</th>
                                         <th className="px-3 py-2 text-left">Current</th>
@@ -94,11 +94,11 @@ export function KeyboardShortcutsDialog({
                                         const conflictIds = current ? conflicts[current.toLowerCase()] : undefined
                                         const hasConflict = conflictIds && conflictIds.length > 1
                                         return (
-                                            <tr key={cmd.id} className="border-t border-stone-100">
+                                            <tr key={cmd.id} className="border-t border-border">
                                                 <td className="px-3 py-2 w-[45%]">
                                                     <div className="flex flex-col">
-                                                        <span className="font-medium text-stone-900">{cmd.title}</span>
-                                                        <span className="text-xs text-stone-500 truncate">{cmd.id}</span>
+                                                        <span className="font-medium text-foreground">{cmd.title}</span>
+                                                        <span className="text-xs text-muted-foreground truncate">{cmd.id}</span>
                                                     </div>
                                                 </td>
                                                 <td className="px-3 py-2 w-[20%]">
@@ -108,7 +108,7 @@ export function KeyboardShortcutsDialog({
                                                     </div>
                                                 </td>
                                                 <td className="px-3 py-2 w-[15%]">
-                                                    <div className="text-xs text-stone-500">
+                                                    <div className="text-xs text-muted-foreground">
                                                         {def ? <BindingDisplay raw={def} isMac={isMac} /> : <span>—</span>}
                                                     </div>
                                                 </td>
@@ -128,7 +128,7 @@ export function KeyboardShortcutsDialog({
                                     })}
                                     {filtered.length === 0 && (
                                         <tr>
-                                            <td colSpan={4} className="px-3 py-6 text-center text-sm text-stone-500">
+                                            <td colSpan={4} className="px-3 py-6 text-center text-sm text-muted-foreground">
                                                 No shortcuts match your search.
                                             </td>
                                         </tr>

@@ -161,9 +161,9 @@ export function ConnectionDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="!max-w-2xl !w-[700px] max-h-[80vh] sm:!max-w-2xl">
         <div className="flex flex-col h-full">
-          <DialogHeader className="pb-2 border-b border-stone-100">
+          <DialogHeader className="pb-2 border-b border-border">
             <DialogTitle className="flex items-center gap-2">
-              <Database className="h-5 w-5 text-stone-600" />
+              <Database className="h-5 w-5 text-muted-foreground" />
               Database Connections
             </DialogTitle>
           </DialogHeader>
@@ -171,10 +171,10 @@ export function ConnectionDialog({
           <div className="overflow-y-auto py-4" style={{ maxHeight: 'calc(80vh - 10rem)' }}>
             <div className="flex gap-5 min-h-[320px]">
               {/* Connection list */}
-              <div className="w-56 border-r border-stone-200 pr-4 flex-shrink-0">
+              <div className="w-56 border-r border-border pr-4 flex-shrink-0">
                 <div className="flex items-center justify-between mb-3 px-2">
-                  <span className="text-xs font-medium text-stone-500 uppercase tracking-wider">Connections</span>
-                  <Button variant="ghost" size="icon" className="h-5 w-5 text-stone-400 hover:text-stone-700" onClick={handleAddConnection}>
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Connections</span>
+                  <Button variant="ghost" size="icon" className="h-5 w-5 text-muted-foreground hover:text-foreground" onClick={handleAddConnection}>
                     <Plus className="h-3.5 w-3.5" />
                   </Button>
                 </div>
@@ -198,26 +198,26 @@ export function ConnectionDialog({
                       className={cn(
                         "w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm text-left transition-colors border border-transparent",
                         editingConnection?.id === conn.id
-                          ? "bg-stone-100 text-stone-900 font-medium"
-                          : "text-stone-600 hover:bg-stone-50 hover:text-stone-900"
+                          ? "bg-secondary text-foreground font-medium"
+                          : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
                       )}
                     >
                       <div className="relative flex items-center justify-center">
                         <Database
                           className={cn(
                             "h-3.5 w-3.5",
-                            editingConnection?.id === conn.id ? "text-stone-700" : "text-stone-400"
+                            editingConnection?.id === conn.id ? "text-foreground" : "text-muted-foreground"
                           )}
                         />
                         {activeConnection === conn.id && (
-                          <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-emerald-500 rounded-full ring-1 ring-white" />
+                          <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-emerald-500 rounded-full ring-1 ring-background" />
                         )}
                       </div>
                       <span className="truncate flex-1">{conn.label}</span>
                     </button>
                   ))}
                   {connections.length === 0 && (
-                    <p className="text-xs text-stone-400 text-center py-4 italic">No connections</p>
+                    <p className="text-xs text-muted-foreground text-center py-4 italic">No connections</p>
                   )}
                 </div>
               </div>
@@ -226,16 +226,16 @@ export function ConnectionDialog({
               <div className="flex-1 pl-2">
                 {editingConnection ? (
                   <div className="h-full flex flex-col">
-                    <div className="pb-4 mb-4 border-b border-stone-100 flex items-center justify-between">
+                    <div className="pb-4 mb-4 border-b border-border flex items-center justify-between">
                       <div>
-                        <h3 className="text-sm font-semibold text-stone-800">Connection Details</h3>
-                        <p className="text-xs text-stone-500">Configure connection parameters</p>
+                        <h3 className="text-sm font-semibold text-foreground">Connection Details</h3>
+                        <p className="text-xs text-muted-foreground">Configure connection parameters</p>
                       </div>
                       <div className="flex items-center gap-1">
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-7 px-2 text-stone-500 hover:text-red-600 hover:bg-red-50 disabled:opacity-50"
+                          className="h-7 px-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 disabled:opacity-50"
                           onClick={() => handleDeleteConnection(editingConnection.id)}
                           disabled={editingConnection.from === "env"}
                         >
@@ -248,73 +248,73 @@ export function ConnectionDialog({
                     <div className="space-y-4 flex-1 overflow-y-auto pr-1">
                       <div className="space-y-3">
                         <div className="grid gap-1.5">
-                          <Label htmlFor="name" className="text-xs font-medium text-stone-600">
+                          <Label htmlFor="name" className="text-xs font-medium text-muted-foreground">
                             Connection Name
                           </Label>
                           <Input
                             id="name"
                             value={editingConnection.label}
                             onChange={(e) => handleUpdateConnection({ label: e.target.value })}
-                            className="h-8 bg-white border-stone-200 focus:border-stone-400 focus:ring-stone-400/20"
+                            className="h-8 bg-background border-border focus:border-ring focus:ring-ring/20"
                             placeholder="My Production DB"
                           />
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
                           <div className="grid gap-1.5">
-                            <Label htmlFor="host" className="text-xs font-medium text-stone-600">
+                            <Label htmlFor="host" className="text-xs font-medium text-muted-foreground">
                               Host
                             </Label>
                             <Input
                               id="host"
                               value={editingConnection.host}
                               onChange={(e) => handleUpdateConnection({ host: e.target.value })}
-                              className="h-8 bg-white border-stone-200"
+                              className="h-8 bg-background border-border"
                               placeholder="localhost"
                             />
                           </div>
                           <div className="grid gap-1.5">
-                            <Label htmlFor="port" className="text-xs font-medium text-stone-600">
+                            <Label htmlFor="port" className="text-xs font-medium text-muted-foreground">
                               Port
                             </Label>
                             <Input
                               id="port"
                               value={editingConnection.port}
                               onChange={(e) => handleUpdateConnection({ port: e.target.value })}
-                              className="h-8 bg-white border-stone-200"
+                              className="h-8 bg-background border-border"
                               placeholder="5432"
                             />
                           </div>
                         </div>
 
                         <div className="grid gap-1.5">
-                          <Label htmlFor="database" className="text-xs font-medium text-stone-600">
+                          <Label htmlFor="database" className="text-xs font-medium text-muted-foreground">
                             Database Name
                           </Label>
                           <Input
                             id="database"
                             value={editingConnection.database}
                             onChange={(e) => handleUpdateConnection({ database: e.target.value })}
-                            className="h-8 bg-white border-stone-200"
+                            className="h-8 bg-background border-border"
                             placeholder="postgres"
                           />
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
                           <div className="grid gap-1.5">
-                            <Label htmlFor="user" className="text-xs font-medium text-stone-600">
+                            <Label htmlFor="user" className="text-xs font-medium text-muted-foreground">
                               Username
                             </Label>
                             <Input
                               id="user"
                               value={editingConnection.username}
                               onChange={(e) => handleUpdateConnection({ username: e.target.value })}
-                              className="h-8 bg-white border-stone-200"
+                              className="h-8 bg-background border-border"
                               placeholder="postgres"
                             />
                           </div>
                           <div className="grid gap-1.5">
-                            <Label htmlFor="password" className="text-xs font-medium text-stone-600">
+                            <Label htmlFor="password" className="text-xs font-medium text-muted-foreground">
                               Password
                             </Label>
                             <Input
@@ -322,7 +322,7 @@ export function ConnectionDialog({
                               type="password"
                               value={editingConnection.password}
                               onChange={(e) => handleUpdateConnection({ password: e.target.value })}
-                              className="h-8 bg-white border-stone-200"
+                              className="h-8 bg-background border-border"
                               placeholder="••••••••"
                             />
                           </div>
@@ -335,8 +335,8 @@ export function ConnectionDialog({
                           size="sm"
                           className={cn(
                             "w-full gap-2 h-8",
-                            testStatus === "success" ? "border-green-200 bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 hover:border-green-300" :
-                              testStatus === "error" ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100" : ""
+                            testStatus === "success" ? "border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:text-emerald-800 dark:hover:text-emerald-300 hover:border-emerald-300 dark:hover:border-emerald-700" :
+                              testStatus === "error" ? "border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20" : ""
                           )}
                           onClick={handleTestConnection}
                           disabled={testStatus === "testing"}
@@ -361,7 +361,7 @@ export function ConnectionDialog({
                       </div>
 
                       <div className="pt-3">
-                        <div className="text-xs font-medium text-stone-600 mb-1">Connection usage</div>
+                        <div className="text-xs font-medium text-muted-foreground mb-1">Connection usage</div>
                         <ToggleGroup
                           type="single"
                           value={poolMode}
@@ -376,25 +376,25 @@ export function ConnectionDialog({
                             <ToggleGroupItem
                               key={opt.key}
                               value={opt.key}
-                              className="text-[10px] h-6 px-2 rounded-full border border-stone-200 data-[state=on]:bg-stone-800 data-[state=on]:text-white data-[state=on]:border-stone-800 hover:bg-stone-50 hover:text-stone-900 transition-colors"
+                              className="text-[10px] h-6 px-2 rounded-full border border-border data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:border-primary hover:bg-secondary hover:text-foreground transition-colors"
                             >
                               {opt.label}
                             </ToggleGroupItem>
                           ))}
                         </ToggleGroup>
-                        <p className="text-[11px] text-stone-500 mt-1">
+                        <p className="text-[11px] text-muted-foreground mt-1">
                           Single = 1 connection total; Shared = pool re-used across tabs; Per Tab = dedicated connection per tab.
                         </p>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div className="h-full flex flex-col items-center justify-center text-stone-400 text-sm">
-                    <div className="h-10 w-10 rounded-full bg-stone-50 flex items-center justify-center mb-3">
-                      <Database className="h-5 w-5 text-stone-300" />
+                  <div className="h-full flex flex-col items-center justify-center text-muted-foreground text-sm">
+                    <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center mb-3">
+                      <Database className="h-5 w-5 text-muted-foreground/50" />
                     </div>
-                    <p className="font-medium text-stone-500">Select a connection to edit</p>
-                    <Button variant="link" onClick={handleAddConnection} className="text-stone-500 hover:text-stone-800 h-auto p-0 mt-1 text-xs underline decoration-stone-300 hover:decoration-stone-500">
+                    <p className="font-medium text-muted-foreground">Select a connection to edit</p>
+                    <Button variant="link" onClick={handleAddConnection} className="text-muted-foreground hover:text-foreground h-auto p-0 mt-1 text-xs underline decoration-border hover:decoration-foreground">
                       or create new
                     </Button>
                   </div>
@@ -404,12 +404,12 @@ export function ConnectionDialog({
           </div>
 
           {appInfo && (
-            <div className="mt-2 pt-3 border-t border-stone-100 flex items-center justify-between text-xs text-stone-500">
+            <div className="mt-2 pt-3 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
               <div className="flex items-center gap-2">
-                <span className="font-medium text-stone-700">DBConsole v{appInfo.version}</span>
-                {appInfo.buildSha && <span className="text-stone-400">build {appInfo.buildSha}</span>}
+                <span className="font-medium text-foreground">DBConsole v{appInfo.version}</span>
+                {appInfo.buildSha && <span className="text-muted-foreground/70">build {appInfo.buildSha}</span>}
               </div>
-              {appInfo.runtime?.electron && <span className="text-stone-400">Electron {appInfo.runtime.electron}</span>}
+              {appInfo.runtime?.electron && <span className="text-muted-foreground/70">Electron {appInfo.runtime.electron}</span>}
             </div>
           )}
 
@@ -477,7 +477,6 @@ export function ConnectionDialog({
                 }
               }}
               disabled={!editingConnection}
-              className="bg-stone-800 hover:bg-stone-900"
             >
               Connect
             </Button>

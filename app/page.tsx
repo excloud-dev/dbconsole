@@ -8,7 +8,7 @@ export default function Home() {
   }
 
   return (
-    <main className="h-full w-full bg-white">
+    <main className="h-full w-full bg-background">
       <WebShortcutsRoot>
         <DbConsole />
       </WebShortcutsRoot>

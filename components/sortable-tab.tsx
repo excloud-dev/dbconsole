@@ -52,8 +52,8 @@ export const SortableTab = forwardRef<HTMLDivElement, SortableTabProps>(
             className={cn(
               "group flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm cursor-grab active:cursor-grabbing transition-all duration-150",
               isActive
-                ? "bg-white text-stone-900 border border-stone-200 font-medium"
-                : "text-stone-500 hover:bg-stone-200/50 hover:text-stone-700",
+                ? "bg-card text-foreground border border-border font-medium"
+                : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground",
               isDragging && "opacity-50 shadow-lg z-50",
             )}
             onClick={() => onTabChange(tab.id)}
@@ -72,7 +72,7 @@ export const SortableTab = forwardRef<HTMLDivElement, SortableTabProps>(
                   e.stopPropagation()
                   onTabClose(tab.id)
                 }}
-                className="opacity-0 group-hover:opacity-100 hover:bg-stone-200 rounded p-0.5 transition-opacity flex-shrink-0"
+                className="opacity-0 group-hover:opacity-100 hover:bg-muted rounded p-0.5 transition-opacity flex-shrink-0"
                 onPointerDown={(e) => e.stopPropagation()}
               >
                 <X className="h-3 w-3" />

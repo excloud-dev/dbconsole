@@ -93,7 +93,7 @@ export function WebUpdateNotification({
                 <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <RefreshCw className="h-5 w-5 text-blue-600" />
+                            <RefreshCw className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                             <CardTitle className="text-lg">
                                 {error ? 'Update Check Failed' : 'Update Available'}
                             </CardTitle>
@@ -118,7 +118,7 @@ export function WebUpdateNotification({
                     )}
 
                     {error && (
-                        <CardDescription className="text-red-600">
+                        <CardDescription className="text-red-600 dark:text-red-400">
                             {error}
                         </CardDescription>
                     )}
@@ -244,7 +244,7 @@ export function WebUpdateBanner({
     }
 
     return (
-        <div className={`bg-blue-600 text-white px-4 py-2 ${className}`}>
+        <div className={`bg-blue-600 dark:bg-blue-800 text-white px-4 py-2 ${className}`}>
             <div className="flex items-center justify-between max-w-7xl mx-auto">
                 <div className="flex items-center gap-3">
                     <RefreshCw className="h-4 w-4" />
