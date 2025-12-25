@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.6.0 - 2025-12-25
+
+- feat: persist and restore last used connection across sessions (92fbae7)
+- feat: add query execution toast notification and conditional search bar in join builder (5+ tables) (a54d9b6)
+- fix: comprehensively improve dark mode theming with SQL highlighting, tooltip fixes, and consistent theme variables across all components (5d14db1)
+- feat: add --push flag to release.sh to gate pushing tags to origin (8dad93b)
+- feat: add --force/-f flag to release.sh to allow dirty working tree (3bf7f4f)
+
 ## v0.5.1 - 2025-12-24
 
 - Add macOS in-place Electron auto-updater design for private GitHub releases (#1) (af2601f)

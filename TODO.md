@@ -27,12 +27,12 @@
 - [x] Add a way to export the query results to a CSV file.
 
 ## UI/UX Improvements
-- [ ] Dark mode!
 - [ ] When cells are highlighed, it looks a little off. investigate.
 - [ ] Fix fullscreen datagrid view. 
 - [ ] Fix setting modal styling, make it consistent with the rest of the app.
 - [ ] Fix the toggle columns modal/dialog thing.
 - [ ] Explore allowing for both SET and WHERE for same column in UPDATE queries
+- [x] Dark mode!
 - [x] Fix the sidebar styling. make it consistent with the rest of the app.
 - [x] If i press the view button and a query if the same query exists dont do anything just execute again
 - [x] Shortcuts! But want to do this via a seperate interface if possible so we can remap shortcuts from settings if needed. Disable some for web or have sensible defaults for web vs desktop.
