@@ -229,6 +229,17 @@ export function DbConsole() {
 
   const [connections, setConnections] = useState<ConnectionWithStatus[]>([])
   const [activeConnection, setActiveConnection] = useState<string | null>(null)
+
+  // Persistence: Save active connection on change
+  useEffect(() => {
+    if (activeConnection) {
+      try {
+        localStorage.setItem("db-console-last-connection-id", activeConnection)
+      } catch (e) {
+        console.error("Failed to save last connection", e)
+      }
+    }
+  }, [activeConnection])
   const [showConnectionDialog, setShowConnectionDialog] = useState(false)
 
   const [namedQueries, setNamedQueries] = useState<NamedQuery[]>([])
@@ -432,14 +443,32 @@ export function DbConsole() {
         ])
 
         if (Array.isArray(conns)) {
-          const withStatus: ConnectionWithStatus[] = conns.map((c, index) => ({
-            ...c,
-            status: index === 0 ? "connected" : "disconnected",
-          }))
-          setConnections(withStatus)
-          if (withStatus.length > 0) {
-            setActiveConnection(withStatus[0].id)
-            void loadSchema(withStatus[0].id)
+          if (conns.length > 0) {
+            let initialConnectionId = conns[0].id  // Default: first connection
+
+            // Try to restore last used connection
+            try {
+              const savedConnectionId = localStorage.getItem("db-console-last-connection-id")
+              if (savedConnectionId) {
+                const exists = conns.some(c => c.id === savedConnectionId)
+                if (exists) {
+                  initialConnectionId = savedConnectionId
+                }
+              }
+            } catch (e) {
+              console.error("Failed to restore last connection", e)
+            }
+
+            // Set connection statuses based on which one is active
+            const withStatus: ConnectionWithStatus[] = conns.map(c => ({
+              ...c,
+              status: c.id === initialConnectionId ? "connected" : "disconnected",
+            }))
+            setConnections(withStatus)
+            setActiveConnection(initialConnectionId)
+            void loadSchema(initialConnectionId)
+          } else {
+            setConnections([])
           }
         }
 
