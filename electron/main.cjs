@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, shell, Menu, protocol, ipcMain } = require('electron')
+const { app, BrowserWindow, dialog, shell, Menu, protocol, ipcMain, net } = require('electron')
 const fs = require('node:fs')
 const { registerDesktopIpcHandlers } = require('./ipc-loader.cjs')
 const { setupSqlFileOpen } = require('./sql-file-open.cjs')
@@ -75,9 +75,11 @@ try {
         corsEnabled: true,
         allowServiceWorkers: true,
         stream: true,
+        bypassCSP: true,
       },
     },
   ])
+  console.log('[Init] Registered app:// scheme privileges')
 } catch (e) {
   console.error('Failed to register scheme privileges for app://', e)
 }
@@ -148,26 +150,46 @@ function registerRendererProtocol() {
   // This maps `app://...` to the packaged renderer directory.
   if (!app.isPackaged) return
   try {
-    protocol.registerFileProtocol('app', (request, callback) => {
-      const url = request.url.replace(/^app:\/\//, '')
-      const withoutFragment = url.split('#')[0].split('?')[0]
-      let rel = withoutFragment.length > 0 ? withoutFragment : 'index.html'
-      if (rel.startsWith('/')) rel = rel.slice(1)
-      // When index.html references "./assets/...", it resolves to "index.html/assets/...".
-      // Normalize that to the renderer root so assets resolve correctly.
-      if (rel.startsWith('index.html/')) rel = rel.slice('index.html/'.length)
-      // Handle trailing slashes / directory-like URLs (e.g. app://index.html/).
-      if (rel === '' || rel.endsWith('/')) rel = `${rel}index.html`
-
-      let filePath = path.join(process.resourcesPath, 'renderer', rel)
-      // If we somehow end up with a directory path, serve its index.html.
+    protocol.handle('app', async (request) => {
       try {
-        if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
-          filePath = path.join(filePath, 'index.html')
+        console.log('[Protocol] Request:', request.url)
+        const url = new URL(request.url)
+        let pathname = url.pathname
+        // Remove leading slash
+        if (pathname.startsWith('/')) pathname = pathname.slice(1)
+
+        // Default to index.html
+        if (!pathname || pathname === '') pathname = 'index.html'
+
+        // When index.html references "./assets/...", it might come as "index.html/assets/..."
+        if (pathname.startsWith('index.html/')) {
+          pathname = pathname.slice('index.html/'.length)
         }
-      } catch { }
-      callback({ path: filePath })
+
+        let filePath = path.join(process.resourcesPath, 'renderer', pathname)
+        console.log('[Protocol] Resolved path:', filePath, 'exists:', fs.existsSync(filePath))
+
+        // If directory, serve index.html
+        try {
+          if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
+            filePath = path.join(filePath, 'index.html')
+          }
+        } catch (e) {
+          console.error('[Protocol] Stat error:', e)
+        }
+
+        // Use net.fetch with file:// URL
+        const fileUrl = `file://${filePath}`
+        console.log('[Protocol] Fetching:', fileUrl)
+        const response = await net.fetch(fileUrl)
+        console.log('[Protocol] Response status:', response.status)
+        return response
+      } catch (err) {
+        console.error('[Protocol] Handler error:', err)
+        throw err
+      }
     })
+    console.log('[Protocol] app:// protocol handler registered')
   } catch (e) {
     console.error('Failed to register app:// protocol', e)
   }
