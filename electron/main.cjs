@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, shell, Menu, protocol, ipcMain, net } = require('electron')
+const { app, BrowserWindow, dialog, shell, Menu, protocol, ipcMain, net, session } = require('electron')
 const fs = require('node:fs')
 const { registerDesktopIpcHandlers } = require('./ipc-loader.cjs')
 const { setupSqlFileOpen } = require('./sql-file-open.cjs')
@@ -150,7 +150,9 @@ function registerRendererProtocol() {
   // This maps `app://...` to the packaged renderer directory.
   if (!app.isPackaged) return
   try {
-    protocol.handle('app', async (request) => {
+    // Use the same session partition as the BrowserWindow
+    const ses = session.fromPartition('persist:dbconsole')
+    ses.protocol.handle('app', async (request) => {
       try {
         console.log('[Protocol] Request:', request.url)
         const url = new URL(request.url)
@@ -189,7 +191,7 @@ function registerRendererProtocol() {
         throw err
       }
     })
-    console.log('[Protocol] app:// protocol handler registered')
+    console.log('[Protocol] app:// protocol handler registered on session')
   } catch (e) {
     console.error('Failed to register app:// protocol', e)
   }
@@ -287,10 +289,13 @@ function createMainWindow() {
   }
 
   if (isDev) {
+    console.log('[Window] Loading dev URL:', getRendererUrl())
     void win.loadURL(getRendererUrl())
   } else {
     // Prefer app:// in packaged builds to avoid file:// module loading issues.
-    void win.loadURL('app://index.html')
+    const url = 'app://index.html'
+    console.log('[Window] Loading packaged URL:', url, 'isPackaged:', app.isPackaged)
+    void win.loadURL(url)
   }
 
   return win
