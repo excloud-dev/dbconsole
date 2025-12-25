@@ -184,12 +184,17 @@ main() {
 
   local bump="patch"
   local explicit_version=""
+  local push_flag=false
+
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'EOF'
 Usage:
-  ./release.sh                 # bumps patch from last reachable v* tag
-  ./release.sh patch|minor|major
-  ./release.sh X.Y.Z           # explicit version
+  ./release.sh [--push]                 # bumps patch from last reachable v* tag
+  ./release.sh [--push] patch|minor|major
+  ./release.sh [--push] X.Y.Z           # explicit version
+
+Options:
+  --push    Automatically push commit and tag to origin (without prompting)
 
 What it does:
   - Fetches tags from origin (best-effort)
@@ -197,20 +202,32 @@ What it does:
   - Bumps package.json/package-lock.json version (via `npm version --no-git-tag-version`)
   - Adds a CHANGELOG.md section for the new tag (from git commits), if missing
   - Commits and tags the release
-  - Prompts before pushing to origin
+  - If --push is provided, pushes to origin
 EOF
     exit 0
   fi
 
-  if [[ -n "${1:-}" ]]; then
-    if [[ "${1}" == "patch" || "${1}" == "minor" || "${1}" == "major" ]]; then
-      bump="${1}"
-    elif is_semver "${1}"; then
-      explicit_version="${1}"
-    else
-      die "unknown argument: ${1} (expected patch|minor|major|X.Y.Z)"
-    fi
-  fi
+  # Parse arguments
+  while [[ $# -gt 0 ]]; do
+    case "${1}" in
+      --push)
+        push_flag=true
+        shift
+        ;;
+      patch|minor|major)
+        bump="${1}"
+        shift
+        ;;
+      *)
+        if is_semver "${1}"; then
+          explicit_version="${1}"
+          shift
+        else
+          die "unknown argument: ${1} (expected --push, patch|minor|major, or X.Y.Z)"
+        fi
+        ;;
+    esac
+  done
 
   ensure_clean_tree
 
@@ -232,7 +249,7 @@ EOF
   # If HEAD is already tagged, treat this as a "push-only" rerun (idempotent).
   if [[ -n "${last_tag}" ]] && tag_points_at_head "${last_tag}"; then
     info "HEAD is already tagged as ${last_tag}."
-    if confirm "Push commit and tag ${last_tag} to origin?"; then
+    if [[ "${push_flag}" == true ]]; then
       if git remote get-url origin >/dev/null 2>&1; then
         git push origin HEAD
         set +e
@@ -247,7 +264,7 @@ EOF
         info "No 'origin' remote; skipping push"
       fi
     else
-      info "Skipped push."
+      info "Skipping push (use --push flag to push to origin)."
     fi
     exit 0
   fi
@@ -316,7 +333,7 @@ EOF
   fi
 
   info "Release prepared locally."
-  if confirm "Push commit and tag ${tag} to origin?"; then
+  if [[ "${push_flag}" == true ]]; then
     if git remote get-url origin >/dev/null 2>&1; then
       git push origin HEAD
       # Push tag; if it already exists remotely, don't fail the whole release script.
@@ -332,7 +349,7 @@ EOF
       info "No 'origin' remote; skipping push"
     fi
   else
-    info "Skipped push."
+    info "Skipping push (use --push flag to push to origin)."
   fi
 
   info "Done."
