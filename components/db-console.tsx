@@ -506,7 +506,8 @@ export function DbConsole() {
 
   const closeTab = (id: string) => {
     if (tabs.length === 1) return
-    const closingTab = tabs.find((t) => t.id === id)
+    const closingTabIndex = tabs.findIndex((t) => t.id === id)
+    const closingTab = closingTabIndex >= 0 ? tabs[closingTabIndex] : undefined
     const newTabs = tabs.filter((t) => t.id !== id)
     setTabs(newTabs)
     // If we are using per-tab pools, release the tab-specific pool on close.
@@ -517,8 +518,10 @@ export function DbConsole() {
         scopeKey: id,
       }).catch(() => { })
     }
-    if (activeTab === id) {
-      setActiveTab(newTabs[0].id)
+    if (activeTab === id && newTabs.length > 0) {
+      const nextIndex = Math.max(0, closingTabIndex - 1)
+      const nextTab = newTabs[nextIndex] ?? newTabs[newTabs.length - 1]
+      if (nextTab) setActiveTab(nextTab.id)
     }
   }
 
