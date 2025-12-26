@@ -180,7 +180,7 @@ export function SchemasSidebar({
           <DropdownMenuTrigger asChild>
             <button
               className={cn(
-                "group flex h-9 w-full items-center gap-2 rounded-md border border-border bg-background/60 px-2 text-left text-sm text-foreground shadow-xs backdrop-blur",
+                "group flex h-9 w-full items-center gap-2 rounded-md border border-border bg-background/70 px-2 text-left text-sm text-foreground shadow-xs backdrop-blur",
                 "hover:bg-background hover:text-foreground",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
               )}
@@ -195,13 +195,13 @@ export function SchemasSidebar({
               <ChevronDown className="ml-auto h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-56">
+          <DropdownMenuContent align="start" className="w-64 p-2">
             {connections.length === 0 ? (
               <div className="px-3 py-4 text-center">
                 <div className="text-xs text-muted-foreground mb-2">No connections yet</div>
                 <DropdownMenuItem
                   onClick={onOpenSettings}
-                  className="text-xs justify-center bg-secondary hover:bg-secondary/80"
+                  className="text-xs justify-center rounded-md bg-secondary hover:bg-secondary/80"
                 >
                   <Plus className="h-3 w-3 mr-1.5" />
                   Add connection
@@ -209,26 +209,37 @@ export function SchemasSidebar({
               </div>
             ) : (
               <>
+                <div className="px-2 pb-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                  Connections
+                </div>
                 {connections.map((conn) => (
                   <DropdownMenuItem
                     key={conn.id}
                     onClick={() => onConnectionChange(conn.id)}
                     className={cn(
-                      "text-sm gap-2 cursor-pointer",
-                      activeConnection === conn.id && "bg-secondary",
+                      "text-sm gap-2 cursor-pointer rounded-md px-2 py-1.5",
+                      activeConnection === conn.id ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground",
                     )}
                   >
                     <span
                       className={cn(
-                        "h-2 w-2 rounded-full flex-shrink-0 ring-2 ring-white shadow-sm",
+                        "h-2 w-2 rounded-full flex-shrink-0 ring-2 ring-background shadow-sm",
                         getStatusColor(conn.status),
                       )}
                     />
                     <span className="truncate font-medium">{conn.label}</span>
+                    {activeConnection === conn.id && (
+                      <span className="ml-auto text-[10px] uppercase tracking-wide text-muted-foreground">
+                        Active
+                      </span>
+                    )}
                   </DropdownMenuItem>
                 ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onOpenSettings} className="text-sm text-muted-foreground">
+                <DropdownMenuSeparator className="my-2" />
+                <DropdownMenuItem
+                  onClick={onOpenSettings}
+                  className="text-sm text-muted-foreground rounded-md px-2 py-1.5 hover:text-foreground"
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   Manage connections...
                 </DropdownMenuItem>

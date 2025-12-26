@@ -14,7 +14,6 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -119,10 +118,11 @@ export function UpdateSettingsDialog({
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                <DialogHeader>
+            <DialogContent className="!max-w-2xl !w-[720px] max-h-[85vh] overflow-hidden p-0">
+                <div className="flex flex-col h-full">
+                <DialogHeader className="px-6 pt-5 pb-3 border-b border-border">
                     <DialogTitle className="flex items-center gap-2">
-                        <Settings className="h-5 w-5" />
+                        <Settings className="h-5 w-5 text-muted-foreground" />
                         Update Settings
                     </DialogTitle>
                     <DialogDescription>
@@ -130,20 +130,22 @@ export function UpdateSettingsDialog({
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="space-y-6">
+                <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
                     {/* GitHub Authentication */}
                     <div className="space-y-4">
-                        <div className="flex items-center gap-2">
-                            <Key className="h-4 w-4" />
-                            <h3 className="text-sm font-medium">GitHub Authentication</h3>
+                        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                            <Key className="h-3.5 w-3.5" />
+                            <span>GitHub Authentication</span>
                             {tokenConfigured && (
-                                <Badge variant="secondary" className="text-xs">
+                                <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
                                     Token Configured
                                 </Badge>
                             )}
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="github-token">Personal Access Token</Label>
+                            <Label htmlFor="github-token" className="text-xs font-medium text-muted-foreground">
+                                Personal Access Token
+                            </Label>
                             <div className="flex gap-2">
                                 <div className="relative flex-1">
                                     <Input
@@ -152,13 +154,13 @@ export function UpdateSettingsDialog({
                                         value={localToken}
                                         onChange={(e) => setLocalToken(e.target.value)}
                                         placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-                                        className="pr-10"
+                                        className="h-8 pr-9"
                                     />
                                     <Button
                                         type="button"
                                         variant="ghost"
                                         size="sm"
-                                        className="absolute right-0 top-0 h-full px-3"
+                                        className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 px-0 text-muted-foreground hover:text-foreground"
                                         onClick={() => setShowToken(!showToken)}
                                     >
                                         {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -169,11 +171,11 @@ export function UpdateSettingsDialog({
                                     Required for accessing private repositories. Token should have &apos;repo&apos; permissions.
                                 </p>
                                 {tokenConfigured && (
-                                    <div className="flex items-start gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-md text-emerald-900 text-sm">
-                                        <Shield className="h-4 w-4 shrink-0" />
+                                    <div className="flex items-start gap-3 p-3 rounded-md border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-200 text-sm">
+                                        <Shield className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                                         <div>
                                             <p className="font-medium leading-tight">Token already configured</p>
-                                            <p className="text-xs text-emerald-700 leading-tight">
+                                            <p className="text-xs text-emerald-700 dark:text-emerald-300 leading-tight">
                                                 DBConsole is already using a saved GitHub token. Leave this field empty to keep it,
                                                 or enter a new token to replace the stored credentials if needed.
                                             </p>
@@ -187,15 +189,15 @@ export function UpdateSettingsDialog({
 
                     {/* Update Checking */}
                     <div className="space-y-4">
-                        <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4" />
-                            <h3 className="text-sm font-medium">Update Checking</h3>
+                        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                            <Clock className="h-3.5 w-3.5" />
+                            <span>Update Checking</span>
                         </div>
 
                         <div className="space-y-4">
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between gap-4 rounded-md border border-border bg-card px-3 py-2">
                                 <div className="space-y-0.5">
-                                    <Label>Automatic Update Checks</Label>
+                                    <Label className="text-xs font-medium text-muted-foreground">Automatic Update Checks</Label>
                                     <p className="text-xs text-muted-foreground">
                                         Automatically check for new versions in the background
                                     </p>
@@ -208,12 +210,14 @@ export function UpdateSettingsDialog({
 
                             {localSettings.autoCheck && (
                                 <div className="space-y-2">
-                                    <Label htmlFor="check-interval">Check Interval</Label>
+                                    <Label htmlFor="check-interval" className="text-xs font-medium text-muted-foreground">
+                                        Check Interval
+                                    </Label>
                                     <Select
                                         value={localSettings.checkInterval.toString()}
                                         onValueChange={(value) => updateSetting('checkInterval', parseInt(value))}
                                     >
-                                        <SelectTrigger>
+                                        <SelectTrigger className="h-8 border-border bg-background">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -228,14 +232,16 @@ export function UpdateSettingsDialog({
                             )}
 
                             <div className="space-y-2">
-                                <Label htmlFor="update-channel">Update Channel</Label>
+                                <Label htmlFor="update-channel" className="text-xs font-medium text-muted-foreground">
+                                    Update Channel
+                                </Label>
                                 <Select
                                     value={localSettings.updateChannel}
                                     onValueChange={(value: UpdateSettings['updateChannel']) =>
                                         updateSetting('updateChannel', value)
                                     }
                                 >
-                                    <SelectTrigger>
+                                    <SelectTrigger className="h-8 border-border bg-background">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -262,12 +268,15 @@ export function UpdateSettingsDialog({
 
                                 {localSettings.updateChannel === 'custom' && (
                                     <div className="space-y-2">
-                                        <Label htmlFor="custom-pattern">Tag Pattern</Label>
+                                        <Label htmlFor="custom-pattern" className="text-xs font-medium text-muted-foreground">
+                                            Tag Pattern
+                                        </Label>
                                         <Input
                                             id="custom-pattern"
                                             value={localSettings.customTagPattern || ''}
                                             onChange={(e) => updateSetting('customTagPattern', e.target.value)}
                                             placeholder="v*-beta"
+                                            className="h-8"
                                         />
                                         <p className="text-xs text-muted-foreground">
                                             Use wildcards (*) to match tag patterns. Example: v*-beta, release-*
@@ -282,14 +291,14 @@ export function UpdateSettingsDialog({
 
                     {/* Installation Settings */}
                     <div className="space-y-4">
-                        <div className="flex items-center gap-2">
-                            <Download className="h-4 w-4" />
-                            <h3 className="text-sm font-medium">Installation</h3>
+                        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                            <Download className="h-3.5 w-3.5" />
+                            <span>Installation</span>
                         </div>
 
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between gap-4 rounded-md border border-border bg-card px-3 py-2">
                             <div className="space-y-0.5">
-                                <Label>Automatic Installation</Label>
+                                <Label className="text-xs font-medium text-muted-foreground">Automatic Installation</Label>
                                 <p className="text-xs text-muted-foreground">
                                     Install updates automatically without user confirmation
                                 </p>
@@ -301,9 +310,9 @@ export function UpdateSettingsDialog({
                         </div>
 
                         <div className="space-y-4">
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between gap-4 rounded-md border border-border bg-card px-3 py-2">
                                 <div className="space-y-0.5">
-                                    <Label>Maintenance Window</Label>
+                                    <Label className="text-xs font-medium text-muted-foreground">Maintenance Window</Label>
                                     <p className="text-xs text-muted-foreground">
                                         Only install updates during specified hours
                                     </p>
@@ -317,21 +326,27 @@ export function UpdateSettingsDialog({
                             {localSettings.maintenanceWindow?.enabled && (
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="start-time">Start Time</Label>
+                                        <Label htmlFor="start-time" className="text-xs font-medium text-muted-foreground">
+                                            Start Time
+                                        </Label>
                                         <Input
                                             id="start-time"
                                             type="time"
                                             value={localSettings.maintenanceWindow.startTime}
                                             onChange={(e) => updateMaintenanceWindow({ startTime: e.target.value })}
+                                            className="h-8"
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="end-time">End Time</Label>
+                                        <Label htmlFor="end-time" className="text-xs font-medium text-muted-foreground">
+                                            End Time
+                                        </Label>
                                         <Input
                                             id="end-time"
                                             type="time"
                                             value={localSettings.maintenanceWindow.endTime}
                                             onChange={(e) => updateMaintenanceWindow({ endTime: e.target.value })}
+                                            className="h-8"
                                         />
                                     </div>
                                 </div>
@@ -341,11 +356,11 @@ export function UpdateSettingsDialog({
 
                     {/* Warning for auto-install */}
                     {localSettings.autoInstall && (
-                        <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
-                            <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5" />
+                        <div className="flex items-start gap-2 p-3 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950">
+                            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5" />
                             <div className="text-sm">
-                                <p className="font-medium text-amber-800">Automatic Installation Enabled</p>
-                                <p className="text-amber-700">
+                                <p className="font-medium text-amber-800 dark:text-amber-200">Automatic Installation Enabled</p>
+                                <p className="text-amber-700 dark:text-amber-300">
                                     Updates will be installed automatically and may restart the application without warning.
                                 </p>
                             </div>
@@ -353,7 +368,7 @@ export function UpdateSettingsDialog({
                     )}
                 </div>
 
-                <DialogFooter>
+                <DialogFooter className="px-6 py-3 border-t border-border">
                     <Button variant="outline" onClick={handleCancel} disabled={isLoading}>
                         Cancel
                     </Button>
@@ -361,6 +376,7 @@ export function UpdateSettingsDialog({
                         {isLoading ? 'Saving...' : 'Save Settings'}
                     </Button>
                 </DialogFooter>
+                </div>
             </DialogContent>
         </Dialog>
     )
