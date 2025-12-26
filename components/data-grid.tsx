@@ -195,6 +195,20 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
     return () => window.removeEventListener("mouseup", handleGlobalMouseUp)
   }, [])
 
+  // Handle Escape to exit fullscreen
+  useEffect(() => {
+    if (!isFullscreen) return
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsFullscreen(false)
+      }
+    }
+
+    window.addEventListener("keydown", handleEscape)
+    return () => window.removeEventListener("keydown", handleEscape)
+  }, [isFullscreen])
+
   const handleMouseDown = (r: number, c: number, e: React.MouseEvent) => {
     if (e.button !== 0) return // Only left click
     e.preventDefault()
@@ -318,8 +332,11 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
   })
 
   useCommand("results.toggleFullscreen", () => {
-    setIsFullscreen((v) => !v)
-    return true
+    if (isFullscreen) {
+      setIsFullscreen(false)
+      return true
+    }
+    return false
   })
 
   useCommand("results.showExecutedSql", () => {
@@ -439,22 +456,11 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
 
   return (
     <>
-      {isFullscreen && (
-        <div className="h-full w-full rounded-lg border border-dashed border-border bg-secondary/50 flex items-center justify-center text-sm text-muted-foreground">
-          Viewing in fullscreen
-        </div>
-      )}
-      {isFullscreen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/10 backdrop-blur-[2px] animate-in fade-in duration-500"
-          onClick={() => setIsFullscreen(false)}
-        />
-      )}
       <div
         className={cn(
           "flex flex-col bg-card transition-all duration-300 ease-in-out",
           isFullscreen
-            ? "fixed inset-0 sm:inset-6 z-50 rounded-xl border border-border shadow-2xl overflow-hidden animate-in fade-in zoom-in-[0.98] slide-in-from-bottom-2 duration-300"
+            ? "fixed inset-0 sm:inset-2 z-50 border border-border overflow-hidden animate-in fade-in duration-200"
             : "h-full w-full bg-card",
         )}
       >
