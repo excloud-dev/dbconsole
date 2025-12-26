@@ -27,9 +27,12 @@ import {
     getShortcutsKeymap,
     resetAllShortcutsOverrides,
     resetShortcutsOverride,
+    setShortcutsDisabled,
     setShortcutsKeymap,
     setShortcutsOverride,
 } from '@/lib/core/shortcuts-settings'
+
+
 import { ElectronUpdater } from '@/lib/updater/electron-updater'
 import type { UpdateSettings as CoreUpdateSettings, TimeWindow } from '@/lib/updater/types'
 
@@ -253,6 +256,7 @@ const ShortcutsPayloadSchema = z.object({
     runtime: RuntimeSchema.optional(),
     commandId: z.string().optional(),
     binding: z.union([z.string().min(1), z.null()]).optional(),
+    disabled: z.boolean().optional(),
     reset: z.boolean().optional(),
     resetAll: z.boolean().optional(),
 })
@@ -504,6 +508,10 @@ export function registerDesktopIpcHandlers(): void {
                     }
                     if (parsed.binding !== undefined) {
                         setShortcutsOverride(rt, parsed.commandId as any, parsed.binding)
+                        return ok({ ok: true })
+                    }
+                    if (parsed.disabled !== undefined) {
+                        setShortcutsDisabled(rt, parsed.commandId as any, parsed.disabled)
                         return ok({ ok: true })
                     }
                 }

@@ -5,6 +5,7 @@ import {
   getShortcutsKeymap,
   resetAllShortcutsOverrides,
   resetShortcutsOverride,
+  setShortcutsDisabled,
   setShortcutsKeymap,
   setShortcutsOverride,
 } from "@/lib/core/shortcuts-settings"
@@ -27,6 +28,7 @@ const PayloadSchema = z.object({
   runtime: RuntimeSchema.optional(),
   commandId: z.string().optional(),
   binding: z.union([z.string().min(1), z.null()]).optional(),
+  disabled: z.boolean().optional(),
   reset: z.boolean().optional(),
   resetAll: z.boolean().optional(),
 })
@@ -69,6 +71,10 @@ export async function POST(req: Request) {
         }
         if (parsed.binding !== undefined) {
           setShortcutsOverride(runtime, commandId, parsed.binding)
+          return NextResponse.json({ ok: true })
+        }
+        if (parsed.disabled !== undefined) {
+          setShortcutsDisabled(runtime, commandId, parsed.disabled)
           return NextResponse.json({ ok: true })
         }
       }

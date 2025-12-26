@@ -6,9 +6,11 @@ import { ShortcutsContext } from "./ShortcutsProvider"
 
 export function useCommand(id: CommandId, handler: (event: KeyboardEvent) => boolean | void) {
   const ctx = useContext(ShortcutsContext)
+  const registerHandler = ctx?.registerHandler
+
   useEffect(() => {
-    if (!ctx || !handler) return
-    return ctx.registerHandler(id, handler)
-  }, [ctx, id, handler])
+    if (!registerHandler || !handler) return
+    return registerHandler(id, handler)
+  }, [registerHandler, id, handler])
 }
 

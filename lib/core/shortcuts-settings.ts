@@ -4,11 +4,19 @@ import type { CommandId, Runtime } from "@/lib/shortcuts/types"
 
 const SETTINGS_KEY = "shortcuts.keymap.v1"
 
-export type ShortcutsOverrides = Partial<Record<CommandId, string | null>>
+export type ShortcutsOverrideValue =
+    | { binding?: string | null; disabled?: boolean }
+    | string
+    | null
+
+export type ShortcutsOverrides = Partial<Record<CommandId, ShortcutsOverrideValue>>
 
 export const OverridesRecordSchema: z.ZodType<ShortcutsOverrides> = z.record(
     z.string() as z.ZodType<CommandId>,
-    z.union([z.string().min(1), z.null()]),
+    z.union([
+        z.union([z.string().min(1), z.null()]),
+        z.object({ binding: z.union([z.string().min(1), z.null()]).optional(), disabled: z.boolean().optional() }),
+    ]),
 )
 
 const StoredKeymapSchema = z.object({
@@ -48,7 +56,36 @@ export function getShortcutsKeymap(runtime: Runtime): ShortcutsOverrides {
 export function setShortcutsOverride(runtime: Runtime, commandId: CommandId, binding: string | null): void {
     const current = load()
     const overrides = { ...current.overrides[runtime] }
-    overrides[commandId] = binding
+
+    const existing = overrides[commandId]
+    if (existing && typeof existing === 'object') {
+        overrides[commandId] = { ...existing, binding }
+    } else {
+        overrides[commandId] = binding
+    }
+
+    persist({
+        version: 1,
+        overrides: {
+            ...current.overrides,
+            [runtime]: overrides,
+        },
+    })
+}
+
+export function setShortcutsDisabled(runtime: Runtime, commandId: CommandId, disabled: boolean): void {
+    const current = load()
+    const overrides = { ...current.overrides[runtime] }
+
+    const existing = overrides[commandId]
+    if (existing === undefined) {
+        overrides[commandId] = { disabled }
+    } else if (existing && typeof existing === 'object') {
+        overrides[commandId] = { ...existing, disabled }
+    } else {
+        overrides[commandId] = { binding: existing as string | null, disabled }
+    }
+
     persist({
         version: 1,
         overrides: {

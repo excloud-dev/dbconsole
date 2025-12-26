@@ -148,7 +148,10 @@ export function SqlEditor({ value, onChange, onExecute, schema, className, onLin
     }, [value])
 
     const executeBinding = useBinding("query.run")
-    const codeMirrorExecuteKey = useMemo(() => (executeBinding ? executeBinding.replace(/\+/g, "-") : "Mod-Enter"), [executeBinding])
+    const codeMirrorExecuteKey = useMemo(
+        () => (executeBinding ? executeBinding.replace(/\+/g, "-") : undefined),
+        [executeBinding],
+    )
 
     // Build schema completions from schema prop
     const schemaCompletions = useCallback(
@@ -260,16 +263,17 @@ export function SqlEditor({ value, onChange, onExecute, schema, className, onLin
     useEffect(() => {
         if (!editorRef.current) return
 
-        // Custom keymap for Cmd/Ctrl+Enter to execute
-        const executeKeymap = keymap.of([
-            {
-                key: codeMirrorExecuteKey,
-                run: () => {
-                    onExecuteRef.current?.()
-                    return true
+        const executeKeymap = codeMirrorExecuteKey
+            ? keymap.of([
+                {
+                    key: codeMirrorExecuteKey,
+                    run: () => {
+                        onExecuteRef.current?.()
+                        return true
+                    },
                 },
-            },
-        ])
+            ])
+            : []
 
         const state = EditorState.create({
             doc: valueRef.current,

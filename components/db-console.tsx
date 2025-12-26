@@ -25,6 +25,7 @@ import { listCommands } from "@/lib/shortcuts/commands"
 import { useShortcutsContext } from "@/components/shortcuts/ShortcutsProvider"
 import { parseBinding } from "@/lib/shortcuts/parse"
 import { formatBinding } from "@/lib/shortcuts/format"
+import { cn } from "@/lib/utils"
 import { MenuHandler } from "./menu-handler"
 import { GenerateWriteQueryDialog, type WriteQueryMode } from "./generate-write-query-dialog"
 import { SaveGeneratorDialog } from "./save-generator-dialog"
@@ -1564,7 +1565,8 @@ export function DbConsole() {
               {idx > 0 && <CommandSeparator />}
               <CommandGroup heading={category}>
                 {cmds.map((cmd) => {
-                  const raw = shortcuts.getBinding(cmd.id)
+                  const state = shortcuts.getCommandState(cmd.id)
+                  const raw = state.displayBinding
                   const parsed = raw ? parseBinding(raw) : null
                   const isMac = typeof navigator !== "undefined" ? /mac/i.test(navigator.platform) : false
                   const label = parsed ? formatBinding(parsed, shortcuts.runtime, { isMac }) : undefined
@@ -1578,7 +1580,16 @@ export function DbConsole() {
                       }}
                     >
                       <span className="truncate">{cmd.title}</span>
-                      {label && <CommandShortcut>{label}</CommandShortcut>}
+                      {label && (
+                        <CommandShortcut
+                          className={cn(
+                            state.isDisabled &&
+                              "text-destructive border border-destructive/50 rounded-sm px-1 py-0.5",
+                          )}
+                        >
+                          {label}
+                        </CommandShortcut>
+                      )}
                     </CommandItem>
                   )
                 })}

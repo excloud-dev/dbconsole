@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { BindingDisplay } from "@/components/shortcuts/binding-kbd"
 import { listCommands, getDefaultBindings } from "@/lib/shortcuts/commands"
 import { useShortcutsContext } from "@/components/shortcuts/ShortcutsProvider"
+import { cn } from "@/lib/utils"
 import { ShortcutCaptureDialog } from "./shortcut-capture-dialog"
 import type { CommandId } from "@/lib/shortcuts/types"
 
@@ -24,24 +25,33 @@ export function KeyboardShortcutsDialog({
     const [editing, setEditing] = useState<CommandId | null>(null)
     const isMac = useMemo(() => (typeof navigator !== "undefined" ? /mac/i.test(navigator.platform) : false), [])
 
-    const bindingSnapshot = useMemo(() => {
-        const map: Record<CommandId, string | undefined> = {} as any
+    const stateSnapshot = useMemo(() => {
+        const map: Record<CommandId, ReturnType<typeof ctx.getCommandState>> = {} as any
         commands.forEach((cmd) => {
-            map[cmd.id] = ctx.getBinding(cmd.id)
+            map[cmd.id] = ctx.getCommandState(cmd.id)
         })
         return map
     }, [commands, ctx])
+
+    const bindingSnapshot = useMemo(() => {
+        const map: Record<CommandId, string | undefined> = {} as any
+        commands.forEach((cmd) => {
+            map[cmd.id] = stateSnapshot[cmd.id]?.displayBinding
+        })
+        return map
+    }, [commands, stateSnapshot])
 
     const conflicts = useMemo(() => {
         const map: Record<string, CommandId[]> = {}
         for (const [id, binding] of Object.entries(bindingSnapshot) as [CommandId, string | undefined][]) {
             if (!binding) continue
+            if (stateSnapshot[id]?.isDisabled) continue
             const key = binding.toLowerCase()
             if (!map[key]) map[key] = []
             map[key].push(id)
         }
         return map
-    }, [bindingSnapshot])
+    }, [bindingSnapshot, stateSnapshot])
 
     const filtered = commands.filter((cmd) => {
         if (!query.trim()) return true
@@ -49,8 +59,9 @@ export function KeyboardShortcutsDialog({
         return cmd.title.toLowerCase().includes(q) || cmd.id.toLowerCase().includes(q) || cmd.category?.toLowerCase().includes(q)
     })
 
-    const handleDisable = async (id: CommandId) => {
-        await ctx.setBinding(id, null)
+    const handleToggleDisabled = async (id: CommandId) => {
+        const state = stateSnapshot[id]
+        await ctx.setDisabled(id, !state?.isDisabled)
     }
 
     const handleReset = async (id: CommandId) => {
@@ -91,33 +102,60 @@ export function KeyboardShortcutsDialog({
                                     {filtered.map((cmd) => {
                                         const current = bindingSnapshot[cmd.id]
                                         const def = getDefaultBindings(cmd.id, ctx.runtime)[0]
-                                        const conflictIds = current ? conflicts[current.toLowerCase()] : undefined
-                                        const hasConflict = conflictIds && conflictIds.length > 1
+                                         const conflictIds = current ? conflicts[current.toLowerCase()] : undefined
+                                         const hasConflict = conflictIds && conflictIds.length > 1
+                                         const isDisabled = stateSnapshot[cmd.id]?.isDisabled
+
                                         return (
                                             <tr key={cmd.id} className="border-t border-border">
-                                                <td className="px-3 py-2 w-[45%]">
+                                                <td
+                                                    className={cn(
+                                                        "px-3 py-2 w-[45%]",
+                                                        isDisabled &&
+                                                            "bg-destructive/10 shadow-[inset_3px_0_0_0_hsl(var(--destructive)/0.8),inset_0_3px_0_0_hsl(var(--destructive)/0.8),inset_0_-3px_0_0_hsl(var(--destructive)/0.8)]",
+                                                    )}
+                                                >
                                                     <div className="flex flex-col">
                                                         <span className="font-medium text-foreground">{cmd.title}</span>
                                                         <span className="text-xs text-muted-foreground truncate">{cmd.id}</span>
                                                     </div>
                                                 </td>
-                                                <td className="px-3 py-2 w-[20%]">
+                                                <td
+                                                    className={cn(
+                                                        "px-3 py-2 w-[20%]",
+                                                        isDisabled &&
+                                                            "bg-destructive/10 shadow-[inset_0_3px_0_0_hsl(var(--destructive)/0.8),inset_0_-3px_0_0_hsl(var(--destructive)/0.8)]",
+                                                    )}
+                                                >
                                                     <div className="flex items-center gap-2">
                                                         <BindingDisplay raw={current} isMac={isMac} />
+                                                        {isDisabled && <Badge variant="secondary">Disabled</Badge>}
                                                         {hasConflict && <Badge variant="destructive">Conflict</Badge>}
                                                     </div>
                                                 </td>
-                                                <td className="px-3 py-2 w-[15%]">
+                                                <td
+                                                    className={cn(
+                                                        "px-3 py-2 w-[15%]",
+                                                        isDisabled &&
+                                                            "bg-destructive/10 shadow-[inset_0_3px_0_0_hsl(var(--destructive)/0.8),inset_0_-3px_0_0_hsl(var(--destructive)/0.8)]",
+                                                    )}
+                                                >
                                                     <div className="text-xs text-muted-foreground">
                                                         {def ? <BindingDisplay raw={def} isMac={isMac} /> : <span>—</span>}
                                                     </div>
                                                 </td>
-                                                <td className="px-3 py-2 text-right space-x-2 w-[20%] whitespace-nowrap">
+                                                <td
+                                                    className={cn(
+                                                        "px-3 py-2 text-right space-x-2 w-[20%] whitespace-nowrap",
+                                                        isDisabled &&
+                                                            "bg-destructive/10 shadow-[inset_-3px_0_0_0_hsl(var(--destructive)/0.8),inset_0_3px_0_0_hsl(var(--destructive)/0.8),inset_0_-3px_0_0_hsl(var(--destructive)/0.8)]",
+                                                    )}
+                                                >
                                                     <Button variant="outline" size="sm" onClick={() => setEditing(cmd.id)}>
                                                         Edit
                                                     </Button>
-                                                    <Button variant="outline" size="sm" onClick={() => handleDisable(cmd.id)}>
-                                                        Disable
+                                                    <Button variant="outline" size="sm" onClick={() => handleToggleDisabled(cmd.id)}>
+                                                        {isDisabled ? "Enable" : "Disable"}
                                                     </Button>
                                                     <Button variant="ghost" size="sm" onClick={() => handleReset(cmd.id)}>
                                                         Reset
