@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useCallback } from "react"
 import { ChevronRight, Table2, Search, Bookmark, GitMerge, X, Plus, ChevronDown, Eye, RotateCcw, KeyRound } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
@@ -68,6 +68,7 @@ interface SchemasSidebarProps {
   schema?: SchemaGraph | null
   activeTab?: "tables" | "queries"
   onActiveTabChange?: (tab: "tables" | "queries") => void
+  onFocusQuery?: () => void
 }
 
 export function SchemasSidebar({
@@ -87,6 +88,7 @@ export function SchemasSidebar({
   schema,
   activeTab: activeTabProp,
   onActiveTabChange,
+  onFocusQuery,
 }: SchemasSidebarProps) {
   const [search, setSearch] = useState("")
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set())
@@ -98,6 +100,36 @@ export function SchemasSidebar({
     if (onActiveTabChange) onActiveTabChange(tab)
     else setActiveTabState(tab)
   }
+
+  // Refs for keyboard navigation
+  const tableListRef = useRef<HTMLDivElement>(null)
+  const queryListRef = useRef<HTMLDivElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
+  // Keyboard navigation helper
+  const handleListKeyDown = useCallback((
+    e: React.KeyboardEvent,
+    itemSelector: string,
+    currentIndex: number,
+    totalItems: number
+  ) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault()
+      const nextIndex = Math.min(currentIndex + 1, totalItems - 1)
+      const nextItem = document.querySelector(`[${itemSelector}="${nextIndex}"]`) as HTMLElement
+      nextItem?.focus()
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault()
+      if (currentIndex === 0) {
+        // Focus search input when at top
+        searchInputRef.current?.focus()
+      } else {
+        const prevIndex = currentIndex - 1
+        const prevItem = document.querySelector(`[${itemSelector}="${prevIndex}"]`) as HTMLElement
+        prevItem?.focus()
+      }
+    }
+  }, [])
 
   const toggleTable = (name: string) => {
     const next = new Set(expandedTables)
@@ -251,10 +283,21 @@ export function SchemasSidebar({
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
+            ref={searchInputRef}
             id="schema-sidebar-search"
             placeholder="Search tables & queries..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowDown") {
+                e.preventDefault()
+                // Focus first table or query item based on active tab
+                const firstItem = activeTab === "tables"
+                  ? document.querySelector('[data-table-index="0"]') as HTMLElement
+                  : document.querySelector('[data-query-index="0"]') as HTMLElement
+                firstItem?.focus()
+              }
+            }}
             className={cn(
               "h-9 pl-9 pr-9 bg-background/60 border-border shadow-xs backdrop-blur",
               "focus-visible:ring-ring/60",
@@ -334,12 +377,23 @@ export function SchemasSidebar({
               </div>
             </div>
 
-            <div className="mt-1 space-y-1">
-              {filteredTables.map((table) => (
+            <div className="mt-1 space-y-1" ref={tableListRef}>
+              {filteredTables.map((table, index) => (
                 <div key={table.qualifiedName}>
                   <div className="group/row flex items-center gap-1">
                     <button
+                      data-table-index={index}
                       onClick={() => toggleTable(table.name)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault()
+                          onViewTable(table.name)
+                          // Focus query editor after viewing
+                          onFocusQuery?.()
+                        } else {
+                          handleListKeyDown(e, "data-table-index", index, filteredTables.length)
+                        }
+                      }}
                       aria-expanded={expandedTables.has(table.name)}
                       className={cn(
                         "flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-left text-sm text-foreground",
@@ -504,11 +558,21 @@ export function SchemasSidebar({
               </div>
             </div>
 
-            <div className="space-y-0.5">
-              {filteredQueries.map((nq) => (
+            <div className="space-y-0.5" ref={queryListRef}>
+              {filteredQueries.map((nq, index) => (
                 <div key={nq.id} className="group/item flex items-center">
                   <button
+                    data-query-index={index}
                     onClick={() => onOpenNamedQuery(nq.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault()
+                        onOpenNamedQuery(nq.id)
+                        onFocusQuery?.()
+                      } else {
+                        handleListKeyDown(e, "data-query-index", index, filteredQueries.length)
+                      }
+                    }}
                     className={cn(
                       "flex h-8 flex-1 items-center gap-2 rounded-md px-2 text-left text-sm text-foreground",
                       "hover:bg-secondary hover:text-foreground",

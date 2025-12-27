@@ -1320,6 +1320,16 @@ export function DbConsole() {
                         schema={schema}
                         activeTab={sidebarTab}
                         onActiveTabChange={setSidebarTab}
+                        onFocusQuery={() => {
+                          // Focus the SQL editor after a brief delay to let state update
+                          setTimeout(() => {
+                            const editorEl = document.getElementById("sql-editor-main")
+                            if (editorEl) {
+                              const cmContent = editorEl.querySelector(".cm-content") as HTMLElement
+                              cmContent?.focus()
+                            }
+                          }, 50)
+                        }}
                       />
                     </div>
                   </div>

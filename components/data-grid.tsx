@@ -13,6 +13,13 @@ import {
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { rowsToCsv } from "@/lib/csv"
+
+// Helper to escape CSV values for clipboard
+function escapeCsvValue(value: string): string {
+  const NEEDS_QUOTING_REGEX = /[\n\r",]/g
+  if (!NEEDS_QUOTING_REGEX.test(value)) return value
+  return `"${value.replace(/"/g, '""')}"`
+}
 import { CellDetailDialog } from "./cell-detail-dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 
@@ -303,7 +310,20 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
     const minC = Math.min(selection.start.c, selection.end.c)
     const maxC = Math.max(selection.start.c, selection.end.c)
 
-    let tsv = ""
+    // Get selected column headers
+    const selectedColumns = []
+    for (let c = minC; c <= maxC; c++) {
+      const colName = visibleColumns[c]
+      if (colName) selectedColumns.push(colName)
+    }
+
+    // Build CSV with headers
+    const rows: string[] = []
+
+    // Add header row
+    rows.push(selectedColumns.map(col => escapeCsvValue(col)).join(","))
+
+    // Add data rows
     for (let r = minR; r <= maxR; r++) {
       const rowData = data[r]
       const rowVals: string[] = []
@@ -312,16 +332,18 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
         if (!colName) continue
 
         const val = rowData[colName]
-        rowVals.push(stringifyVal(val))
+        rowVals.push(escapeCsvValue(stringifyVal(val)))
       }
-      tsv += rowVals.join("\t") + "\n"
+      rows.push(rowVals.join(","))
     }
+
+    const csv = rows.join("\n")
 
     setIsCopied(true)
     if (copyResetTimerRef.current) clearTimeout(copyResetTimerRef.current)
     copyResetTimerRef.current = setTimeout(() => setIsCopied(false), 2000)
 
-    navigator.clipboard.writeText(tsv).catch(() => { })
+    navigator.clipboard.writeText(csv).catch(() => { })
   }, [data, getVisibleColumnFields, selection, stringifyVal])
 
   useCommand("results.copySelection", (e) => {
