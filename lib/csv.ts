@@ -30,3 +30,24 @@ export function rowsToCsv(columns: string[], rows: Record<string, unknown>[]): s
     return [header, ...body].join("\r\n")
 }
 
+export function rowsToMarkdownTable(columns: string[], rows: Record<string, unknown>[]): string {
+    if (columns.length === 0) return ""
+    
+    // Escape pipe characters in cells for markdown tables
+    const escapeMarkdown = (value: string): string => value.replace(/\|/g, '\\|')
+    
+    // Header row
+    const header = "| " + columns.map(escapeMarkdown).join(" | ") + " |"
+    
+    // Separator row (---for each column)
+    const separator = "| " + columns.map(() => "---").join(" | ") + " |"
+    
+    // Data rows
+    const body = rows.map((row) => {
+        const cells = columns.map((col) => escapeMarkdown(normalizeCell(row[col])))
+        return "| " + cells.join(" | ") + " |"
+    })
+    
+    return [header, separator, ...body].join("\n")
+}
+

@@ -12,7 +12,7 @@ import {
 } from "@tanstack/react-table"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { rowsToCsv } from "@/lib/csv"
+import { rowsToCsv, rowsToMarkdownTable } from "@/lib/csv"
 
 // Helper to escape CSV values for clipboard
 function escapeCsvValue(value: string): string {
@@ -23,7 +23,7 @@ function escapeCsvValue(value: string): string {
 import { CellDetailDialog } from "./cell-detail-dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 
-import { ChevronLeft, ChevronRight, Loader2, Copy, FileDown, EyeOff, Columns, Check, Eye, SlidersHorizontal, Maximize2, Minimize2, Info } from "lucide-react"
+import { ChevronLeft, ChevronRight, Loader2, Copy, FileDown, EyeOff, Columns, Check, Eye, SlidersHorizontal, Maximize2, Minimize2, Info, ChevronDown, Table } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -135,6 +135,8 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
   const [lastSelectedRow, setLastSelectedRow] = useState<number | null>(null)
   const [isCopied, setIsCopied] = useState(false)
   const copyResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const gridContainerRef = useRef<HTMLDivElement>(null)
+
 
   // Smart sizing effect
   useEffect(() => {
@@ -299,7 +301,7 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
     URL.revokeObjectURL(url)
   }, [data, getVisibleColumnFields])
 
-  const handleSmartCopy = useCallback(() => {
+  const handleSmartCopy = useCallback((includeHeaders: boolean = true) => {
     if (!selection || data.length === 0) return
 
     const visibleColumns = getVisibleColumnFields()
@@ -317,11 +319,22 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
       if (colName) selectedColumns.push(colName)
     }
 
-    // Build CSV with headers
+    const numRows = maxR - minR + 1
+    const numCols = maxC - minC + 1
+
+    // Only include headers if:
+    // - Explicitly requested (includeHeaders=true) AND
+    // - Selection spans multiple columns OR multiple rows
+    // Single cell or single column of cells = no headers
+    const shouldIncludeHeaders = includeHeaders && (numCols > 1 || numRows > 1)
+
+    // Build CSV
     const rows: string[] = []
 
-    // Add header row
-    rows.push(selectedColumns.map(col => escapeCsvValue(col)).join(","))
+    // Add header row only if needed
+    if (shouldIncludeHeaders) {
+      rows.push(selectedColumns.map(col => escapeCsvValue(col)).join(","))
+    }
 
     // Add data rows
     for (let r = minR; r <= maxR; r++) {
@@ -346,12 +359,135 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
     navigator.clipboard.writeText(csv).catch(() => { })
   }, [data, getVisibleColumnFields, selection, stringifyVal])
 
+  const handleCopyAsTable = useCallback(() => {
+    if (!selection || data.length === 0) return
+
+    const visibleColumns = getVisibleColumnFields()
+    if (visibleColumns.length === 0) return
+
+    const minR = Math.min(selection.start.r, selection.end.r)
+    const maxR = Math.max(selection.start.r, selection.end.r)
+    const minC = Math.min(selection.start.c, selection.end.c)
+    const maxC = Math.max(selection.start.c, selection.end.c)
+
+    // Get selected column headers
+    const selectedColumns = []
+    for (let c = minC; c <= maxC; c++) {
+      const colName = visibleColumns[c]
+      if (colName) selectedColumns.push(colName)
+    }
+
+    // Build rows for the selected range
+    const selectedRows: Record<string, unknown>[] = []
+    for (let r = minR; r <= maxR; r++) {
+      const rowData = data[r]
+      const filteredRow: Record<string, unknown> = {}
+      for (const col of selectedColumns) {
+        filteredRow[col] = rowData[col]
+      }
+      selectedRows.push(filteredRow)
+    }
+
+    const markdown = rowsToMarkdownTable(selectedColumns, selectedRows)
+
+    setIsCopied(true)
+    if (copyResetTimerRef.current) clearTimeout(copyResetTimerRef.current)
+    copyResetTimerRef.current = setTimeout(() => setIsCopied(false), 2000)
+
+    navigator.clipboard.writeText(markdown).catch(() => { })
+  }, [data, getVisibleColumnFields, selection])
+
+  const handleCopyAsTabbed = useCallback(() => {
+    if (!selection || data.length === 0) return
+
+    const visibleColumns = getVisibleColumnFields()
+    if (visibleColumns.length === 0) return
+
+    const minR = Math.min(selection.start.r, selection.end.r)
+    const maxR = Math.max(selection.start.r, selection.end.r)
+    const minC = Math.min(selection.start.c, selection.end.c)
+    const maxC = Math.max(selection.start.c, selection.end.c)
+
+    // Get selected column headers
+    const selectedColumns = []
+    for (let c = minC; c <= maxC; c++) {
+      const colName = visibleColumns[c]
+      if (colName) selectedColumns.push(colName)
+    }
+
+    const numRows = maxR - minR + 1
+    const numCols = maxC - minC + 1
+    const shouldIncludeHeaders = numCols > 1 || numRows > 1
+
+    // Build TSV (tab-separated)
+    const rows: string[] = []
+
+    if (shouldIncludeHeaders) {
+      rows.push(selectedColumns.join("\t"))
+    }
+
+    for (let r = minR; r <= maxR; r++) {
+      const rowData = data[r]
+      const rowVals: string[] = []
+      for (let c = minC; c <= maxC; c++) {
+        const colName = visibleColumns[c]
+        if (!colName) continue
+        const val = rowData[colName]
+        rowVals.push(stringifyVal(val))
+      }
+      rows.push(rowVals.join("\t"))
+    }
+
+    const tsv = rows.join("\n")
+
+    setIsCopied(true)
+    if (copyResetTimerRef.current) clearTimeout(copyResetTimerRef.current)
+    copyResetTimerRef.current = setTimeout(() => setIsCopied(false), 2000)
+
+    navigator.clipboard.writeText(tsv).catch(() => { })
+  }, [data, getVisibleColumnFields, selection, stringifyVal])
+
   useCommand("results.copySelection", (e) => {
+    // Only handle if grid has selection
     if (!selection) return false
+
+    // Check if there's a text selection anywhere (user selecting text in query editor)
+    const textSelection = window.getSelection()
+    if (textSelection && textSelection.toString().length > 0) {
+      // User has text selected somewhere, let native copy work
+      return false
+    }
+
+    // Check if focus is in an input or textarea with selection
+    const activeElement = document.activeElement
+    if (activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement) {
+      // If there's text in the input/textarea, let native copy work
+      const hasSelection = activeElement.selectionStart !== activeElement.selectionEnd
+      if (hasSelection) return false
+    }
+
     e.preventDefault()
-    handleSmartCopy()
+
+    // Smart copy: single cell = plain data, multiple cells = table
+    const minR = Math.min(selection.start.r, selection.end.r)
+    const maxR = Math.max(selection.start.r, selection.end.r)
+    const minC = Math.min(selection.start.c, selection.end.c)
+    const maxC = Math.max(selection.start.c, selection.end.c)
+    const numRows = maxR - minR + 1
+    const numCols = maxC - minC + 1
+
+    if (numRows === 1 && numCols === 1) {
+      // Single cell: just copy the value, no headers, no table
+      handleSmartCopy(false)
+    } else {
+      // Multiple cells: copy as TSV (tab-separated)
+      handleCopyAsTabbed()
+    }
+
     return true
   })
+
+
 
   useCommand("results.toggleFullscreen", () => {
     if (isFullscreen) {
@@ -479,6 +615,7 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
   return (
     <>
       <div
+        ref={gridContainerRef}
         className={cn(
           "flex flex-col bg-card transition-all duration-300 ease-in-out",
           isFullscreen
@@ -486,6 +623,7 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
             : "h-full w-full bg-card",
         )}
       >
+
         <div className="flex-1 overflow-auto relative select-none" onMouseLeave={() => setIsDragging(false)}>
           <table
             className="w-full border-collapse text-sm"
@@ -664,23 +802,60 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
         >
           {/* LEFT: Actions */}
           <div className="flex items-center gap-2" onDoubleClick={(e) => e.stopPropagation()}>
-            {/* Smart Copy Button */}
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={!selection} // Only active if selected
-              className={cn(
-                "h-7 gap-1.5 transition-all duration-300 border",
-                isCopied
-                  ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
-                  : "bg-card text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-950 border-emerald-100 dark:border-emerald-900 hover:border-emerald-200/50 shadow-sm",
-                !selection && "opacity-50 grayscale cursor-not-allowed bg-secondary border-border text-muted-foreground shadow-none"
-              )}
-              onClick={handleSmartCopy}
-            >
-              {isCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-              <span className="text-xs font-medium">{isCopied ? "Copied!" : "Copy Selected"}</span>
-            </Button>
+            {/* Copy Dropdown Button */}
+            <div className="flex items-center">
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={!selection}
+                className={cn(
+                  "h-7 gap-1.5 transition-all duration-300 border rounded-r-none border-r-0",
+                  isCopied
+                    ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
+                    : "bg-card text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-950 border-emerald-100 dark:border-emerald-900 hover:border-emerald-200/50 shadow-sm",
+                  !selection && "opacity-50 grayscale cursor-not-allowed bg-secondary border-border text-muted-foreground shadow-none"
+                )}
+                onClick={() => handleSmartCopy()}
+              >
+                {isCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                <span className="text-xs font-medium">{isCopied ? "Copied!" : "Copy"}</span>
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={!selection}
+                    className={cn(
+                      "h-7 px-1.5 transition-all duration-300 border rounded-l-none",
+                      isCopied
+                        ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
+                        : "bg-card text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-950 border-emerald-100 dark:border-emerald-900 hover:border-emerald-200/50 shadow-sm",
+                      !selection && "opacity-50 grayscale cursor-not-allowed bg-secondary border-border text-muted-foreground shadow-none"
+                    )}
+                  >
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-44">
+                  <DropdownMenuItem onClick={() => handleSmartCopy()} className="gap-2 text-xs">
+                    <Copy className="h-3.5 w-3.5" />
+                    Copy as CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleCopyAsTable} className="gap-2 text-xs">
+                    <Table className="h-3.5 w-3.5" />
+                    Copy as Table
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleCopyAsTabbed} className="gap-2 text-xs">
+                    <Columns className="h-3.5 w-3.5" />
+                    Copy as TSV
+                  </DropdownMenuItem>
+
+                </DropdownMenuContent>
+
+              </DropdownMenu>
+            </div>
+
 
             <Button
               variant="ghost"
