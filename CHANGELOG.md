@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.6.2 - 2026-01-03
+
+- fix: improve fullscreen datagrid styling with sharp edges, reduced margins, and Escape to exit (97ad0fb)
+- fix: support disabled shortcuts without losing bindings (16fc509)
+- fix: refine connection settings dialogs and dropdown (2c78b59)
+- fix: focus previous tab on close (cde04b2)
+- feat: improve copy with CSV headers and add sidebar keyboard navigation (da24965)
+- feat: fix data grid copy with options for CSV, Markdown, and tab-separated values. (f506c8f)
+
 ## v0.6.1 - 2025-12-25
 
 - fix: update Electron protocol handler to use modern protocol.handle() API for Electron 39 (e795b67)
