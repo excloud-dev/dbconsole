@@ -67,8 +67,12 @@ export function cleanupTrivialPredicates(sql: string): string {
     cleaned = cleaned.replace(/\bAND\s+1\s*=\s*1\b/gi, '')
     cleaned = cleaned.replace(/\b1\s*=\s*1\s+AND\b/gi, '')
 
-    // If WHERE is left with only 1=1, drop it entirely
-    cleaned = cleaned.replace(/\bWHERE\s+1\s*=\s*1\b/gi, '')
+    // If WHERE is left with only 1=1, drop it entirely.
+    // Important: do NOT remove `WHERE 1=1` when it participates in an `OR` clause.
+    cleaned = cleaned.replace(
+        /\bWHERE\s+1\s*=\s*1\b(?=\s*(?:$|;|\)|\bGROUP\b|\bORDER\b|\bLIMIT\b|\bOFFSET\b|\bUNION\b|\bINTERSECT\b|\bEXCEPT\b|\bRETURNING\b|\bFOR\b))/gi,
+        ''
+    )
 
     return cleaned
 }

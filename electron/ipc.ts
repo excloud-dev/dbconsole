@@ -266,14 +266,17 @@ export function registerDesktopIpcHandlers(): void {
     // Allow overrides via env vars for forks/private deployments.
     const repoOwner = (process.env.GITHUB_REPO_OWNER || process.env.DBCONSOLE_GITHUB_OWNER || 'excloud-in').trim()
     const repoName = (process.env.GITHUB_REPO_NAME || process.env.DBCONSOLE_GITHUB_REPO || 'dbconsole').trim()
+    
+    // Feature flag to enable Electron's native autoUpdater with differential downloads
+    // Set ENABLE_ELECTRON_AUTO_UPDATER=true to opt in (defaults to false for gradual rollout)
+    const enableElectronAutoUpdater = process.env.ENABLE_ELECTRON_AUTO_UPDATER === 'true'
 
     electronUpdater = new ElectronUpdater({
         owner: repoOwner,
         repo: repoName,
-        // The current updater flow downloads GitHub release assets directly.
-        // Disable electron-updater integration by default until a publish provider
-        // is configured and we're actually using autoUpdater for downloads.
-        enableElectronUpdater: false,
+        // Enable electron-updater integration when opted in via feature flag.
+        // This enables in-place updates with differential downloads (blockmap) on macOS.
+        enableElectronUpdater: enableElectronAutoUpdater,
         // Don't auto-restart; the installer handoff flow requires the user to complete
         // the OS-level install and then relaunch the app.
         quitAndInstall: false,
@@ -618,7 +621,7 @@ export function registerDesktopIpcHandlers(): void {
                 if (v instanceof Date) return v
                 if (typeof v === 'string' || typeof v === 'number') return new Date(v)
                 return v
-            }, z.date()),
+            }, z.date().nullable()),
             isPrerelease: z.boolean(),
         })
 
@@ -659,6 +662,20 @@ export function registerDesktopIpcHandlers(): void {
             return ok(history)
         } catch (e) {
             const message = e instanceof Error ? e.message : 'Failed to get update history'
+            return err(500, { error: message })
+        }
+    })
+
+    ipcMain.handle('dbconsole:updater:capabilities', () => {
+        if (!electronUpdater) {
+            return err(500, { error: 'Updater not initialized' })
+        }
+
+        try {
+            const capabilities = electronUpdater.getCapabilities()
+            return ok(capabilities)
+        } catch (e) {
+            const message = e instanceof Error ? e.message : 'Failed to get updater capabilities'
             return err(500, { error: message })
         }
     })

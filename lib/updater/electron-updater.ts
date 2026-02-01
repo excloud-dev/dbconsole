@@ -70,6 +70,16 @@ export class ElectronUpdater extends EventEmitter {
         })
 
         this.setupEventListeners()
+
+        // Safety net: emitting EventEmitter 'error' without listeners throws.
+        this.on('error', (info) => {
+            try {
+                this.log(`Unhandled ElectronUpdater error event: ${JSON.stringify(info)}`, 'error')
+            } catch {
+                this.log('Unhandled ElectronUpdater error event (unserializable payload)', 'error')
+            }
+        })
+
         this.log('ElectronUpdater initialized')
     }
 
@@ -132,15 +142,94 @@ export class ElectronUpdater extends EventEmitter {
         try {
             this.log('Checking for updates...')
             this.setElectronState({ electronUpdaterState: 'checking' })
+            
+            this.emitTelemetry('update-check-started', {
+                electronUpdaterEnabled: this.options.enableElectronUpdater,
+                isConfigured: this.electronState.isElectronUpdaterEnabled
+            })
 
-            // Use our custom update controller for private repos
+            // If electron updater is enabled and configured, try using it first
+            if (this.options.enableElectronUpdater && this.electronState.isElectronUpdaterEnabled) {
+                try {
+                    this.log('Using Electron autoUpdater for update check')
+                    const updateCheckResult = await autoUpdater.checkForUpdates()
+                    
+                    if (updateCheckResult && updateCheckResult.updateInfo) {
+                        const info = updateCheckResult.updateInfo
+                        // Convert ElectronUpdateInfo to our UpdateInfo format
+                        // electron-updater provides these fields but they're not in the type definitions
+                        // This is a known limitation of the electron-updater types
+                        interface ExtendedUpdateInfo {
+                            version: string
+                            releaseNotes?: string
+                            // path: download URL for the update file
+                            path?: string
+                            // files: array of downloadable files in the release
+                            files?: Array<{ url?: string }>
+                            sha512?: string
+                            releaseDate?: string
+                            prerelease?: boolean
+                        }
+                        
+                        // Safe cast: we know autoUpdater provides these fields at runtime
+                        const extendedInfo = info as unknown as ExtendedUpdateInfo
+                        
+                        const updateInfo: UpdateInfo = {
+                            version: extendedInfo.version,
+                            releaseNotes: extendedInfo.releaseNotes || '',
+                            // path is the main download URL
+                            downloadUrl: extendedInfo.path || '',
+                            // Use first file URL as asset name (typically the zip file)
+                            assetName: extendedInfo.files?.[0]?.url || '',
+                            checksum: extendedInfo.sha512 || '',
+                            // If release date is unavailable, represent it explicitly as null
+                            publishedAt: extendedInfo.releaseDate
+                                ? new Date(extendedInfo.releaseDate)
+                                : null,
+                            // Preserve prerelease status from electron-updater
+                            isPrerelease: extendedInfo.prerelease || false
+                        }
+                        
+                        this.emitTelemetry('update-check-success-electron', {
+                            version: updateInfo.version,
+                            method: 'electron-auto-updater',
+                            differentialSupported: this.isDifferentialUpdateSupported()
+                        })
+                        
+                        this.setElectronState({ electronUpdaterState: 'available' })
+                        this.emit('update-available', updateInfo)
+                        return updateInfo
+                    }
+                } catch (autoUpdaterError) {
+                    this.log(
+                        `Electron autoUpdater check failed, falling back to custom updater: ${
+                            autoUpdaterError instanceof Error ? autoUpdaterError.message : String(autoUpdaterError)
+                        }`,
+                        'warn'
+                    )
+                    this.emitTelemetry('update-check-fallback', {
+                        reason: 'electron-auto-updater-failed',
+                        error: autoUpdaterError instanceof Error ? autoUpdaterError.message : String(autoUpdaterError)
+                    })
+                    // Fall through to custom updater
+                }
+            }
+
+            // Use our custom update controller for private repos (fallback or default)
             const updateInfo = await this.updateController.checkNow()
 
             if (updateInfo) {
+                this.emitTelemetry('update-check-success-custom', {
+                    version: updateInfo.version,
+                    method: 'custom-github-client'
+                })
                 this.setElectronState({ electronUpdaterState: 'available' })
                 this.emit('update-available', updateInfo)
                 return updateInfo
             } else {
+                this.emitTelemetry('update-check-no-update', {
+                    method: this.options.enableElectronUpdater ? 'electron-auto-updater-or-custom' : 'custom-only'
+                })
                 this.setElectronState({ electronUpdaterState: 'idle' })
                 this.emit('update-not-available')
                 return null
@@ -165,11 +254,82 @@ export class ElectronUpdater extends EventEmitter {
         }
 
         try {
+            // Keep behavior consistent with the existing controller flow:
+            // enforce enterprise policy + maintenance window before performing any download/install work.
+            const autoInstallAllowed = await this.configService.isAutoInstallAllowed()
+            if (!autoInstallAllowed) {
+                throw new Error('Automatic installation is disabled by policy')
+            }
+
+            const inMaintenanceWindow = await this.configService.isInMaintenanceWindow()
+            if (!inMaintenanceWindow) {
+                throw new Error('Installation not allowed outside maintenance window')
+            }
+
             this.log(`Starting download and installation for version ${updateInfo.version}`)
             this.setElectronState({ electronUpdaterState: 'downloading' })
+            
+            this.emitTelemetry('download-started', {
+                version: updateInfo.version,
+                electronUpdaterEnabled: this.options.enableElectronUpdater,
+                differentialSupported: this.isDifferentialUpdateSupported()
+            })
 
-            // Use our custom update controller to download and verify
+            // If electron updater is enabled and configured, use it for download
+            if (this.options.enableElectronUpdater && this.electronState.isElectronUpdaterEnabled) {
+                try {
+                    this.log('Using Electron autoUpdater for download')
+                    const startTime = Date.now()
+                    await autoUpdater.downloadUpdate()
+                    
+                    const downloadDuration = Date.now() - startTime
+                    
+                    this.emitTelemetry('download-success-electron', {
+                        version: updateInfo.version,
+                        method: 'electron-auto-updater',
+                        durationMs: downloadDuration,
+                        differentialUsed: this.isDifferentialUpdateSupported()
+                    })
+                    
+                    // Update downloaded successfully via autoUpdater
+                    this.setElectronState({
+                        electronUpdaterState: 'downloaded',
+                        isUpdateDownloaded: true
+                    })
+                    
+                    this.emit('update-downloaded', updateInfo)
+                    
+                    // Auto-install if enabled
+                    if (this.options.quitAndInstall) {
+                        await this.quitAndInstall()
+                    }
+                    
+                    return
+                } catch (autoUpdaterError) {
+                    this.log(
+                        `Electron autoUpdater download failed, falling back to custom updater: ${
+                            autoUpdaterError instanceof Error ? autoUpdaterError.message : String(autoUpdaterError)
+                        }`,
+                        'warn'
+                    )
+                    this.emitTelemetry('download-fallback', {
+                        reason: 'electron-auto-updater-failed',
+                        error: autoUpdaterError instanceof Error ? autoUpdaterError.message : String(autoUpdaterError)
+                    })
+                    // Fall through to custom updater
+                }
+            }
+
+            // Use our custom update controller to download and verify (fallback or default)
+            const startTime = Date.now()
             await this.updateController.downloadAndInstall(updateInfo)
+            const downloadDuration = Date.now() - startTime
+            
+            this.emitTelemetry('download-success-custom', {
+                version: updateInfo.version,
+                method: 'custom-github-client',
+                durationMs: downloadDuration
+            })
 
             // Mark as downloaded and ready for installation
             this.setElectronState({
@@ -303,44 +463,117 @@ export class ElectronUpdater extends EventEmitter {
     }
 
     /**
+     * Check if differential updates (blockmap) are supported
+     */
+    isDifferentialUpdateSupported(): boolean {
+        // Differential updates are supported when:
+        // 1. Electron updater is enabled
+        // 2. Platform is macOS (zip targets with blockmap)
+        // 3. autoUpdater is properly configured
+        return this.options.enableElectronUpdater && 
+               this.electronState.isElectronUpdaterEnabled &&
+               process.platform === 'darwin'
+    }
+
+    /**
+     * Get updater capabilities
+     */
+    getCapabilities(): {
+        electronUpdaterEnabled: boolean
+        differentialUpdatesSupported: boolean
+        platform: string
+        inPlaceUpdateSupported: boolean
+    } {
+        return {
+            electronUpdaterEnabled: this.electronState.isElectronUpdaterEnabled,
+            differentialUpdatesSupported: this.isDifferentialUpdateSupported(),
+            platform: process.platform,
+            inPlaceUpdateSupported: this.options.enableElectronUpdater && this.electronState.isElectronUpdaterEnabled
+        }
+    }
+
+    /**
      * Private helper methods
      */
 
     private async setupElectronAutoUpdater(): Promise<void> {
         try {
-            // Configure Electron's autoUpdater for fallback scenarios
+            // Configure Electron's autoUpdater for in-place updates
             if (autoUpdater) {
-                // Set up basic autoUpdater event listeners
+                // Configure feed URL with GitHub private repo support
+                    const token = await this.configService.getGitHubToken()
+                
+                if (token) {
+                    // Set up feed URL for GitHub releases
+                    const owner = this.updateController.getOwner()
+                    const repo = this.updateController.getRepo()
+                    const feedUrl = `https://github.com/${owner}/${repo}`
+                    
+                    // Configure autoUpdater with GitHub settings
+                    // electron-updater's runtime accepts GitHub options that may not be reflected
+                    // in its TS typings across versions (e.g. `private`, `token`), so cast to `any`.
+                    ;(autoUpdater as any).setFeedURL({
+                        provider: 'github',
+                        owner,
+                        repo,
+                        token,
+                        // Use private flag for private repositories
+                        private: true
+                    } as any)
+                    
+                    this.log(`Electron autoUpdater feed configured: ${feedUrl}`)
+                } else {
+                    this.log('No GitHub token available - autoUpdater feed not configured', 'warn')
+                }
+                
+                // Configure autoUpdater behavior
+                autoUpdater.autoDownload = false // We control download timing
+                autoUpdater.autoInstallOnAppQuit = false // We control installation timing
+                
+                // Set up autoUpdater event listeners
                 autoUpdater.on('checking-for-update', () => {
                     this.log('Electron autoUpdater: Checking for update...')
+                    this.setElectronState({ electronUpdaterState: 'checking' })
                 })
 
                 autoUpdater.on('update-available', (info: ElectronUpdateInfo) => {
-                    this.log('Electron autoUpdater: Update available', 'info')
+                    this.log(`Electron autoUpdater: Update available - ${info.version}`, 'info')
+                    this.setElectronState({ electronUpdaterState: 'available' })
                     this.emit('electron-update-available', info)
                 })
 
                 autoUpdater.on('update-not-available', (info: ElectronUpdateInfo) => {
                     this.log('Electron autoUpdater: Update not available')
+                    this.setElectronState({ electronUpdaterState: 'idle' })
                     this.emit('electron-update-not-available', info)
                 })
 
                 autoUpdater.on('error', (err: Error) => {
-                    this.log(`Electron autoUpdater error: ${err}`, 'error')
+                    this.log(`Electron autoUpdater error: ${err.message}`, 'error')
+                    this.setElectronState({ 
+                        electronUpdaterState: 'error',
+                        lastElectronError: err.message 
+                    })
                     this.emit('electron-update-error', err)
                 })
 
                 autoUpdater.on('download-progress', (progressObj: ProgressInfo) => {
+                    this.log(`Download progress: ${progressObj.percent.toFixed(2)}% (${progressObj.transferred}/${progressObj.total} bytes)`)
+                    this.setElectronState({ electronUpdaterState: 'downloading' })
                     this.emit('electron-download-progress', progressObj)
                 })
 
                 autoUpdater.on('update-downloaded', (info: ElectronUpdateInfo) => {
-                    this.log('Electron autoUpdater: Update downloaded', 'info')
+                    this.log(`Electron autoUpdater: Update downloaded - ${info.version}`, 'info')
+                    this.setElectronState({ 
+                        electronUpdaterState: 'downloaded',
+                        isUpdateDownloaded: true 
+                    })
                     this.emit('electron-update-downloaded', info)
                 })
 
                 this.electronState.isElectronUpdaterEnabled = true
-                this.log('Electron autoUpdater configured')
+                this.log('Electron autoUpdater configured successfully')
             }
 
         } catch (error) {
@@ -411,12 +644,22 @@ export class ElectronUpdater extends EventEmitter {
     private async handleUpdateNotification(updateInfo: UpdateInfo): Promise<boolean> {
         try {
             this.log(`Handling update notification for version ${updateInfo.version}`)
+            
+            // Emit telemetry for update notification
+            this.emitTelemetry('update-notification-received', {
+                version: updateInfo.version,
+                isPrerelease: updateInfo.isPrerelease,
+                channel: (await this.configService.getUpdateSettings()).updateChannel
+            })
 
             // Check if auto-install is enabled
             const settings = await this.configService.getUpdateSettings()
 
             if (settings.autoInstall) {
                 this.log('Auto-install enabled, proceeding with download')
+                this.emitTelemetry('auto-install-triggered', {
+                    version: updateInfo.version
+                })
                 return true
             }
 
@@ -465,31 +708,57 @@ export class ElectronUpdater extends EventEmitter {
         }
 
         this.log(`ERROR: ${context} - ${errorMessage}`, 'error')
+        
+        // Emit telemetry for errors
+        this.emitTelemetry('update-error', {
+            context,
+            errorMessage,
+            electronUpdaterEnabled: this.electronState.isElectronUpdaterEnabled,
+            state: this.electronState.electronUpdaterState
+        })
+        
         this.emit('error', errorInfo)
     }
 
-    private log(message: string, level: 'debug' | 'info' | 'warn' | 'error' = 'debug'): void {
+    private emitTelemetry(eventName: string, data: Record<string, any>): void {
+        const telemetryEvent = {
+            event: eventName,
+            timestamp: new Date().toISOString(),
+            component: 'ElectronUpdater',
+            data: {
+                ...data,
+                capabilities: this.getCapabilities()
+            }
+        }
+        
+        this.log(`Telemetry: ${eventName}`, 'info', telemetryEvent)
+        this.emit('telemetry', telemetryEvent)
+    }
+
+    private log(message: string, level: 'debug' | 'info' | 'warn' | 'error' = 'debug', data?: any): void {
         const timestamp = new Date().toISOString()
         const logEntry = {
             timestamp,
             level,
             component: 'ElectronUpdater',
-            message
+            message,
+            data
         }
 
         // In production, this would integrate with a proper logging system
+        const dataStr = data ? JSON.stringify(data, null, 2) : ''
         switch (level) {
             case 'error':
-                console.error(`[ElectronUpdater] ${message}`)
+                console.error(`[ElectronUpdater] ${message}`, dataStr)
                 break
             case 'warn':
-                console.warn(`[ElectronUpdater] ${message}`)
+                console.warn(`[ElectronUpdater] ${message}`, dataStr)
                 break
             case 'info':
-                console.info(`[ElectronUpdater] ${message}`)
+                console.info(`[ElectronUpdater] ${message}`, dataStr)
                 break
             default:
-                console.debug(`[ElectronUpdater] ${message}`)
+                console.debug(`[ElectronUpdater] ${message}`, dataStr)
         }
 
         this.emit('log', logEntry)

@@ -372,7 +372,7 @@ export class UpdateControllerImpl extends EventEmitter implements UpdateControll
     async getFormattedReleaseInfo(version: string): Promise<{
         version: string
         releaseNotes: string
-        publishedAt?: Date
+        publishedAt?: Date | null
         isPrerelease?: boolean
         downloadUrl?: string
     }> {
@@ -380,7 +380,7 @@ export class UpdateControllerImpl extends EventEmitter implements UpdateControll
             const releaseNotes = await this.getReleaseNotes(version)
 
             // Get additional metadata if available
-            let publishedAt: Date | undefined
+            let publishedAt: Date | null | undefined
             let isPrerelease: boolean | undefined
             let downloadUrl: string | undefined
 
@@ -408,6 +408,20 @@ export class UpdateControllerImpl extends EventEmitter implements UpdateControll
      */
     isInstallationInProgress(): boolean {
         return this.isUpdateInProgress
+    }
+
+    /**
+     * Get repository owner
+     */
+    getOwner(): string {
+        return this.options.owner
+    }
+
+    /**
+     * Get repository name
+     */
+    getRepo(): string {
+        return this.options.repo
     }
 
     /**
