@@ -70,6 +70,16 @@ export class ElectronUpdater extends EventEmitter {
         })
 
         this.setupEventListeners()
+
+        // Safety net: emitting EventEmitter 'error' without listeners throws.
+        this.on('error', (info) => {
+            try {
+                this.log(`Unhandled ElectronUpdater error event: ${JSON.stringify(info)}`, 'error')
+            } catch {
+                this.log('Unhandled ElectronUpdater error event (unserializable payload)', 'error')
+            }
+        })
+
         this.log('ElectronUpdater initialized')
     }
 
@@ -479,7 +489,7 @@ export class ElectronUpdater extends EventEmitter {
             // Configure Electron's autoUpdater for in-place updates
             if (autoUpdater) {
                 // Configure feed URL with GitHub private repo support
-                const token = await this.configService.getGitHubToken()
+                    const token = await this.configService.getGitHubToken()
                 
                 if (token) {
                     // Set up feed URL for GitHub releases
@@ -488,14 +498,16 @@ export class ElectronUpdater extends EventEmitter {
                     const feedUrl = `https://github.com/${owner}/${repo}`
                     
                     // Configure autoUpdater with GitHub settings
-                    autoUpdater.setFeedURL({
+                    // electron-updater's runtime accepts GitHub options that may not be reflected
+                    // in its TS typings across versions (e.g. `private`, `token`), so cast to `any`.
+                    ;(autoUpdater as any).setFeedURL({
                         provider: 'github',
                         owner,
                         repo,
                         token,
                         // Use private flag for private repositories
                         private: true
-                    })
+                    } as any)
                     
                     this.log(`Electron autoUpdater feed configured: ${feedUrl}`)
                 } else {

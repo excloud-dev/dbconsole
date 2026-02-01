@@ -613,7 +613,7 @@ export function registerDesktopIpcHandlers(): void {
                 if (v instanceof Date) return v
                 if (typeof v === 'string' || typeof v === 'number') return new Date(v)
                 return v
-            }, z.date()),
+            }, z.date().nullable()),
             isPrerelease: z.boolean(),
         })
 

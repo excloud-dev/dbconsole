@@ -49,7 +49,7 @@ export interface UpdateController {
     getFormattedReleaseInfo(version: string): Promise<{
         version: string
         releaseNotes: string
-        publishedAt?: Date
+        publishedAt?: Date | null
         isPrerelease?: boolean
         downloadUrl?: string
     }>

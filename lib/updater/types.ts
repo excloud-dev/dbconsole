@@ -13,7 +13,11 @@ export interface UpdateInfo {
     assetName?: string
     checksum: string
     signature?: string
-    publishedAt: Date
+    /**
+     * Published date for the release when available.
+     * Some update sources (e.g. `electron-updater`) may not provide it.
+     */
+    publishedAt: Date | null
     isPrerelease: boolean
 }
 
