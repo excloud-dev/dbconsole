@@ -46,6 +46,7 @@ vi.mock('fs/promises', () => ({
 import { ElectronUpdater } from '@/lib/updater/electron-updater'
 import { autoUpdater } from 'electron-updater'
 import { ConfigServiceImpl } from '@/lib/updater/config-service'
+import { UpdateControllerImpl } from '@/lib/updater/update-controller'
 
 // Helper function to temporarily mock platform
 function withMockedPlatform<T>(platform: string, fn: () => T): T {
@@ -69,7 +70,7 @@ describe('ElectronUpdater Capability Detection', () => {
     let updater: ElectronUpdater
     
     beforeEach(async () => {
-        vi.clearAllMocks()
+        vi.restoreAllMocks()
         
         // Create updater with electron integration enabled
         updater = new ElectronUpdater({
@@ -263,13 +264,71 @@ describe('ElectronUpdater Capability Detection', () => {
             expect(autoUpdater.downloadUpdate).not.toHaveBeenCalled()
         })
     })
+
+    describe('Custom Fallback Integrity', () => {
+        it('should re-check and use custom UpdateInfo when autoUpdater download fails', async () => {
+            vi.spyOn(autoUpdater, 'downloadUpdate').mockRejectedValue(new Error('Download failed'))
+
+            const checkNowSpy = vi.spyOn(UpdateControllerImpl.prototype, 'checkNow').mockResolvedValue({
+                version: 'v9.9.9',
+                releaseNotes: 'notes',
+                downloadUrl: 'https://api.github.com/repos/test-org/test-repo/releases/assets/123',
+                assetName: 'DBConsole-v9.9.9-darwin-arm64.dmg',
+                checksum: 'abc123',
+                publishedAt: new Date(),
+                isPrerelease: false
+            } as any)
+
+            const downloadAndInstallSpy = vi
+                .spyOn(UpdateControllerImpl.prototype, 'downloadAndInstall')
+                .mockResolvedValue(undefined)
+
+            // This mimics the electron-updater check path: valid URL for IPC/UI but not a direct asset URL for downloads.
+            const electronStyleUpdateInfo = {
+                version: '9.9.9',
+                releaseNotes: 'notes',
+                downloadUrl: 'https://github.com/test-org/test-repo/releases/tag/v9.9.9',
+                assetName: 'DBConsole-v9.9.9-mac.zip',
+                checksum: 'sha512-from-yml',
+                publishedAt: new Date(),
+                isPrerelease: false
+            }
+
+            await expect(updater.downloadAndInstall(electronStyleUpdateInfo as any)).resolves.not.toThrow()
+            expect(checkNowSpy).toHaveBeenCalled()
+            expect(downloadAndInstallSpy).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    downloadUrl: 'https://api.github.com/repos/test-org/test-repo/releases/assets/123',
+                    checksum: 'abc123'
+                })
+            )
+        })
+
+        it('should fail cleanly if fallback cannot fetch a valid UpdateInfo', async () => {
+            vi.spyOn(autoUpdater, 'downloadUpdate').mockRejectedValue(new Error('Download failed'))
+            vi.spyOn(UpdateControllerImpl.prototype, 'checkNow').mockResolvedValue(null as any)
+
+            const electronStyleUpdateInfo = {
+                version: '9.9.9',
+                releaseNotes: 'notes',
+                downloadUrl: 'https://github.com/test-org/test-repo/releases/tag/v9.9.9',
+                checksum: 'sha512-from-yml',
+                publishedAt: new Date(),
+                isPrerelease: false
+            }
+
+            await expect(updater.downloadAndInstall(electronStyleUpdateInfo as any)).rejects.toThrow(
+                /re-check for updates/i
+            )
+        })
+    })
 })
 
 describe('ElectronUpdater with Disabled AutoUpdater', () => {
     let updater: ElectronUpdater
     
     beforeEach(async () => {
-        vi.clearAllMocks()
+        vi.restoreAllMocks()
         
         // Create updater with electron integration disabled
         updater = new ElectronUpdater({

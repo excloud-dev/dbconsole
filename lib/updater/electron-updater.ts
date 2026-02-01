@@ -173,14 +173,25 @@ export class ElectronUpdater extends EventEmitter {
                         
                         // Safe cast: we know autoUpdater provides these fields at runtime
                         const extendedInfo = info as unknown as ExtendedUpdateInfo
+
+                        const owner = this.updateController.getOwner()
+                        const repo = this.updateController.getRepo()
+                        const tag = extendedInfo.version.startsWith('v')
+                            ? extendedInfo.version
+                            : `v${extendedInfo.version}`
+
+                        const assetNameFromFiles = extendedInfo.files?.[0]?.url
+                            ? this.basename(extendedInfo.files?.[0]?.url)
+                            : undefined
+                        const assetNameFromPath = extendedInfo.path ? this.basename(extendedInfo.path) : undefined
                         
                         const updateInfo: UpdateInfo = {
                             version: extendedInfo.version,
                             releaseNotes: extendedInfo.releaseNotes || '',
-                            // path is the main download URL
-                            downloadUrl: extendedInfo.path || '',
-                            // Use first file URL as asset name (typically the zip file)
-                            assetName: extendedInfo.files?.[0]?.url || '',
+                            // Use a stable URL for UI/IPC; downloads are handled by autoUpdater.
+                            downloadUrl: `https://github.com/${owner}/${repo}/releases/tag/${tag}`,
+                            // Capture a useful filename for display/debugging.
+                            assetName: assetNameFromFiles || assetNameFromPath,
                             checksum: extendedInfo.sha512 || '',
                             // If release date is unavailable, represent it explicitly as null
                             publishedAt: extendedInfo.releaseDate
@@ -266,6 +277,19 @@ export class ElectronUpdater extends EventEmitter {
                 throw new Error('Installation not allowed outside maintenance window')
             }
 
+            const getCustomUpdateInfoForVersion = async (): Promise<UpdateInfo> => {
+                const checked = await this.updateController.checkNow()
+                if (!checked) {
+                    throw new Error('Unable to fetch update metadata for fallback download; please re-check for updates.')
+                }
+                if (!this.isSameUpdateVersion(checked.version, updateInfo.version)) {
+                    throw new Error(
+                        `Updater fallback check returned a different version (wanted ${updateInfo.version}, got ${checked.version}). Please re-check for updates.`
+                    )
+                }
+                return checked
+            }
+
             this.log(`Starting download and installation for version ${updateInfo.version}`)
             this.setElectronState({ electronUpdaterState: 'downloading' })
             
@@ -316,17 +340,21 @@ export class ElectronUpdater extends EventEmitter {
                         reason: 'electron-auto-updater-failed',
                         error: autoUpdaterError instanceof Error ? autoUpdaterError.message : String(autoUpdaterError)
                     })
-                    // Fall through to custom updater
+                    // Fall through to custom updater (requires a GitHub asset URL + checksum).
                 }
             }
 
             // Use our custom update controller to download and verify (fallback or default)
+            const customUpdateInfo = this.isValidUpdateInfoForCustomDownload(updateInfo)
+                ? updateInfo
+                : await getCustomUpdateInfoForVersion()
+
             const startTime = Date.now()
-            await this.updateController.downloadAndInstall(updateInfo)
+            await this.updateController.downloadAndInstall(customUpdateInfo)
             const downloadDuration = Date.now() - startTime
             
             this.emitTelemetry('download-success-custom', {
-                version: updateInfo.version,
+                version: customUpdateInfo.version,
                 method: 'custom-github-client',
                 durationMs: downloadDuration
             })
@@ -762,5 +790,38 @@ export class ElectronUpdater extends EventEmitter {
         }
 
         this.emit('log', logEntry)
+    }
+
+    private basename(input: string): string {
+        const normalized = input.replace(/[#?].*$/, '')
+        const idx = normalized.lastIndexOf('/')
+        return idx >= 0 ? normalized.slice(idx + 1) : normalized
+    }
+
+    private normalizeVersion(input: string): string {
+        return input.trim().replace(/^v/i, '')
+    }
+
+    private isSameUpdateVersion(a: string, b: string): boolean {
+        return this.normalizeVersion(a) === this.normalizeVersion(b)
+    }
+
+    private isValidUpdateInfoForCustomDownload(info: UpdateInfo): boolean {
+        if (!info.checksum || info.checksum.trim() === '') return false
+        if (!info.downloadUrl) return false
+
+        try {
+            const url = new URL(info.downloadUrl)
+            if (url.protocol !== 'https:' && url.protocol !== 'http:') return false
+            if (url.hostname === 'api.github.com') {
+                return /\/releases\/assets\/\d+/.test(url.pathname)
+            }
+            if (url.hostname === 'objects.githubusercontent.com') {
+                return true
+            }
+            return false
+        } catch {
+            return false
+        }
     }
 }
