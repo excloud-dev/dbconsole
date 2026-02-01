@@ -44,6 +44,8 @@ vi.mock('fs/promises', () => ({
 
 // Import the module under test
 import { ElectronUpdater } from '@/lib/updater/electron-updater'
+import { autoUpdater } from 'electron-updater'
+import { ConfigServiceImpl } from '@/lib/updater/config-service'
 
 // Helper function to temporarily mock platform
 function withMockedPlatform<T>(platform: string, fn: () => T): T {
@@ -220,6 +222,45 @@ describe('ElectronUpdater Capability Detection', () => {
 
         it('should expose setUpdateSettings method', () => {
             expect(typeof updater.setUpdateSettings).toBe('function')
+        })
+    })
+
+    describe('Policy Enforcement', () => {
+        it('should enforce policy before autoUpdater download', async () => {
+            vi.spyOn(ConfigServiceImpl.prototype, 'isAutoInstallAllowed').mockResolvedValue(false)
+
+            const updateInfo = {
+                version: 'v9.9.9',
+                releaseNotes: '',
+                downloadUrl: 'https://example.com/fake.zip',
+                checksum: 'deadbeef',
+                publishedAt: new Date(),
+                isPrerelease: false
+            }
+
+            await expect(updater.downloadAndInstall(updateInfo as any)).rejects.toThrow(
+                /disabled by policy/i
+            )
+            expect(autoUpdater.downloadUpdate).not.toHaveBeenCalled()
+        })
+
+        it('should enforce maintenance window before autoUpdater download', async () => {
+            vi.spyOn(ConfigServiceImpl.prototype, 'isAutoInstallAllowed').mockResolvedValue(true)
+            vi.spyOn(ConfigServiceImpl.prototype, 'isInMaintenanceWindow').mockResolvedValue(false)
+
+            const updateInfo = {
+                version: 'v9.9.9',
+                releaseNotes: '',
+                downloadUrl: 'https://example.com/fake.zip',
+                checksum: 'deadbeef',
+                publishedAt: new Date(),
+                isPrerelease: false
+            }
+
+            await expect(updater.downloadAndInstall(updateInfo as any)).rejects.toThrow(
+                /maintenance window/i
+            )
+            expect(autoUpdater.downloadUpdate).not.toHaveBeenCalled()
         })
     })
 })

@@ -254,6 +254,18 @@ export class ElectronUpdater extends EventEmitter {
         }
 
         try {
+            // Keep behavior consistent with the existing controller flow:
+            // enforce enterprise policy + maintenance window before performing any download/install work.
+            const autoInstallAllowed = await this.configService.isAutoInstallAllowed()
+            if (!autoInstallAllowed) {
+                throw new Error('Automatic installation is disabled by policy')
+            }
+
+            const inMaintenanceWindow = await this.configService.isInMaintenanceWindow()
+            if (!inMaintenanceWindow) {
+                throw new Error('Installation not allowed outside maintenance window')
+            }
+
             this.log(`Starting download and installation for version ${updateInfo.version}`)
             this.setElectronState({ electronUpdaterState: 'downloading' })
             
