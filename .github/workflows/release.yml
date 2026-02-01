@@ -74,4 +74,6 @@ jobs:
           files: |
             dist/electron-build/*.dmg
             dist/electron-build/*.dmg.blockmap
+            dist/electron-build/*.zip
+            dist/electron-build/*.zip.blockmap
             dist/electron-build/latest-mac.yml

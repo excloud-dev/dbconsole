@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+- feat: (desktop) optional in-place updates on macOS via Electron `autoUpdater` with differential downloads (feature-flagged), plus policy/maintenance-window enforcement and release workflow uploads for `.zip` + `.zip.blockmap`.
+
 ## v0.5.0 - 2025-12-22
 
 - feat: add write-query generator UI for INSERT/UPDATE with a searchable table picker, generator tabs, and DataGrid output preview
