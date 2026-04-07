@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState, useRef } from "react"
 import { SchemasSidebar } from "./schemas-sidebar"
+import { SlowQueryPanel } from "./slow-query-panel"
+import { QueryHistoryPanel } from "./query-history-panel"
+import { SchemaGraphView } from "./schema-graph-view"
 import { QueryTabs, type Tab } from "./query-tabs"
 import { QueryEditor } from "./query-editor"
 import { NamedQueryEditor, type NamedQuery, type NamedQueryParamMeta } from "./named-query-editor"
@@ -18,7 +21,7 @@ import { useToast } from "@/hooks/use-toast"
 import type { ClientConnectionMeta } from "@/lib/connections"
 import type { SchemaGraph } from "@/lib/schema-introspection"
 import { hasLimitClause, isReadOnlySql } from "@/lib/sql/safety"
-import { ApiError, apiClient, type NamedQuerySyncResolution } from "@/lib/client/apiClient"
+import { ApiError, apiClient, asQueryErrorBody, type NamedQuerySyncResolution } from "@/lib/client/apiClient"
 import { useCommand } from "@/components/shortcuts/useCommand"
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator, CommandShortcut } from "@/components/ui/command"
 import { listCommands } from "@/lib/shortcuts/commands"
@@ -257,11 +260,30 @@ export function DbConsole() {
   const autoSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [resultsByTab, setResultsByTab] = useState<{
-    [tabId: string]: { columns: string[]; rows: Record<string, unknown>[]; durationMs: number; sqlDisplay?: string } | undefined
+    [tabId: string]: {
+      columns: string[]
+      rows: Record<string, unknown>[]
+      durationMs: number
+      sqlDisplay?: string
+      truncated?: boolean
+      truncatedAt?: number
+      requestedLimit?: number
+    } | undefined
   }>({})
   const [schema, setSchema] = useState<SchemaGraph | null>(null)
   const [isRunning, setIsRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /**
+   * Per-tab streaming state. When set, the tab is currently consuming a
+   * server-side cursor: streamId identifies the open stream and rowsSent
+   * tracks how many rows have been delivered so far. The grid renders a
+   * "Load more" footer instead of pagination controls.
+   */
+  const [streamsByTab, setStreamsByTab] = useState<{
+    [tabId: string]: { streamId: string; rowsSent: number; hasMore: boolean; loading: boolean } | undefined
+  }>({})
+  const [showSlowQueries, setShowSlowQueries] = useState(false)
+  const [showQueryHistory, setShowQueryHistory] = useState(false)
 
   const openSqlInNewTab = useCallback(
     (sql: string, name?: string) => {
@@ -279,6 +301,44 @@ export function DbConsole() {
     },
     [activeConnection],
   )
+
+  // Open or focus the schema-graph tab. Creates a single dedicated tab so the
+  // user doesn't end up with five identical schema-graph tabs in their
+  // workspace; if one already exists for the active connection, just focus it.
+  const openSchemaGraphTab = useCallback(() => {
+    if (!activeConnection) return
+    const existing = tabs.find((t) => t.isSchemaGraph && t.connectionId === activeConnection)
+    if (existing) {
+      setActiveTab(existing.id)
+      return
+    }
+    const newId = `schema-graph-${Date.now()}`
+    setTabs((prev) => [
+      ...prev,
+      {
+        id: newId,
+        name: "Schema graph",
+        query: "",
+        isSchemaGraph: true,
+        connectionId: activeConnection,
+      },
+    ])
+    setActiveTab(newId)
+  }, [activeConnection, tabs])
+
+  // Listen for Tools menu actions from the macOS application menu.
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.dbconsole?.isDesktop) return
+    const dc = window.dbconsole
+    const offHistory = dc.events.onMenuQueryHistory(() => setShowQueryHistory(true))
+    const offSlow = dc.events.onMenuSlowQueries(() => setShowSlowQueries(true))
+    const offGraph = dc.events.onMenuSchemaGraph(() => openSchemaGraphTab())
+    return () => {
+      offHistory()
+      offSlow()
+      offGraph()
+    }
+  }, [openSchemaGraphTab])
 
   useEffect(() => {
     const events = typeof window !== "undefined" ? window.dbconsole?.events : undefined
@@ -359,7 +419,7 @@ export function DbConsole() {
 
   // Desktop-only: menu items + persisted UI preference (sidebar action hover behavior)
   useEffect(() => {
-    const dc = typeof window !== "undefined" ? (window as any).dbconsole : undefined
+    const dc = typeof window !== "undefined" ? window.dbconsole : undefined
     if (!dc?.isDesktop) return
 
     const api = dc?.api
@@ -510,6 +570,9 @@ export function DbConsole() {
     const closingTab = closingTabIndex >= 0 ? tabs[closingTabIndex] : undefined
     const newTabs = tabs.filter((t) => t.id !== id)
     setTabs(newTabs)
+    // Tear down any open stream attached to this tab so we don't leak the
+    // pg client checked out for the cursor's transaction.
+    if (streamsByTab[id]) void closeStreamForTab(id)
     // If we are using per-tab pools, release the tab-specific pool on close.
     if (poolMode === "per-scope" && closingTab?.connectionId) {
       void apiClient.connections.releasePools({
@@ -1032,6 +1095,10 @@ export function DbConsole() {
 
     setIsRunning(true)
     setError(null)
+    // If this tab had an open stream, tear it down — running a new query
+    // means the previous stream is no longer interesting, and leaving it
+    // open holds a Postgres client checked out indefinitely.
+    void closeStreamForTab(targetTabId)
 
     try {
       // Clean SQL for wrapping (remove trailing semicolon)
@@ -1082,18 +1149,147 @@ export function DbConsole() {
 
     } catch (e: any) {
       console.error("Failed to run query", e)
-      setError(e?.message || "Failed to run query")
+      const detail = asQueryErrorBody(e)
+      setError(detail?.error ?? e?.message ?? "Failed to run query")
       toast({
         variant: "destructive",
         title: "Query failed",
-        description: e?.message || "Failed to run query",
+        description: detail?.error ?? e?.message ?? "Failed to run query",
       })
     } finally {
       setIsRunning(false)
     }
   }
 
+  // ---- Streaming -----------------------------------------------------------
+  //
+  // When a bounded query gets clipped to DBCONSOLE_MAX_ROWS the user can opt
+  // into streaming via the truncation banner. We re-run the same SQL through
+  // /api/query/stream/open, replace the bounded result with the first batch,
+  // and let "Load more" pull subsequent batches via /next. The stream is held
+  // open server-side until the user closes it, runs a new query in the same
+  // tab, or closes the tab.
 
+  const closeStreamForTab = useCallback(async (tabId: string) => {
+    const stream = streamsByTab[tabId]
+    if (!stream) return
+    try {
+      await apiClient.query.stream.close({ streamId: stream.streamId })
+    } catch (e) {
+      console.error("Failed to close stream", e)
+    }
+    setStreamsByTab((prev) => {
+      const next = { ...prev }
+      delete next[tabId]
+      return next
+    })
+  }, [streamsByTab])
+
+  async function startStreamForTab(targetTabId: string) {
+    const tab = tabs.find((t) => t.id === targetTabId)
+    if (!tab) return
+    const targetConnectionId = tab.connectionId ?? activeConnection
+    if (!targetConnectionId) return
+
+    // Tear down any existing stream for this tab before starting a new one.
+    await closeStreamForTab(targetTabId)
+
+    setIsRunning(true)
+    setError(null)
+
+    try {
+      const cleanSql = (tab.query ?? "").trim().replace(/;+$/, "")
+      const result = await apiClient.query.stream.open({
+        query: {
+          kind: "raw",
+          sql: cleanSql,
+          originalSql: cleanSql,
+          connectionId: targetConnectionId,
+          poolMode,
+          scopeKey: poolMode === "per-scope" ? targetTabId : undefined,
+        },
+      })
+
+      // Replace the bounded result with the streamed first batch. truncated is
+      // explicitly false because the streaming UI carries its own affordances.
+      setResultsByTab((prev) => ({
+        ...prev,
+        [targetTabId]: {
+          columns: result.columns,
+          rows: result.rows,
+          durationMs: 0,
+          sqlDisplay: cleanSql,
+          truncated: false,
+          truncatedAt: undefined,
+          requestedLimit: undefined,
+        },
+      }))
+
+      setStreamsByTab((prev) => ({
+        ...prev,
+        [targetTabId]: {
+          streamId: result.streamId,
+          rowsSent: result.rowsSent,
+          hasMore: result.hasMore,
+          loading: false,
+        },
+      }))
+
+      toast({
+        title: "Streaming started",
+        description: `${result.rows.length} rows in first batch`,
+      })
+    } catch (e: any) {
+      console.error("Failed to open stream", e)
+      const detail = asQueryErrorBody(e)
+      setError(detail?.error ?? e?.message ?? "Failed to open stream")
+      toast({
+        variant: "destructive",
+        title: "Stream failed",
+        description: detail?.error ?? e?.message ?? "Failed to open stream",
+      })
+    } finally {
+      setIsRunning(false)
+    }
+  }
+
+  async function loadMoreForStream(targetTabId: string) {
+    const stream = streamsByTab[targetTabId]
+    if (!stream || !stream.hasMore || stream.loading) return
+
+    setStreamsByTab((prev) => ({
+      ...prev,
+      [targetTabId]: prev[targetTabId] ? { ...prev[targetTabId]!, loading: true } : prev[targetTabId],
+    }))
+
+    try {
+      const result = await apiClient.query.stream.next({ streamId: stream.streamId })
+      setResultsByTab((prev) => {
+        const cur = prev[targetTabId]
+        if (!cur) return prev
+        return {
+          ...prev,
+          [targetTabId]: { ...cur, rows: [...cur.rows, ...result.rows] },
+        }
+      })
+      setStreamsByTab((prev) => ({
+        ...prev,
+        [targetTabId]: prev[targetTabId]
+          ? { ...prev[targetTabId]!, rowsSent: result.rowsSent, hasMore: result.hasMore, loading: false }
+          : prev[targetTabId],
+      }))
+    } catch (e: any) {
+      console.error("Failed to fetch next batch", e)
+      const detail = asQueryErrorBody(e)
+      setError(detail?.error ?? e?.message ?? "Stream fetch failed")
+      // The server already torn down the stream on a fetch error; clear state.
+      setStreamsByTab((prev) => {
+        const next = { ...prev }
+        delete next[targetTabId]
+        return next
+      })
+    }
+  }
 
   async function executeNamedQuery(query: NamedQuery, params: Record<string, string>, newOffset: number = 0, newLimit?: number | null) {
     if (!activeConnection) return
@@ -1107,6 +1303,7 @@ export function DbConsole() {
     const limit = newLimit === undefined ? fallbackLimit : newLimit === null ? undefined : newLimit
     setIsRunning(true)
     setError(null)
+    if (currentTab) void closeStreamForTab(currentTab.id)
 
     try {
       const shouldIncludeCount = offset === 0 || targetTab?.pagination?.total === undefined
@@ -1158,11 +1355,12 @@ export function DbConsole() {
       }
     } catch (e: any) {
       console.error("Failed to run named query", e)
-      setError(e?.message || "Failed to run named query")
+      const detail = asQueryErrorBody(e)
+      setError(detail?.error ?? e?.message ?? "Failed to run named query")
       toast({
         variant: "destructive",
         title: "Query failed",
-        description: e?.message || "Failed to run query",
+        description: detail?.error ?? e?.message ?? "Failed to run query",
       })
     } finally {
       setIsRunning(false)
@@ -1318,6 +1516,7 @@ export function DbConsole() {
                         }}
                         onJoinTables={handleJoinTables}
                         onViewTable={handleViewTable}
+                        onOpenSql={openSqlInNewTab}
                         onOpenSettings={() => setShowConnectionDialog(true)}
                         onOpenSyncSettings={() => setShowSyncSettingsDialog(true)}
                         onSyncNamedQueries={handleSyncNamedQueries}
@@ -1350,6 +1549,14 @@ export function DbConsole() {
 
             {/* Query and results area */}
             <ResizablePanel defaultSize={95}>
+              {currentTab?.isSchemaGraph ? (
+                <SchemaGraphView
+                  schema={schema}
+                  onRefresh={() => {
+                    if (activeConnection) void loadSchema(activeConnection)
+                  }}
+                />
+              ) : (
               <div className="h-full flex flex-col overflow-hidden">
                 <ResizablePanelGroup direction="vertical">
                   {/* Query editor section */}
@@ -1430,6 +1637,28 @@ export function DbConsole() {
                             data={currentResult?.rows || []}
                             loading={isRunning}
                             error={error}
+                            truncated={
+                              currentResult?.truncated
+                                ? {
+                                  at: currentResult.truncatedAt ?? currentResult.rows.length,
+                                  requestedLimit: currentResult.requestedLimit,
+                                  onSwitchToStream: currentTab && !currentTab.isNamedQuery && !currentTab.isGenerator
+                                    ? () => { void startStreamForTab(currentTab.id) }
+                                    : undefined,
+                                }
+                                : null
+                            }
+                            streaming={
+                              currentTab && streamsByTab[currentTab.id]
+                                ? {
+                                  rowsSent: streamsByTab[currentTab.id]!.rowsSent,
+                                  hasMore: streamsByTab[currentTab.id]!.hasMore,
+                                  loading: streamsByTab[currentTab.id]!.loading,
+                                  onLoadMore: () => { void loadMoreForStream(currentTab.id) },
+                                  onClose: () => { void closeStreamForTab(currentTab.id) },
+                                }
+                                : null
+                            }
                             executedSql={currentResult?.sqlDisplay}
                             pagination={currentTab.pagination}
                             onPageChange={(newOffset) => {
@@ -1470,6 +1699,7 @@ export function DbConsole() {
                   </ResizablePanel>
                 </ResizablePanelGroup>
               </div>
+              )}
             </ResizablePanel>
           </ResizablePanelGroup>
         </div>
@@ -1481,6 +1711,27 @@ export function DbConsole() {
         tables={schema?.tables ?? []}
         onGenerate={(mode: WriteQueryMode, table) => {
           openGeneratorTab(mode, table)
+        }}
+      />
+
+      <SlowQueryPanel
+        open={showSlowQueries}
+        onOpenChange={setShowSlowQueries}
+        connectionId={activeConnection}
+        onOpenInTab={(sql) => {
+          openSqlInNewTab(sql, "Slow query")
+          setShowSlowQueries(false)
+        }}
+      />
+
+      <QueryHistoryPanel
+        open={showQueryHistory}
+        onOpenChange={setShowQueryHistory}
+        connections={connections.map((c) => ({ id: c.id, label: c.label }))}
+        defaultConnectionId={activeConnection}
+        onOpenInTab={(sql) => {
+          openSqlInNewTab(sql, "From history")
+          setShowQueryHistory(false)
         }}
       />
 

@@ -36,8 +36,8 @@ export function MenuHandler() {
 
     const checkIfTokenExists = useCallback(async (): Promise<boolean> => {
         try {
-            if (typeof window !== 'undefined' && (window as any).dbconsole?.api?.updater) {
-                const result = await (window as any).dbconsole.api.updater.token.exists()
+            if (typeof window !== 'undefined' && window.dbconsole?.api?.updater) {
+                const result = await window.dbconsole.api.updater.token.exists()
                 return result.exists
             }
             return false
@@ -63,9 +63,9 @@ export function MenuHandler() {
         setUpdateError(null)
 
         try {
-            if (typeof window !== 'undefined' && (window as any).dbconsole?.api?.updater) {
+            if (typeof window !== 'undefined' && window.dbconsole?.api?.updater) {
                 // First check if we have a GitHub token configured
-                const settings = await (window as any).dbconsole.api.updater.settings.get()
+                const settings = await window.dbconsole.api.updater.settings.get()
 
                 // For manual checks, if no token is configured, show settings dialog
                 const hasToken = await checkIfTokenExists()
@@ -78,7 +78,7 @@ export function MenuHandler() {
                     return
                 }
 
-                const result = await (window as any).dbconsole.api.updater.check()
+                const result = await window.dbconsole.api.updater.check()
 
                 if (result) {
                     // Update available
@@ -117,8 +117,8 @@ export function MenuHandler() {
 
     const loadUpdateSettings = useCallback(async () => {
         try {
-            if (typeof window !== 'undefined' && (window as any).dbconsole?.api?.updater) {
-                const settings = await (window as any).dbconsole.api.updater.settings.get()
+            if (typeof window !== 'undefined' && window.dbconsole?.api?.updater) {
+                const settings = await window.dbconsole.api.updater.settings.get()
                 setUpdateSettings(settings)
             }
         } catch (error) {
@@ -127,11 +127,11 @@ export function MenuHandler() {
     }, [])
 
     useEffect(() => {
-        if (typeof window === 'undefined' || !(window as any).dbconsole?.isDesktop) {
+        if (typeof window === 'undefined' || !window.dbconsole?.isDesktop) {
             return
         }
 
-        const dbconsole = (window as any).dbconsole
+        const dbconsole = window.dbconsole
 
         // Load initial settings
         loadUpdateSettings()
@@ -175,13 +175,13 @@ export function MenuHandler() {
 
     // Load persisted theme on startup
     useEffect(() => {
-        if (typeof window === 'undefined' || !(window as any).dbconsole?.isDesktop) {
+        if (typeof window === 'undefined' || !window.dbconsole?.isDesktop) {
             return
         }
 
         const loadTheme = async () => {
             try {
-                const result = await (window as any).dbconsole.api.uiPrefs.get('theme')
+                const result = await window.dbconsole!.api.uiPrefs!.get('theme')
                 if (result?.value) {
                     setTheme(result.value)
                 }
@@ -204,8 +204,8 @@ export function MenuHandler() {
                 message: 'Preparing to download update...'
             })
 
-            if (typeof window !== 'undefined' && (window as any).dbconsole?.api?.updater) {
-                await (window as any).dbconsole.api.updater.install(updateInfo)
+            if (typeof window !== 'undefined' && window.dbconsole?.api?.updater) {
+                await window.dbconsole.api.updater.install(updateInfo)
             }
 
             setProgressInfo({
@@ -241,7 +241,7 @@ export function MenuHandler() {
     // While the installer is running, poll updater state for progress updates so the UI isn't stuck at 0%.
     useEffect(() => {
         if (!showUpdateProgressDialog || !isInstallingUpdate) return
-        if (typeof window === 'undefined' || !(window as any).dbconsole?.api?.updater?.state) return
+        if (typeof window === 'undefined' || !window.dbconsole?.api?.updater?.state) return
 
         let cancelled = false
         let inFlight = false
@@ -251,7 +251,7 @@ export function MenuHandler() {
             if (cancelled || inFlight) return
             inFlight = true
             try {
-                const state = await (window as any).dbconsole.api.updater.state()
+                const state = await window.dbconsole!.api.updater!.state()
                 if (cancelled || !state) return
 
                 const status: string | undefined = state.status
@@ -318,8 +318,8 @@ export function MenuHandler() {
 
     const handleSaveSettings = async (newSettings: UpdateSettings) => {
         try {
-            if (typeof window !== 'undefined' && (window as any).dbconsole?.api?.updater) {
-                await (window as any).dbconsole.api.updater.settings.set(newSettings)
+            if (typeof window !== 'undefined' && window.dbconsole?.api?.updater) {
+                await window.dbconsole.api.updater.settings.set(newSettings)
                 setUpdateSettings(newSettings)
                 toast({
                     title: "Settings Saved",
@@ -355,8 +355,8 @@ export function MenuHandler() {
             }
 
             // Token is valid, save it
-            if (typeof window !== 'undefined' && (window as any).dbconsole?.api?.updater) {
-                await (window as any).dbconsole.api.updater.token.set(token)
+            if (typeof window !== 'undefined' && window.dbconsole?.api?.updater) {
+                await window.dbconsole.api.updater.token.set(token)
                 setGithubToken(token)
                 setIsTokenConfigured(true)
                 toast({
@@ -376,8 +376,8 @@ export function MenuHandler() {
 
     const validateGitHubToken = async (token: string): Promise<boolean> => {
         try {
-            if (typeof window !== 'undefined' && (window as any).dbconsole?.api?.updater) {
-                const result = await (window as any).dbconsole.api.updater.token.validate(token)
+            if (typeof window !== 'undefined' && window.dbconsole?.api?.updater) {
+                const result = await window.dbconsole.api.updater.token.validate(token)
 
                 if (!result.valid) {
                     toast({
@@ -403,7 +403,7 @@ export function MenuHandler() {
     }
 
     // Don't render anything in web environment
-    if (typeof window === 'undefined' || !(window as any).dbconsole?.isDesktop) {
+    if (typeof window === 'undefined' || !window.dbconsole?.isDesktop) {
         return null
     }
 

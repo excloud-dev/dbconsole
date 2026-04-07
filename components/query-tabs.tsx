@@ -33,6 +33,8 @@ export interface Tab {
   query: string
   isNamedQuery?: boolean
   isGenerator?: boolean
+  /** Schema graph tab — renders a Mermaid ER diagram instead of the SQL editor + grid. */
+  isSchemaGraph?: boolean
   namedQueryId?: string
   connectionId?: string
   params?: RawParam[]

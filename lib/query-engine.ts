@@ -1,8 +1,22 @@
 import { getConnectionById } from '@/lib/connections'
-import { getNamedQuery, logQueryRun, type LogQueryRunInput } from '@/lib/meta-db'
+import { logQueryRun, type LogQueryRunInput } from '@/lib/meta-db'
 import { getPoolForConnection, type PoolMode } from '@/lib/pg-pool'
-import { applyNamedQueryParams } from '@/lib/sql/named-query-params'
+import { resolveTableNames } from '@/lib/pg-pool-cache'
 import { isReadOnlySql, normalizeSql } from '@/lib/sql/safety'
+import { QueryError, toQueryError } from '@/lib/core/errors'
+import { prepareQuery } from '@/lib/query-prep'
+
+// Hard cap on rows materialized into a single bounded query response. Beyond
+// this users should switch to streaming. Configurable via DBCONSOLE_MAX_ROWS;
+// defaults to 5000 to preserve historical behavior.
+const DEFAULT_MAX_ROWS = 5000
+function readMaxRows(): number {
+    const raw = process.env.DBCONSOLE_MAX_ROWS
+    if (!raw) return DEFAULT_MAX_ROWS
+    const n = Number.parseInt(raw, 10)
+    if (!Number.isFinite(n) || n <= 0) return DEFAULT_MAX_ROWS
+    return n
+}
 
 export type RawQueryInput = {
     kind: 'raw'
@@ -36,6 +50,12 @@ export type QueryResult = {
     rowCount: number
     durationMs: number
     totalCount?: number
+    /** True when the result was clipped to fit `truncatedAt` rows. */
+    truncated: boolean
+    /** The cap that produced the truncation (i.e. the number of rows actually returned). */
+    truncatedAt: number
+    /** The user-supplied LIMIT, if any. Helps the UI explain *why* a result was capped. */
+    requestedLimit?: number
 }
 
 export { applyNamedQueryParams } from '@/lib/sql/named-query-params'
@@ -43,54 +63,30 @@ export { applyNamedQueryParams } from '@/lib/sql/named-query-params'
 export async function runQuery(input: RawQueryInput | NamedQueryInput): Promise<QueryResult> {
     const start = Date.now()
 
-    let sql: string
-    // A best-effort copy of the user's query _before_ we wrap it (e.g. for pagination).
-    // We use it later to recover table qualifiers when Postgres strips tableIDs in subqueries.
-    let userSql: string | undefined
-    let values: unknown[] = []
-    let connectionId: string
-    let poolMode: PoolMode | undefined
-    let scopeKey: string | undefined
-    let kind: LogQueryRunInput['kind']
-    let namedQueryId: string | undefined
-
-    if (input.kind === 'raw') {
-        sql = input.sql
-        userSql = input.originalSql ?? input.sql
-        connectionId = input.connectionId
-        poolMode = input.poolMode
-        scopeKey = input.scopeKey
-        values = input.params ?? []
-        kind = 'raw'
-    } else {
-        const nq = getNamedQuery(input.queryId)
-        if (!nq) {
-            throw new Error('Named query not found')
-        }
-        const connId = input.connectionId ?? nq.defaultConnectionId
-        if (!connId) {
-            throw new Error('No connection specified for named query')
-        }
-        connectionId = connId
-        poolMode = input.poolMode
-        scopeKey = input.scopeKey
-        kind = 'named'
-        namedQueryId = nq.id
-
-        const paramSql = applyNamedQueryParams(nq.sqlTemplate, input.params)
-        sql = paramSql.text
-        userSql = input.originalSql ?? paramSql.text
-        values = paramSql.values
-    }
+    const prep = prepareQuery(input)
+    const sql = prep.sql
+    const userSql = prep.originalSqlHint
+    const values = prep.values
+    const connectionId = prep.connectionId
+    const poolMode: PoolMode | undefined = prep.poolMode
+    const scopeKey = prep.scopeKey
+    const kind: LogQueryRunInput['kind'] = prep.kind
+    const namedQueryId = prep.namedQueryId
 
     const trimmed = sql.trim()
     if (!isReadOnlySql(trimmed)) {
-        throw new Error('Only read-only SELECT / WITH queries are allowed')
+        throw new QueryError({
+            error: 'Only read-only SELECT / WITH queries are allowed',
+            classification: 'safety',
+        })
     }
 
     const conn = getConnectionById(connectionId)
     if (!conn) {
-        throw new Error('Connection not found')
+        throw new QueryError({
+            error: 'Connection not found',
+            classification: 'not_found',
+        })
     }
 
     const pool = getPoolForConnection(conn, { mode: poolMode, scopeKey })
@@ -132,19 +128,16 @@ export async function runQuery(input: RawQueryInput | NamedQueryInput): Promise<
                 return obj
             })
         } else {
-            // Disambiguate duplicates by qualifying with table alias (preferred) or schema.table; fall back to suffix.
-            const tableOids = Array.from(new Set(fields.map((f) => f.tableID).filter((oid) => oid && oid > 0)))
+            // Disambiguate duplicates by qualifying with table alias (preferred)
+            // or schema.table; fall back to suffix. The OID → name lookup goes
+            // through a per-pool LRU so repeated dup-column queries don't hit
+            // pg_class on every run (see lib/pg-pool-cache.ts).
+            const tableOids = Array.from(new Set(fields.map((f) => f.tableID).filter((oid): oid is number => !!oid && oid > 0)))
             const tableNameByOid: Record<number, string> = {}
             if (tableOids.length > 0) {
-                const lookup = await pool.query(
-                    `SELECT c.oid, n.nspname, c.relname
-                     FROM pg_class c
-                     JOIN pg_namespace n ON n.oid = c.relnamespace
-                     WHERE c.oid = ANY($1::oid[])`,
-                    [tableOids],
-                )
-                for (const r of lookup.rows) {
-                    tableNameByOid[Number(r.oid)] = `${r.nspname}.${r.relname}`
+                const resolved = await resolveTableNames(pool, tableOids)
+                for (const [oid, entry] of resolved) {
+                    tableNameByOid[oid] = entry.qualified
                 }
             }
 
@@ -209,10 +202,11 @@ export async function runQuery(input: RawQueryInput | NamedQueryInput): Promise<
                 return obj
             })
         }
-    } catch (err: any) {
+    } catch (err: unknown) {
         status = 'error'
-        errorMessage = err?.message || 'Query failed'
-        throw err
+        const qe = toQueryError(err)
+        errorMessage = qe.body.error
+        throw qe
     } finally {
         const durationMs = Date.now() - start
             const logInput: LogQueryRunInput = {
@@ -232,7 +226,9 @@ export async function runQuery(input: RawQueryInput | NamedQueryInput): Promise<
         }
     }
 
-    const limitedRows = rows.slice(0, 5000)
+    const maxRows = readMaxRows()
+    const truncated = rows.length > maxRows
+    const limitedRows = truncated ? rows.slice(0, maxRows) : rows
 
     return {
         columns,
@@ -240,6 +236,9 @@ export async function runQuery(input: RawQueryInput | NamedQueryInput): Promise<
         rowCount: limitedRows.length,
         durationMs: Date.now() - start,
         totalCount,
+        truncated,
+        truncatedAt: maxRows,
+        requestedLimit: input.limit,
     }
 }
 

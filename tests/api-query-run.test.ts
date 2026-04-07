@@ -24,6 +24,67 @@ describe('API /api/query/run', () => {
         expect(body.error).toBe('Invalid query payload')
     })
 
+    it('returns a classified safety error for write SQL', async () => {
+        const req = makeJsonRequest('http://localhost/api/query/run', 'POST', {
+            kind: 'raw',
+            sql: 'DELETE FROM users',
+            connectionId: 'any-id',
+        })
+        const res = await queryRunPOST(req)
+        expect(res.status).toBe(400)
+        const body = (await res.json()) as { error: string; classification: string }
+        expect(body.classification).toBe('safety')
+        expect(body.error).toMatch(/read-only/i)
+    })
+
+    it('returns a classified safety error for CTE-wrapped DML', async () => {
+        const req = makeJsonRequest('http://localhost/api/query/run', 'POST', {
+            kind: 'raw',
+            sql: 'WITH gone AS (DELETE FROM users RETURNING *) SELECT * FROM gone',
+            connectionId: 'any-id',
+        })
+        const res = await queryRunPOST(req)
+        expect(res.status).toBe(400)
+        const body = (await res.json()) as { classification: string }
+        expect(body.classification).toBe('safety')
+    })
+
+    it('returns a classified safety error for SELECT INTO newtable', async () => {
+        const req = makeJsonRequest('http://localhost/api/query/run', 'POST', {
+            kind: 'raw',
+            sql: 'SELECT * INTO new_users FROM users',
+            connectionId: 'any-id',
+        })
+        const res = await queryRunPOST(req)
+        expect(res.status).toBe(400)
+        const body = (await res.json()) as { classification: string }
+        expect(body.classification).toBe('safety')
+    })
+
+    it('returns a classified safety error for comment-hidden DML', async () => {
+        const req = makeJsonRequest('http://localhost/api/query/run', 'POST', {
+            kind: 'raw',
+            sql: 'SELECT 1 -- harmless\n; DELETE FROM users',
+            connectionId: 'any-id',
+        })
+        const res = await queryRunPOST(req)
+        expect(res.status).toBe(400)
+        const body = (await res.json()) as { classification: string }
+        expect(body.classification).toBe('safety')
+    })
+
+    it('returns a classified not_found when the connection id is unknown', async () => {
+        const req = makeJsonRequest('http://localhost/api/query/run', 'POST', {
+            kind: 'raw',
+            sql: 'SELECT 1',
+            connectionId: 'definitely-not-a-real-connection-id-xyz',
+        })
+        const res = await queryRunPOST(req)
+        expect(res.status).toBe(404)
+        const body = (await res.json()) as { classification: string }
+        expect(body.classification).toBe('not_found')
+    })
+
     itMaybe('executes a simple raw SELECT against the test Postgres connection', async () => {
         const req = makeJsonRequest('http://localhost/api/query/run', 'POST', {
             kind: 'raw',

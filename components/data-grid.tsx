@@ -23,7 +23,7 @@ function escapeCsvValue(value: string): string {
 import { CellDetailDialog } from "./cell-detail-dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 
-import { ChevronLeft, ChevronRight, Loader2, Copy, FileDown, EyeOff, Columns, Check, Eye, SlidersHorizontal, Maximize2, Minimize2, Info, ChevronDown, Table } from "lucide-react"
+import { ChevronLeft, ChevronRight, Loader2, Copy, FileDown, EyeOff, Columns, Check, Eye, SlidersHorizontal, Maximize2, Minimize2, Info, ChevronDown, Table, AlertTriangle } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,6 +44,24 @@ interface DataGridProps {
   data: Record<string, unknown>[]
   loading?: boolean
   error?: string | null
+  /**
+   * Set when the engine clipped the result. `at` is the row cap that was applied;
+   * `requestedLimit` echoes the user's LIMIT (if any) so the banner can explain
+   * which one is biting. `onSwitchToStream`, when provided, surfaces a button on
+   * the banner that re-runs the same query as a server-side cursor.
+   */
+  truncated?: { at: number; requestedLimit?: number; onSwitchToStream?: () => void } | null
+  /**
+   * Set when the active result is being streamed via a server-side cursor. The
+   * grid renders a "Load more" footer that fetches the next batch and appends.
+   */
+  streaming?: {
+    rowsSent: number
+    hasMore: boolean
+    loading?: boolean
+    onLoadMore: () => void
+    onClose?: () => void
+  } | null
   executedSql?: string
   pagination?: {
     limit?: number
@@ -119,7 +137,7 @@ function formatTimestampForFilename(date: Date): string {
   return `${dateSegment}-${timeSegment}`
 }
 
-export function DataGrid({ columns: rawColumns, data, loading, error, executedSql, pagination, onPageChange, onLimitChange }: DataGridProps) {
+export function DataGrid({ columns: rawColumns, data, loading, error, truncated, streaming, executedSql, pagination, onPageChange, onLimitChange }: DataGridProps) {
   const [sorting, setSorting] = useState<SortingState>([])
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({})
@@ -624,6 +642,56 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
         )}
       >
 
+        {truncated && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex items-center gap-2 px-3 py-1.5 text-xs border-b border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+          >
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span className="truncate flex-1">
+              Result clipped to <strong>{truncated.at.toLocaleString()}</strong> rows.
+              {truncated.requestedLimit !== undefined
+                ? ` Your LIMIT was ${truncated.requestedLimit.toLocaleString()}; the engine cap is the smaller value.`
+                : " Increase DBCONSOLE_MAX_ROWS or add a LIMIT / OFFSET to page through more."}
+            </span>
+            {truncated.onSwitchToStream && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 px-2 text-[11px] border-amber-500/40 hover:bg-amber-500/20"
+                onClick={truncated.onSwitchToStream}
+              >
+                Stream all rows →
+              </Button>
+            )}
+          </div>
+        )}
+
+        {streaming && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex items-center gap-2 px-3 py-1.5 text-xs border-b border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300"
+          >
+            <Loader2 className={cn("h-3.5 w-3.5 shrink-0", streaming.loading && "animate-spin")} aria-hidden />
+            <span className="truncate flex-1">
+              Streaming via server cursor — <strong>{streaming.rowsSent.toLocaleString()}</strong> rows fetched.
+              {!streaming.hasMore && " End of result reached."}
+            </span>
+            {streaming.onClose && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-[11px] hover:bg-blue-500/20"
+                onClick={streaming.onClose}
+              >
+                Close stream
+              </Button>
+            )}
+          </div>
+        )}
+
         <div className="flex-1 overflow-auto relative select-none" onMouseLeave={() => setIsDragging(false)}>
           <table
             className="w-full border-collapse text-sm"
@@ -930,7 +998,24 @@ export function DataGrid({ columns: rawColumns, data, loading, error, executedSq
           <div className="flex items-center gap-4" onDoubleClick={(e) => e.stopPropagation()}>
             {loading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
 
-            {showPagination && (
+            {streaming && (
+              <div className="flex items-center gap-2">
+                <div className="text-xs text-muted-foreground font-medium whitespace-nowrap">
+                  {streaming.rowsSent.toLocaleString()} rows{streaming.hasMore ? "" : " (end)"}
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 px-2 text-[11px]"
+                  disabled={!streaming.hasMore || streaming.loading}
+                  onClick={streaming.onLoadMore}
+                >
+                  {streaming.loading ? <Loader2 className="h-3 w-3 animate-spin" /> : "Load more"}
+                </Button>
+              </div>
+            )}
+
+            {!streaming && showPagination && (
               <div className="flex items-center gap-2">
                 <div className="text-xs text-muted-foreground font-medium whitespace-nowrap">
                   {rowsDescription}

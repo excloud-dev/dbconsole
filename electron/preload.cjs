@@ -41,6 +41,17 @@ contextBridge.exposeInMainWorld('dbconsole', {
     },
     query: {
       run: (payload) => invoke('dbconsole:query:run', payload),
+      stream: {
+        open: (payload) => invoke('dbconsole:query:stream:open', payload),
+        next: (payload) => invoke('dbconsole:query:stream:next', payload),
+        close: (payload) => invoke('dbconsole:query:stream:close', payload),
+      },
+    },
+    diagnostics: {
+      slowQueries: (payload) => invoke('dbconsole:diagnostics:slowQueries', payload),
+    },
+    history: {
+      list: (payload) => invoke('dbconsole:history:list', payload ?? {}),
     },
     sqlFile: {
       openDialog: () => invoke('dbconsole:sqlFile:openDialog'),
@@ -57,10 +68,6 @@ contextBridge.exposeInMainWorld('dbconsole', {
       namedQueries: {
         sync: (payload) => invoke('dbconsole:syncer:namedQueries:sync', payload ?? {}),
       },
-      // Back-compat aliases (older renderers may not have nested groups)
-      get: () => invoke('dbconsole:syncer:settings:get'),
-      set: (payload) => invoke('dbconsole:syncer:settings:set', payload),
-      sync: (payload) => invoke('dbconsole:syncer:namedQueries:sync', payload ?? {}),
     },
     updater: {
       check: () => invoke('dbconsole:updater:check'),
@@ -146,6 +153,24 @@ contextBridge.exposeInMainWorld('dbconsole', {
       }
       ipcRenderer.on('dbconsole:menu:theme', listener)
       return () => ipcRenderer.removeListener('dbconsole:menu:theme', listener)
+    },
+    onMenuQueryHistory: (handler) => {
+      if (typeof handler !== 'function') return () => { }
+      const listener = () => { handler() }
+      ipcRenderer.on('dbconsole:menu:queryHistory', listener)
+      return () => ipcRenderer.removeListener('dbconsole:menu:queryHistory', listener)
+    },
+    onMenuSlowQueries: (handler) => {
+      if (typeof handler !== 'function') return () => { }
+      const listener = () => { handler() }
+      ipcRenderer.on('dbconsole:menu:slowQueries', listener)
+      return () => ipcRenderer.removeListener('dbconsole:menu:slowQueries', listener)
+    },
+    onMenuSchemaGraph: (handler) => {
+      if (typeof handler !== 'function') return () => { }
+      const listener = () => { handler() }
+      ipcRenderer.on('dbconsole:menu:schemaGraph', listener)
+      return () => ipcRenderer.removeListener('dbconsole:menu:schemaGraph', listener)
     },
   },
 })

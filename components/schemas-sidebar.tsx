@@ -23,6 +23,8 @@ interface TableInfo {
   name: string
   schema: string
   qualifiedName: string
+  /** What kind of relation this is — drives the icon and badge in the tree. */
+  kind: "table" | "view" | "matview"
   columns: {
     name: string;
     type: string;
@@ -30,6 +32,19 @@ interface TableInfo {
     isPk?: boolean;
     isAuto?: boolean;
     references?: { schema: string; table: string; qualifiedTable: string; column: string }
+  }[]
+  indexes: {
+    name: string
+    isUnique: boolean
+    isPrimary: boolean
+    columns: string[]
+    definition: string
+  }[]
+  triggers: {
+    name: string
+    timing: string
+    events: string[]
+    definition: string
   }[]
 }
 
@@ -60,6 +75,8 @@ interface SchemasSidebarProps {
   onDeleteNamedQuery?: (id: string) => void
   onJoinTables: (baseTable: string, joins: JoinConfig[]) => void
   onViewTable: (tableName: string) => void
+  /** Open arbitrary SQL in a new tab — used by the routines list. */
+  onOpenSql?: (sql: string, name?: string) => void
   onOpenSettings: () => void
   onSyncNamedQueries?: () => void
   onOpenSyncSettings?: () => void
@@ -80,6 +97,7 @@ export function SchemasSidebar({
   onDeleteNamedQuery,
   onJoinTables,
   onViewTable,
+  onOpenSql,
   onOpenSettings,
   onSyncNamedQueries,
   onOpenSyncSettings,
@@ -154,11 +172,19 @@ export function SchemasSidebar({
 
   const searchLower = search.toLowerCase()
 
+  // Iterate over the unified relations list (tables + views + matviews) so the
+  // tree shows everything you can SELECT FROM, not just base tables. Falls back
+  // to schema.tables for older payloads where relations isn't populated.
+  const sourceRelations = schema?.relations
+    ?? schema?.tables.map((t) => ({ ...t, kind: 'table' as const }))
+    ?? []
+
   const tables: TableInfo[] = schema
-    ? schema.tables.map((t) => ({
+    ? sourceRelations.map((t) => ({
       name: t.name,
       schema: t.schema,
       qualifiedName: `${t.schema}.${t.name}`,
+      kind: t.kind,
       columns:
         schema.columns
           .filter((c) => c.table.schema === t.schema && c.table.name === t.name)
@@ -191,6 +217,23 @@ export function SchemasSidebar({
                 : undefined,
             }
           }) ?? [],
+      indexes: (schema.indexes ?? [])
+        .filter((idx) => idx.table.schema === t.schema && idx.table.name === t.name && !idx.isPrimary)
+        .map((idx) => ({
+          name: idx.name,
+          isUnique: idx.isUnique,
+          isPrimary: idx.isPrimary,
+          columns: idx.columns,
+          definition: idx.definition,
+        })),
+      triggers: (schema.triggers ?? [])
+        .filter((trg) => trg.table.schema === t.schema && trg.table.name === t.name)
+        .map((trg) => ({
+          name: trg.name,
+          timing: trg.timing,
+          events: trg.events,
+          definition: trg.definition,
+        })),
     }))
     : []
 
@@ -495,6 +538,16 @@ export function SchemasSidebar({
                                       )}
                                     />
                                     <span className="truncate">{table.name}</span>
+                                    {table.kind === "view" && (
+                                      <Badge className="h-4 rounded-sm px-1 text-[9px] bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-400 border-purple-200 dark:border-purple-800 shrink-0">
+                                        VIEW
+                                      </Badge>
+                                    )}
+                                    {table.kind === "matview" && (
+                                      <Badge className="h-4 rounded-sm px-1 text-[9px] bg-fuchsia-100 dark:bg-fuchsia-950 text-fuchsia-800 dark:text-fuchsia-400 border-fuchsia-200 dark:border-fuchsia-800 shrink-0">
+                                        MV
+                                      </Badge>
+                                    )}
                                   </button>
 
                                   <div className="flex items-center">
@@ -541,6 +594,11 @@ export function SchemasSidebar({
 
                                 {isExpanded && (
                                   <div className="ml-4 mt-1 border-l border-border pl-3">
+                                    {(table.indexes.length > 0 || table.triggers.length > 0) && (
+                                      <div className="text-[9px] uppercase tracking-wider text-muted-foreground/70 px-2 pt-1 pb-0.5">
+                                        Columns
+                                      </div>
+                                    )}
                                     <div className="space-y-0.5 pb-1">
                                       {table.columns.map((col) => (
                                         <div
@@ -582,6 +640,61 @@ export function SchemasSidebar({
                                         </div>
                                       ))}
                                     </div>
+
+                                    {table.indexes.length > 0 && (
+                                      <>
+                                        <div className="text-[9px] uppercase tracking-wider text-muted-foreground/70 px-2 pt-1 pb-0.5">
+                                          Indexes
+                                        </div>
+                                        <div className="space-y-0.5 pb-1">
+                                          {table.indexes.map((idx) => (
+                                            <div
+                                              key={idx.name}
+                                              className="rounded-md px-2 py-1 text-xs text-foreground hover:bg-secondary/70"
+                                              title={idx.definition}
+                                            >
+                                              <div className="flex items-center gap-2 min-w-0">
+                                                <span className="truncate">{idx.name}</span>
+                                                {idx.isUnique && (
+                                                  <Badge className="h-4 rounded-sm px-1 text-[9px] bg-sky-100 dark:bg-sky-950 text-sky-800 dark:text-sky-400 border-sky-200 dark:border-sky-800 shrink-0">
+                                                    UNIQUE
+                                                  </Badge>
+                                                )}
+                                              </div>
+                                              {idx.columns.length > 0 && (
+                                                <div className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
+                                                  ({idx.columns.join(", ")})
+                                                </div>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </>
+                                    )}
+
+                                    {table.triggers.length > 0 && (
+                                      <>
+                                        <div className="text-[9px] uppercase tracking-wider text-muted-foreground/70 px-2 pt-1 pb-0.5">
+                                          Triggers
+                                        </div>
+                                        <div className="space-y-0.5 pb-1">
+                                          {table.triggers.map((trg) => (
+                                            <div
+                                              key={trg.name}
+                                              className="rounded-md px-2 py-1 text-xs text-foreground hover:bg-secondary/70"
+                                              title={trg.definition}
+                                            >
+                                              <div className="flex items-center gap-2 min-w-0">
+                                                <span className="truncate">{trg.name}</span>
+                                              </div>
+                                              <div className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
+                                                {trg.timing} {trg.events.join(" / ")}
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </>
+                                    )}
                                   </div>
                                 )}
                               </div>
@@ -596,6 +709,23 @@ export function SchemasSidebar({
 
               {filteredTables.length === 0 && search && (
                 <div className="px-2 py-3 text-sm text-muted-foreground text-center">No tables found</div>
+              )}
+
+              {schema && schema.routines && schema.routines.length > 0 && (
+                <RoutinesSection
+                  routines={schema.routines}
+                  search={searchLower}
+                  onPick={(routine) => {
+                    if (!onOpenSql) return
+                    const qualified = `"${routine.schema}"."${routine.name}"`
+                    const sql =
+                      routine.kind === "procedure"
+                        ? `CALL ${qualified}();`
+                        : `SELECT * FROM ${qualified}();`
+                    onOpenSql(sql, `${routine.schema}.${routine.name}`)
+                    onFocusQuery?.()
+                  }}
+                />
               )}
             </div>
           </TabsContent>
@@ -717,6 +847,92 @@ export function SchemasSidebar({
         tables={tables}
         onCreateJoin={onJoinTables}
       />
+    </div>
+  )
+}
+
+// ---- Routines (functions / procedures / aggregates) -----------------------
+
+type RoutineRow = NonNullable<SchemaGraph["routines"]>[number]
+
+function RoutinesSection({
+  routines,
+  search,
+  onPick,
+}: {
+  routines: RoutineRow[]
+  search: string
+  onPick: (routine: RoutineRow) => void
+}) {
+  const [collapsed, setCollapsed] = useState(true)
+
+  const filtered = useMemo(() => {
+    if (!search) return routines
+    const s = search.toLowerCase()
+    return routines.filter(
+      (r) => r.name.toLowerCase().includes(s) || r.schema.toLowerCase().includes(s),
+    )
+  }, [routines, search])
+
+  // While searching, force-expand so matches are visible.
+  const isOpen = search ? true : !collapsed
+
+  if (filtered.length === 0) return null
+
+  return (
+    <div className="mt-3">
+      <button
+        onClick={() => setCollapsed(!collapsed)}
+        className={cn(
+          "flex h-6 w-full items-center gap-2 rounded-md px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground",
+          "hover:bg-secondary hover:text-foreground",
+        )}
+        aria-expanded={isOpen}
+      >
+        <ChevronRight
+          className={cn(
+            "h-3.5 w-3.5 text-muted-foreground transition-transform flex-shrink-0",
+            isOpen && "rotate-90",
+          )}
+        />
+        <span className="truncate">Routines</span>
+        <Badge
+          variant="secondary"
+          className="ml-auto h-4 px-1.5 text-[10px] tabular-nums text-muted-foreground bg-background border-border"
+        >
+          {filtered.length}
+        </Badge>
+      </button>
+
+      {isOpen && (
+        <div className="ml-2 border-l border-border pl-2 mt-1 space-y-0.5">
+          {filtered.map((r) => (
+            <button
+              key={`${r.schema}.${r.name}.${r.argsSignature}`}
+              onClick={() => onPick(r)}
+              className={cn(
+                "block w-full text-left rounded-md px-2 py-1 text-xs",
+                "hover:bg-secondary/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+              )}
+              title={`${r.schema}.${r.name}(${r.argsSignature})${r.returnType ? ` → ${r.returnType}` : ""}`}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="truncate">{r.name}</span>
+                {r.kind !== "function" && (
+                  <Badge className="h-4 rounded-sm px-1 text-[9px] bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 shrink-0 uppercase">
+                    {r.kind === "procedure" ? "PROC" : r.kind === "aggregate" ? "AGG" : "WIN"}
+                  </Badge>
+                )}
+              </div>
+              <div className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
+                {r.schema}
+                {r.argsSignature ? ` (${r.argsSignature})` : "()"}
+                {r.returnType ? ` → ${r.returnType}` : ""}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

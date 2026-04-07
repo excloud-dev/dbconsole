@@ -76,7 +76,7 @@ export function UpdateNotificationDialog({
         async function loadVersion() {
             try {
                 if (typeof window === 'undefined') return
-                const dbconsole = (window as any).dbconsole
+                const dbconsole = window.dbconsole
                 if (!dbconsole?.isDesktop || !dbconsole?.api?.app?.info) {
                     setCurrentVersion(null)
                     return
@@ -218,7 +218,7 @@ export function UpdateNotificationDialog({
                             <div>
                                 <span className="font-medium">Current Version:</span>
                                 <div className="text-muted-foreground">
-                                    {typeof window !== 'undefined' && (window as any).dbconsole?.isDesktop
+                                    {typeof window !== 'undefined' && window.dbconsole?.isDesktop
                                         ? (currentVersion ?? 'Unknown')
                                         : 'Web Version'}
                                 </div>

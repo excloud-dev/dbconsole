@@ -1,27 +1,24 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { runApiQuery } from '@/lib/core/query'
-import type { RawQueryInput, NamedQueryInput } from '@/lib/query-engine'
-import { QueryRunBodySchema } from '@/lib/ipc/schemas'
+
+import { runApiStreamNext } from '@/lib/core/query'
 import { isQueryError, statusForQueryError, toQueryError } from '@/lib/core/errors'
+import { StreamNextBodySchema } from '@/lib/ipc/schemas'
 
 export const runtime = 'nodejs'
-
-const BodySchema = QueryRunBodySchema
 
 export async function POST(req: Request) {
     try {
         const json = await req.json()
-        const parsed = BodySchema.parse(json)
+        const parsed = StreamNextBodySchema.parse(json)
 
-        const result = await runApiQuery(parsed as RawQueryInput | NamedQueryInput)
+        const result = await runApiStreamNext(parsed.streamId, { batchSize: parsed.batchSize })
 
         return NextResponse.json(result)
     } catch (err) {
         if (err instanceof z.ZodError) {
-            return NextResponse.json({ error: 'Invalid query payload', issues: err.issues }, { status: 400 })
+            return NextResponse.json({ error: 'Invalid stream payload', issues: err.issues }, { status: 400 })
         }
-
         const qe = isQueryError(err) ? err : toQueryError(err)
         return NextResponse.json(qe.body, { status: statusForQueryError(qe.body) })
     }

@@ -27,12 +27,12 @@ interface AppInfo {
     version: string
     buildSha?: string
     buildTime?: string
-    platform: string
-    arch: string
-    runtime: {
-        electron: string
-        node: string
-        chrome: string
+    platform?: string
+    arch?: string
+    runtime?: {
+        electron?: string
+        node?: string
+        chrome?: string
     }
 }
 
@@ -41,13 +41,13 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
     const [copied, setCopied] = useState(false)
 
     useEffect(() => {
-        if (!isOpen || typeof window === 'undefined' || !(window as any).dbconsole?.isDesktop) {
+        if (!isOpen || typeof window === 'undefined' || !window.dbconsole?.isDesktop) {
             return
         }
 
         const loadAppInfo = async () => {
             try {
-                const info = await (window as any).dbconsole.api.app.info()
+                const info = await window.dbconsole!.api.app.info()
                 setAppInfo(info)
             } catch (error) {
                 console.error('Failed to load app info:', error)
@@ -64,10 +64,10 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
             `DBConsole ${appInfo.version}`,
             appInfo.buildSha ? `Build: ${appInfo.buildSha}` : '',
             appInfo.buildTime ? `Built: ${new Date(appInfo.buildTime).toLocaleString()}` : '',
-            `Platform: ${appInfo.platform} ${appInfo.arch}`,
-            `Electron: ${appInfo.runtime.electron}`,
-            `Node: ${appInfo.runtime.node}`,
-            `Chrome: ${appInfo.runtime.chrome}`
+            `Platform: ${appInfo.platform ?? 'unknown'} ${appInfo.arch ?? ''}`.trim(),
+            appInfo.runtime?.electron ? `Electron: ${appInfo.runtime.electron}` : '',
+            appInfo.runtime?.node ? `Node: ${appInfo.runtime.node}` : '',
+            appInfo.runtime?.chrome ? `Chrome: ${appInfo.runtime.chrome}` : ''
         ].filter(Boolean).join('\n')
 
         try {
@@ -142,15 +142,15 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
                                 </div>
                                 <div>
                                     <span className="text-muted-foreground">Electron:</span>
-                                    <div>{appInfo.runtime.electron}</div>
+                                    <div>{appInfo.runtime?.electron ?? '—'}</div>
                                 </div>
                                 <div>
                                     <span className="text-muted-foreground">Node.js:</span>
-                                    <div>{appInfo.runtime.node}</div>
+                                    <div>{appInfo.runtime?.node ?? '—'}</div>
                                 </div>
                                 <div>
                                     <span className="text-muted-foreground">Chrome:</span>
-                                    <div>{appInfo.runtime.chrome}</div>
+                                    <div>{appInfo.runtime?.chrome ?? '—'}</div>
                                 </div>
                             </div>
                         </div>

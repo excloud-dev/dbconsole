@@ -68,11 +68,11 @@ export function UpdateManager({ className }: UpdateManagerProps) {
 
     // Initialize and set up event listeners
     useEffect(() => {
-        if (typeof window === 'undefined' || !(window as any).dbconsole?.isDesktop) {
+        if (typeof window === 'undefined' || !window.dbconsole?.isDesktop) {
             return // Not in Electron environment
         }
 
-        const dbconsoleAPI = (window as any).dbconsole
+        const dbconsoleAPI = window.dbconsole
 
         // Load initial data
         loadCurrentVersion()
@@ -174,9 +174,9 @@ export function UpdateManager({ className }: UpdateManagerProps) {
 
     const loadCurrentVersion = async () => {
         try {
-            if (typeof window !== 'undefined' && (window as any).dbconsole?.isDesktop) {
+            if (typeof window !== 'undefined' && window.dbconsole?.isDesktop) {
                 // In Electron, get version from IPC
-                const appInfo = await (window as any).dbconsole.api.app.info()
+                const appInfo = await window.dbconsole.api.app.info()
                 setUpdateState(prev => ({ ...prev, currentVersion: appInfo.version }))
             }
         } catch (error) {
@@ -310,7 +310,7 @@ export function UpdateManager({ className }: UpdateManagerProps) {
     }
 
     // Don't render in web environment
-    if (typeof window === 'undefined' || !(window as any).dbconsole?.isDesktop) {
+    if (typeof window === 'undefined' || !window.dbconsole?.isDesktop) {
         return null
     }
 

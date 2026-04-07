@@ -1,5 +1,6 @@
 import { Pool } from 'pg'
 import type { ServerDbConnection } from '@/lib/connections'
+import { dropTableNameCache } from '@/lib/pg-pool-cache'
 
 export type PoolMode = 'single' | 'shared' | 'per-scope'
 
@@ -90,6 +91,7 @@ export async function closePoolsForConnection(connId: string): Promise<void> {
         const pool = globalPools.get(key)
         if (!pool) continue
 
+        dropTableNameCache(pool)
         await pool.end().catch(() => {})
         globalPools.delete(key)
     }
@@ -98,6 +100,7 @@ export async function closePoolsForConnection(connId: string): Promise<void> {
 export async function closeAllPools(): Promise<void> {
     const closers: Promise<unknown>[] = []
     for (const [key, pool] of globalPools) {
+        dropTableNameCache(pool)
         closers.push(
             pool
                 .end()
@@ -112,6 +115,7 @@ export async function closePool(connId: string, mode: PoolMode, scopeKey?: strin
     const key = buildPoolKey(connId, mode, scopeKey)
     const pool = globalPools.get(key)
     if (!pool) return
+    dropTableNameCache(pool)
     await pool.end().catch(() => {})
     globalPools.delete(key)
 }

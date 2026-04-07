@@ -148,6 +148,8 @@ function migrate(db: BetterSqlite3.Database) {
       error_message TEXT,
       created_at TEXT NOT NULL
     );
+    CREATE INDEX IF NOT EXISTS idx_query_runs_created_at ON dbconsole_query_runs (created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_query_runs_connection ON dbconsole_query_runs (connection_id, created_at DESC);
   `)
 }
 
@@ -857,4 +859,117 @@ export function logQueryRun(input: LogQueryRunInput): void {
             createdAt: now,
         })
         .run()
+}
+
+// --- Query history (read side) ---
+
+export type ListQueryRunsInput = {
+    connectionId?: string
+    status?: QueryRunRow['status']
+    from?: string // ISO timestamp lower bound
+    to?: string // ISO timestamp upper bound
+    search?: string // substring match on sql or error_message
+    kind?: QueryRunRow['kind']
+    limit?: number
+    offset?: number
+}
+
+export type ListQueryRunsResult = {
+    rows: QueryRunRow[]
+    total: number
+    hasMore: boolean
+}
+
+export function listQueryRuns(input: ListQueryRunsInput = {}): ListQueryRunsResult {
+    const db = getMetaDb()
+
+    const limit = Math.min(Math.max(1, input.limit ?? 100), 500)
+    const offset = Math.max(0, input.offset ?? 0)
+
+    const clauses: string[] = []
+    const params: unknown[] = []
+
+    if (input.connectionId) {
+        clauses.push('connection_id = ?')
+        params.push(input.connectionId)
+    }
+    if (input.status) {
+        clauses.push('status = ?')
+        params.push(input.status)
+    }
+    if (input.kind) {
+        clauses.push('kind = ?')
+        params.push(input.kind)
+    }
+    if (input.from) {
+        clauses.push('created_at >= ?')
+        params.push(input.from)
+    }
+    if (input.to) {
+        clauses.push('created_at <= ?')
+        params.push(input.to)
+    }
+    if (input.search && input.search.trim()) {
+        clauses.push('(sql LIKE ? OR error_message LIKE ?)')
+        const like = `%${input.search.trim()}%`
+        params.push(like, like)
+    }
+
+    const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : ''
+
+    const countRow = db
+        .prepare(`SELECT COUNT(*) as count FROM dbconsole_query_runs ${where}`)
+        .get(...params) as { count: number } | undefined
+    const total = countRow?.count ?? 0
+
+    const listed = db
+        .prepare(
+            `SELECT id, kind, named_query_id, connection_id, user_id, sql, rows_returned,
+                    duration_ms, status, error_message, created_at
+             FROM dbconsole_query_runs
+             ${where}
+             ORDER BY id DESC
+             LIMIT ? OFFSET ?`,
+        )
+        .all(...params, limit, offset) as Array<{
+            id: number
+            kind: string
+            named_query_id: string | null
+            connection_id: string
+            user_id: string | null
+            sql: string
+            rows_returned: number | null
+            duration_ms: number | null
+            status: string
+            error_message: string | null
+            created_at: string
+        }>
+
+    const rows: QueryRunRow[] = listed.map((r) => ({
+        id: r.id,
+        kind: r.kind as QueryRunRow['kind'],
+        namedQueryId: r.named_query_id ?? undefined,
+        connectionId: r.connection_id,
+        userId: r.user_id ?? undefined,
+        sql: r.sql,
+        rowsReturned: r.rows_returned ?? undefined,
+        durationMs: r.duration_ms ?? undefined,
+        status: r.status as QueryRunRow['status'],
+        errorMessage: r.error_message ?? undefined,
+        createdAt: r.created_at,
+    }))
+
+    return { rows, total, hasMore: offset + rows.length < total }
+}
+
+/**
+ * Drop query runs older than `olderThanIso`. Returns the number of rows
+ * deleted. Intended to be called at app start with a retention window.
+ */
+export function pruneQueryRuns(olderThanIso: string): number {
+    const db = getMetaDb()
+    const info = db
+        .prepare('DELETE FROM dbconsole_query_runs WHERE created_at < ?')
+        .run(olderThanIso)
+    return Number(info.changes ?? 0)
 }

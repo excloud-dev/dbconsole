@@ -12,34 +12,24 @@ export class ApiError extends Error {
     }
 }
 
+import type { QueryErrorBody as _QueryErrorBody } from '@/lib/core/errors'
+
+/**
+ * Returns the rich {@link QueryErrorBody} carried by an {@link ApiError} when
+ * the failed request was a query. Falls back to `null` for plain string-only
+ * errors so call sites can handle both shapes uniformly.
+ */
+export function asQueryErrorBody(err: unknown): _QueryErrorBody | null {
+    if (!(err instanceof ApiError)) return null
+    const body = err.body as Record<string, unknown> | null | undefined
+    if (!body || typeof body !== 'object') return null
+    if (typeof body.classification !== 'string') return null
+    if (typeof body.error !== 'string') return null
+    return body as unknown as _QueryErrorBody
+}
+
 function isDesktopRuntime(): boolean {
-    return typeof window !== 'undefined' && !!(window as any).dbconsole?.isDesktop
-}
-
-function getDesktopApiOrThrow(): any {
-    const api = typeof window !== 'undefined' ? (window as any).dbconsole?.api : undefined
-    if (!api) {
-        throw new ApiError('Desktop API not available (preload missing or failed to load)', 500, {
-            error: 'Desktop API not available (preload missing or failed to load)',
-        })
-    }
-    return api
-}
-
-function getDesktopIpcFnOrThrow(path: string[], fallbackPaths: string[][] = []): (...args: any[]) => Promise<unknown> {
-    const api = getDesktopApiOrThrow()
-    const allPaths = [path, ...fallbackPaths]
-
-    for (const p of allPaths) {
-        let cur: any = api
-        for (const key of p) cur = cur?.[key]
-        if (typeof cur === 'function') return cur
-    }
-
-    const variants = allPaths.map((p) => `api.${p.join('.')}`).join(' or ')
-    throw new ApiError(`Desktop API mismatch: expected ${variants}`, 500, {
-        error: `Desktop API mismatch: expected ${variants}`,
-    })
+    return typeof window !== 'undefined' && !!window.dbconsole?.isDesktop
 }
 
 async function parseJsonSafe(res: Response): Promise<unknown> {
@@ -154,8 +144,38 @@ export type NamedQuerySyncOkResult = {
     newRemoteVersion?: number
 }
 
+export type RelationKind = 'table' | 'view' | 'matview'
+export type RelationRef = { schema: string; name: string; kind: RelationKind }
+
+export type IndexInfo = {
+    table: { schema: string; name: string }
+    name: string
+    isUnique: boolean
+    isPrimary: boolean
+    columns: string[]
+    definition: string
+}
+
+export type TriggerInfo = {
+    table: { schema: string; name: string }
+    name: string
+    timing: string
+    events: string[]
+    definition: string
+}
+
+export type RoutineInfo = {
+    schema: string
+    name: string
+    kind: 'function' | 'procedure' | 'aggregate' | 'window'
+    language: string
+    returnType?: string
+    argsSignature: string
+}
+
 export type SchemaGraph = {
     tables: { schema: string; name: string }[]
+    relations: RelationRef[]
     columns: {
         table: { schema: string; name: string }
         name: string
@@ -174,6 +194,9 @@ export type SchemaGraph = {
         toColumn: string
     }[]
     primaryKeys: { table: { schema: string; name: string }; columnName: string }[]
+    indexes: IndexInfo[]
+    triggers: TriggerInfo[]
+    routines: RoutineInfo[]
 }
 
 export type QueryResult = {
@@ -182,7 +205,87 @@ export type QueryResult = {
     rowCount: number
     durationMs: number
     totalCount?: number
+    truncated: boolean
+    truncatedAt: number
+    requestedLimit?: number
 }
+
+export type StreamOpenResult = {
+    streamId: string
+    columns: string[]
+    rows: Record<string, unknown>[]
+    rowsSent: number
+    hasMore: boolean
+    batchSize: number
+}
+
+export type StreamNextResult = {
+    streamId: string
+    rows: Record<string, unknown>[]
+    rowsSent: number
+    hasMore: boolean
+}
+
+export type StreamCloseResult = {
+    streamId: string
+    rowsSent: number
+}
+
+export type SlowQuerySort = 'mean_time' | 'total_time' | 'calls' | 'rows'
+
+export type SlowQueryRow = {
+    queryId: string
+    query: string
+    calls: number
+    totalTimeMs: number
+    meanTimeMs: number
+    minTimeMs: number
+    maxTimeMs: number
+    stddevTimeMs: number
+    rows: number
+    sharedBlksHit: number
+    sharedBlksRead: number
+}
+
+export type SlowQueryResult =
+    | { installed: true; rows: SlowQueryRow[]; sort: SlowQuerySort; limit: number }
+    | { installed: false; installSnippet: string }
+
+export type QueryHistoryStatus = 'ok' | 'error' | 'timeout'
+export type QueryHistoryKind = 'raw' | 'named'
+
+export type QueryHistoryRow = {
+    id: number
+    kind: QueryHistoryKind
+    namedQueryId?: string
+    connectionId: string
+    userId?: string
+    sql: string
+    rowsReturned?: number
+    durationMs?: number
+    status: QueryHistoryStatus
+    errorMessage?: string
+    createdAt: string
+}
+
+export type QueryHistoryFilter = {
+    connectionId?: string
+    status?: QueryHistoryStatus
+    kind?: QueryHistoryKind
+    from?: string
+    to?: string
+    search?: string
+    limit?: number
+    offset?: number
+}
+
+export type QueryHistoryResult = {
+    rows: QueryHistoryRow[]
+    total: number
+    hasMore: boolean
+}
+
+export type { QueryErrorBody, QueryErrorClassification } from '@/lib/core/errors'
 
 export type RawQueryPayload = {
     kind: 'raw'
@@ -213,103 +316,133 @@ export type NamedQueryPayload = {
 export const apiClient = {
     app: {
         info: (opts: { signal?: AbortSignal } = {}) => {
-            if (isDesktopRuntime()) return ipcInvoke<AppInfo>(() => (window as any).dbconsole.api.app.info())
+            if (isDesktopRuntime()) return ipcInvoke<AppInfo>(() => window.dbconsole!.api.app.info())
             return http<AppInfo>('/api/app-info', { method: 'GET', signal: opts.signal })
         },
     },
     shortcuts: {
         get: () => {
-            if (isDesktopRuntime()) return ipcInvoke(() => (window as any).dbconsole.api.shortcuts.get())
+            if (isDesktopRuntime()) return ipcInvoke(() => window.dbconsole!.api.shortcuts.get())
             return http('/api/shortcuts', { method: 'GET' })
         },
         set: (payload: any) => {
-            if (isDesktopRuntime()) return ipcInvoke(() => (window as any).dbconsole.api.shortcuts.set(payload))
+            if (isDesktopRuntime()) return ipcInvoke(() => window.dbconsole!.api.shortcuts.set(payload))
             return http('/api/shortcuts', { method: 'POST', body: JSON.stringify(payload) })
         },
     },
     connections: {
         list: (opts: { signal?: AbortSignal } = {}) => {
-            if (isDesktopRuntime()) return ipcInvoke<ClientConnectionMeta[]>(() => (window as any).dbconsole.api.connections.list())
+            if (isDesktopRuntime()) return ipcInvoke<ClientConnectionMeta[]>(() => window.dbconsole!.api.connections.list())
             return http<ClientConnectionMeta[]>('/api/connections', { method: 'GET', signal: opts.signal })
         },
         create: (draft: ConnectionDraft) => {
-            if (isDesktopRuntime()) return ipcInvoke<ClientConnectionMeta>(() => (window as any).dbconsole.api.connections.create(draft))
+            if (isDesktopRuntime()) return ipcInvoke<ClientConnectionMeta>(() => window.dbconsole!.api.connections.create(draft))
             return http<ClientConnectionMeta>('/api/connections', { method: 'POST', body: JSON.stringify(draft) })
         },
         update: (id: string, patch: Partial<ConnectionDraft>) => {
-            if (isDesktopRuntime()) return ipcInvoke<ClientConnectionMeta>(() => (window as any).dbconsole.api.connections.update(id, patch))
+            if (isDesktopRuntime()) return ipcInvoke<ClientConnectionMeta>(() => window.dbconsole!.api.connections.update(id, patch))
             return http<ClientConnectionMeta>(`/api/connections/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(patch) })
         },
         delete: (id: string) => {
-            if (isDesktopRuntime()) return ipcInvoke<{ success: true }>(() => (window as any).dbconsole.api.connections.delete(id))
+            if (isDesktopRuntime()) return ipcInvoke<{ success: true }>(() => window.dbconsole!.api.connections.delete(id))
             return http<{ success: true }>(`/api/connections/${encodeURIComponent(id)}`, { method: 'DELETE' })
         },
         test: (draft: ConnectionDraft) => {
-            if (isDesktopRuntime()) return ipcInvoke<{ ok: boolean; error?: string; issues?: unknown }>(() => (window as any).dbconsole.api.connections.test(draft))
+            if (isDesktopRuntime()) return ipcInvoke<{ ok: boolean; error?: string; issues?: unknown }>(() => window.dbconsole!.api.connections.test(draft))
             return http<{ ok: boolean; error?: string; issues?: unknown }>('/api/connections/test', { method: 'POST', body: JSON.stringify(draft) })
         },
         releasePools: (payload: ReleasePoolsPayload) => {
-            if (isDesktopRuntime()) return ipcInvoke<{ ok: true }>(() => (window as any).dbconsole.api.connections.releasePools(payload))
+            if (isDesktopRuntime()) return ipcInvoke<{ ok: true }>(() => window.dbconsole!.api.connections.releasePools(payload))
             return http<{ ok: true }>('/api/connections/release', { method: 'POST', body: JSON.stringify(payload) })
         },
     },
     namedQueries: {
         list: (opts: { signal?: AbortSignal } = {}) => {
-            if (isDesktopRuntime()) return ipcInvoke<ClientNamedQuery[]>(() => (window as any).dbconsole.api.namedQueries.list())
+            if (isDesktopRuntime()) return ipcInvoke<ClientNamedQuery[]>(() => window.dbconsole!.api.namedQueries.list())
             return http<ClientNamedQuery[]>('/api/named-queries', { method: 'GET', signal: opts.signal })
         },
         get: (id: string) => {
-            if (isDesktopRuntime()) return ipcInvoke<ClientNamedQuery>(() => (window as any).dbconsole.api.namedQueries.get(id))
+            if (isDesktopRuntime()) return ipcInvoke<ClientNamedQuery>(() => window.dbconsole!.api.namedQueries.get(id))
             return http<ClientNamedQuery>(`/api/named-queries/${encodeURIComponent(id)}`, { method: 'GET' })
         },
         save: (payload: Omit<ClientNamedQuery, 'id'> & { id?: string }) => {
-            if (isDesktopRuntime()) return ipcInvoke<ClientNamedQuery>(() => (window as any).dbconsole.api.namedQueries.save(payload))
+            if (isDesktopRuntime()) return ipcInvoke<ClientNamedQuery>(() => window.dbconsole!.api.namedQueries.save(payload))
             return http<ClientNamedQuery>('/api/named-queries', { method: 'POST', body: JSON.stringify(payload) })
         },
         update: (id: string, patch: Partial<Omit<ClientNamedQuery, 'id'>>) => {
-            if (isDesktopRuntime()) return ipcInvoke<ClientNamedQuery>(() => (window as any).dbconsole.api.namedQueries.update(id, patch))
+            if (isDesktopRuntime()) return ipcInvoke<ClientNamedQuery>(() => window.dbconsole!.api.namedQueries.update(id, patch))
             return http<ClientNamedQuery>(`/api/named-queries/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(patch) })
         },
         delete: (id: string) => {
-            if (isDesktopRuntime()) return ipcInvoke<{ ok: true }>(() => (window as any).dbconsole.api.namedQueries.delete(id))
+            if (isDesktopRuntime()) return ipcInvoke<{ ok: true }>(() => window.dbconsole!.api.namedQueries.delete(id))
             return http<{ ok: true }>(`/api/named-queries?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
         },
     },
     schema: {
         load: (connectionId: string) => {
-            if (isDesktopRuntime()) return ipcInvoke<SchemaGraph>(() => (window as any).dbconsole.api.schema.load(connectionId))
+            if (isDesktopRuntime()) return ipcInvoke<SchemaGraph>(() => window.dbconsole!.api.schema.load(connectionId))
             return http<SchemaGraph>(`/api/schema?connectionId=${encodeURIComponent(connectionId)}`, { method: 'GET' })
         },
     },
     query: {
         run: (payload: RawQueryPayload | NamedQueryPayload) => {
-            if (isDesktopRuntime()) return ipcInvoke<QueryResult>(() => (window as any).dbconsole.api.query.run(payload))
+            if (isDesktopRuntime()) return ipcInvoke<QueryResult>(() => window.dbconsole!.api.query.run(payload))
             return http<QueryResult>('/api/query/run', { method: 'POST', body: JSON.stringify(payload) })
+        },
+        stream: {
+            open: (payload: { query: RawQueryPayload | NamedQueryPayload; batchSize?: number }) => {
+                if (isDesktopRuntime()) return ipcInvoke<StreamOpenResult>(() => window.dbconsole!.api.query.stream.open(payload))
+                return http<StreamOpenResult>('/api/query/stream/open', { method: 'POST', body: JSON.stringify(payload) })
+            },
+            next: (payload: { streamId: string; batchSize?: number }) => {
+                if (isDesktopRuntime()) return ipcInvoke<StreamNextResult>(() => window.dbconsole!.api.query.stream.next(payload))
+                return http<StreamNextResult>('/api/query/stream/next', { method: 'POST', body: JSON.stringify(payload) })
+            },
+            close: (payload: { streamId: string }) => {
+                if (isDesktopRuntime()) return ipcInvoke<StreamCloseResult>(() => window.dbconsole!.api.query.stream.close(payload))
+                return http<StreamCloseResult>('/api/query/stream/close', { method: 'POST', body: JSON.stringify(payload) })
+            },
+        },
+    },
+    diagnostics: {
+        slowQueries: (payload: { connectionId: string; sort?: SlowQuerySort; limit?: number }) => {
+            if (isDesktopRuntime()) return ipcInvoke<SlowQueryResult>(() => window.dbconsole!.api.diagnostics.slowQueries(payload) as Promise<SlowQueryResult>)
+            const params = new URLSearchParams({ connectionId: payload.connectionId })
+            if (payload.sort) params.set('sort', payload.sort)
+            if (payload.limit !== undefined) params.set('limit', String(payload.limit))
+            return http<SlowQueryResult>(`/api/diagnostics/slow-queries?${params.toString()}`, { method: 'GET' })
+        },
+    },
+    history: {
+        list: (payload: QueryHistoryFilter = {}) => {
+            if (isDesktopRuntime()) return ipcInvoke<QueryHistoryResult>(() => window.dbconsole!.api.history.list(payload) as Promise<QueryHistoryResult>)
+            const params = new URLSearchParams()
+            if (payload.connectionId) params.set('connectionId', payload.connectionId)
+            if (payload.status) params.set('status', payload.status)
+            if (payload.kind) params.set('kind', payload.kind)
+            if (payload.from) params.set('from', payload.from)
+            if (payload.to) params.set('to', payload.to)
+            if (payload.search) params.set('search', payload.search)
+            if (payload.limit !== undefined) params.set('limit', String(payload.limit))
+            if (payload.offset !== undefined) params.set('offset', String(payload.offset))
+            const qs = params.toString()
+            return http<QueryHistoryResult>(`/api/query/history${qs ? `?${qs}` : ''}`, { method: 'GET' })
         },
     },
     syncer: {
         settings: {
             get: () => {
-                if (isDesktopRuntime()) {
-                    const fn = getDesktopIpcFnOrThrow(['syncer', 'settings', 'get'], [['syncer', 'get']])
-                    return ipcInvoke<SyncerSettings>(() => fn() as Promise<SyncerSettings>)
-                }
+                if (isDesktopRuntime()) return ipcInvoke<SyncerSettings>(() => window.dbconsole!.api.syncer.settings.get())
                 return http<SyncerSettings>('/api/syncer/settings', { method: 'GET' })
             },
             set: (payload: { clear?: boolean; remoteUrl?: string; syncPhrase?: string; syncDeletions?: boolean }) => {
-                if (isDesktopRuntime()) {
-                    const fn = getDesktopIpcFnOrThrow(['syncer', 'settings', 'set'], [['syncer', 'set']])
-                    return ipcInvoke<{ ok: true }>(() => fn(payload) as Promise<{ ok: true }>)
-                }
+                if (isDesktopRuntime()) return ipcInvoke<{ ok: true }>(() => window.dbconsole!.api.syncer.settings.set(payload))
                 return http<{ ok: true }>('/api/syncer/settings', { method: 'POST', body: JSON.stringify(payload) })
             },
         },
         namedQueries: {
             sync: (payload: { resolutions?: NamedQuerySyncResolution[] } = {}) => {
-                if (isDesktopRuntime()) {
-                    const fn = getDesktopIpcFnOrThrow(['syncer', 'namedQueries', 'sync'], [['syncer', 'sync']])
-                    return ipcInvoke<NamedQuerySyncOkResult>(() => fn(payload) as Promise<NamedQuerySyncOkResult>)
-                }
+                if (isDesktopRuntime()) return ipcInvoke<NamedQuerySyncOkResult>(() => window.dbconsole!.api.syncer.namedQueries.sync(payload))
                 return http<NamedQuerySyncOkResult>('/api/syncer/named-queries', { method: 'POST', body: JSON.stringify(payload) })
             },
         },

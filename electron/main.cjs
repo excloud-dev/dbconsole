@@ -392,6 +392,38 @@ function installAppMenu() {
       ],
     },
     {
+      label: 'Tools',
+      submenu: [
+        {
+          label: 'Query History…',
+          accelerator: 'CmdOrCtrl+Shift+H',
+          click: () => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('dbconsole:menu:queryHistory')
+            }
+          }
+        },
+        {
+          label: 'Slow Queries…',
+          accelerator: 'CmdOrCtrl+Shift+S',
+          click: () => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('dbconsole:menu:slowQueries')
+            }
+          }
+        },
+        {
+          label: 'Schema Graph',
+          accelerator: 'CmdOrCtrl+Shift+G',
+          click: () => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('dbconsole:menu:schemaGraph')
+            }
+          }
+        },
+      ],
+    },
+    {
       label: 'View',
       submenu: [
         // Do not include reload: this is an app, not a browser. (CmdOrCtrl+R)

@@ -16,11 +16,14 @@ import {
     setSyncerRemoteUrl,
     setSyncerSyncDeletions,
 } from '@/lib/core/syncer-settings'
-import { runApiQuery } from '@/lib/core/query'
+import { runApiQuery, runApiStreamClose, runApiStreamNext, runApiStreamOpen } from '@/lib/core/query'
+import { fetchSlowQueries, type SlowQuerySort } from '@/lib/diagnostics/slow-queries'
+import { listQueryRuns, type ListQueryRunsInput } from '@/lib/meta-db'
 import { loadSchema } from '@/lib/core/schema'
-import { isCoreError } from '@/lib/core/errors'
+import { isCoreError, isQueryError, statusForQueryError, toQueryError } from '@/lib/core/errors'
 import { ConnectionDraftSchema, type ConnectionDraftInput } from '@/lib/connection-schema'
 import type { NamedQueryInput, RawQueryInput } from '@/lib/query-engine'
+import { QueryRunBodySchema, StreamCloseBodySchema, StreamNextBodySchema, StreamOpenBodySchema } from '@/lib/ipc/schemas'
 import { readSqlFileOrThrow } from './sql-file-open.cjs'
 import {
     OverridesRecordSchema,
@@ -156,36 +159,6 @@ function mergeUiPatchIntoCoreSettings(current: CoreUpdateSettings, patch: Partia
 
     return next
 }
-
-const PoolModeSchema = z.enum(['single', 'shared', 'per-scope']).optional()
-
-const RawQuerySchema = z.object({
-    kind: z.literal('raw'),
-    sql: z.string().min(1),
-    originalSql: z.string().min(1).optional(),
-    connectionId: z.string().min(1),
-    poolMode: PoolModeSchema,
-    scopeKey: z.string().min(1).optional(),
-    params: z.array(z.any()).optional(),
-    limit: z.number().int().nonnegative().optional(),
-    offset: z.number().int().nonnegative().optional(),
-    includeCount: z.boolean().optional(),
-})
-
-const NamedQuerySchema = z.object({
-    kind: z.literal('named'),
-    queryId: z.string().min(1),
-    params: z.record(z.any()).default({}),
-    originalSql: z.string().min(1).optional(),
-    connectionId: z.string().min(1).optional(),
-    poolMode: PoolModeSchema,
-    scopeKey: z.string().min(1).optional(),
-    limit: z.number().int().nonnegative().optional(),
-    offset: z.number().int().nonnegative().optional(),
-    includeCount: z.boolean().optional(),
-})
-
-const QueryRunBodySchema = z.union([RawQuerySchema, NamedQuerySchema])
 
 const ConnectionUpdateSchema = z.object({
     label: z.string().min(1).optional(),
@@ -449,8 +422,87 @@ export function registerDesktopIpcHandlers(): void {
             return ok(await runApiQuery(parsed as RawQueryInput | NamedQueryInput))
         } catch (e) {
             if (e instanceof z.ZodError) return err(400, { error: 'Invalid query payload', issues: e.issues })
-            const message = e instanceof Error ? e.message : 'Query failed'
-            return err(400, { error: message })
+            const qe = isQueryError(e) ? e : toQueryError(e)
+            return err(statusForQueryError(qe.body), qe.body)
+        }
+    })
+
+    ipcMain.handle('dbconsole:query:stream:open', async (_evt, payload: unknown) => {
+        try {
+            const parsed = StreamOpenBodySchema.parse(payload)
+            return ok(
+                await runApiStreamOpen(parsed.query as RawQueryInput | NamedQueryInput, {
+                    batchSize: parsed.batchSize,
+                }),
+            )
+        } catch (e) {
+            if (e instanceof z.ZodError) return err(400, { error: 'Invalid stream payload', issues: e.issues })
+            const qe = isQueryError(e) ? e : toQueryError(e)
+            return err(statusForQueryError(qe.body), qe.body)
+        }
+    })
+
+    ipcMain.handle('dbconsole:query:stream:next', async (_evt, payload: unknown) => {
+        try {
+            const parsed = StreamNextBodySchema.parse(payload)
+            return ok(await runApiStreamNext(parsed.streamId, { batchSize: parsed.batchSize }))
+        } catch (e) {
+            if (e instanceof z.ZodError) return err(400, { error: 'Invalid stream payload', issues: e.issues })
+            const qe = isQueryError(e) ? e : toQueryError(e)
+            return err(statusForQueryError(qe.body), qe.body)
+        }
+    })
+
+    ipcMain.handle('dbconsole:query:stream:close', async (_evt, payload: unknown) => {
+        try {
+            const parsed = StreamCloseBodySchema.parse(payload)
+            return ok(await runApiStreamClose(parsed.streamId))
+        } catch (e) {
+            if (e instanceof z.ZodError) return err(400, { error: 'Invalid stream payload', issues: e.issues })
+            const qe = isQueryError(e) ? e : toQueryError(e)
+            return err(statusForQueryError(qe.body), qe.body)
+        }
+    })
+
+    ipcMain.handle('dbconsole:history:list', async (_evt, payload: unknown) => {
+        const schema = z.object({
+            connectionId: z.string().min(1).optional(),
+            status: z.enum(['ok', 'error', 'timeout']).optional(),
+            kind: z.enum(['raw', 'named']).optional(),
+            from: z.string().min(1).optional(),
+            to: z.string().min(1).optional(),
+            search: z.string().optional(),
+            limit: z.number().int().positive().max(500).optional(),
+            offset: z.number().int().nonnegative().optional(),
+        })
+        try {
+            const parsed = schema.parse(payload ?? {})
+            return ok(listQueryRuns(parsed as ListQueryRunsInput))
+        } catch (e) {
+            if (e instanceof z.ZodError) return err(400, { error: 'Invalid history query', issues: e.issues })
+            const message = e instanceof Error ? e.message : 'Failed to load history'
+            return err(500, { error: message })
+        }
+    })
+
+    ipcMain.handle('dbconsole:diagnostics:slowQueries', async (_evt, payload: unknown) => {
+        const schema = z.object({
+            connectionId: z.string().min(1),
+            sort: z.enum(['mean_time', 'total_time', 'calls', 'rows']).optional(),
+            limit: z.number().int().positive().max(500).optional(),
+        })
+        try {
+            const parsed = schema.parse(payload)
+            return ok(
+                await fetchSlowQueries(parsed.connectionId, {
+                    sort: parsed.sort as SlowQuerySort | undefined,
+                    limit: parsed.limit,
+                }),
+            )
+        } catch (e) {
+            if (e instanceof z.ZodError) return err(400, { error: 'Invalid diagnostics payload', issues: e.issues })
+            const qe = isQueryError(e) ? e : toQueryError(e)
+            return err(statusForQueryError(qe.body), qe.body)
         }
     })
 
