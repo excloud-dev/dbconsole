@@ -337,6 +337,7 @@ export function SchemasSidebar({
                   <DropdownMenuItem
                     key={conn.id}
                     onClick={() => onConnectionChange(conn.id)}
+                    aria-current={activeConnection === conn.id ? "true" : undefined}
                     className={cn(
                       "text-sm gap-2 cursor-pointer rounded-md px-2 py-1.5",
                       activeConnection === conn.id ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground",

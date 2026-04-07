@@ -122,6 +122,7 @@ function clampBatchSize(requested: number | undefined): number {
 export type StreamOpenResult = {
     streamId: string
     columns: string[]
+    columnTypes: number[]
     rows: Record<string, unknown>[]
     rowsSent: number
     hasMore: boolean
@@ -241,7 +242,7 @@ export async function openStream(
             console.error('Failed to log stream open', e)
         }
 
-        return { streamId: id, columns, rows, rowsSent: rows.length, hasMore, batchSize }
+        return { streamId: id, columns, columnTypes, rows, rowsSent: rows.length, hasMore, batchSize }
     } catch (err) {
         // Make sure we don't leak the checked-out client.
         if (client) {

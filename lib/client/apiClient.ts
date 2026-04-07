@@ -201,6 +201,7 @@ export type SchemaGraph = {
 
 export type QueryResult = {
     columns: string[]
+    columnTypes: number[]
     rows: Record<string, unknown>[]
     rowCount: number
     durationMs: number
@@ -213,6 +214,7 @@ export type QueryResult = {
 export type StreamOpenResult = {
     streamId: string
     columns: string[]
+    columnTypes: number[]
     rows: Record<string, unknown>[]
     rowsSent: number
     hasMore: boolean

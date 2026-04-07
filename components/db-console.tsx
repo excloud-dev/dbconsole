@@ -262,6 +262,7 @@ export function DbConsole() {
   const [resultsByTab, setResultsByTab] = useState<{
     [tabId: string]: {
       columns: string[]
+      columnTypes?: number[]
       rows: Record<string, unknown>[]
       durationMs: number
       sqlDisplay?: string
@@ -1216,6 +1217,7 @@ export function DbConsole() {
         ...prev,
         [targetTabId]: {
           columns: result.columns,
+          columnTypes: result.columnTypes,
           rows: result.rows,
           durationMs: 0,
           sqlDisplay: cleanSql,
@@ -1634,6 +1636,7 @@ export function DbConsole() {
                         currentTab && (
                           <DataGrid
                             columns={currentResult?.columns || []}
+                            columnTypes={currentResult?.columnTypes}
                             data={currentResult?.rows || []}
                             loading={isRunning}
                             error={error}

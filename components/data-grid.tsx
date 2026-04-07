@@ -21,6 +21,7 @@ function escapeCsvValue(value: string): string {
   return `"${value.replace(/"/g, '""')}"`
 }
 import { CellDetailDialog } from "./cell-detail-dialog"
+import { DataGridCell } from "./data-grid-cell"
 import { Checkbox } from "@/components/ui/checkbox"
 
 import { ChevronLeft, ChevronRight, Loader2, Copy, FileDown, EyeOff, Columns, Check, Eye, SlidersHorizontal, Maximize2, Minimize2, Info, ChevronDown, Table, AlertTriangle } from "lucide-react"
@@ -41,6 +42,12 @@ import { useCommand } from "@/components/shortcuts/useCommand"
 
 interface DataGridProps {
   columns: string[]
+  /**
+   * Postgres type OIDs in column order. Used to pick rich cell renderers
+   * (jsonb tree, array chips, ranges, …). Optional — when absent or zero,
+   * cells fall back to the plain scalar renderer.
+   */
+  columnTypes?: number[]
   data: Record<string, unknown>[]
   loading?: boolean
   error?: string | null
@@ -70,28 +77,6 @@ interface DataGridProps {
   }
   onPageChange?: (newOffset: number) => void
   onLimitChange?: (newLimit: number | null) => void
-}
-
-// Helper to format cell values properly
-function formatCellValue(value: unknown): React.ReactNode {
-  if (value === null) {
-    return <span className="text-muted-foreground/50 italic">NULL</span>
-  }
-  if (value === undefined) {
-    return <span className="text-muted-foreground/50 italic">—</span>
-  }
-  if (typeof value === "object") {
-    // Handle objects and arrays by JSON stringifying them
-    try {
-      return JSON.stringify(value)
-    } catch {
-      return "[Object]"
-    }
-  }
-  if (typeof value === "boolean") {
-    return value ? "true" : "false"
-  }
-  return String(value)
 }
 
 function calculateColumnWidths(columns: string[], data: Record<string, unknown>[]) {
@@ -137,7 +122,7 @@ function formatTimestampForFilename(date: Date): string {
   return `${dateSegment}-${timeSegment}`
 }
 
-export function DataGrid({ columns: rawColumns, data, loading, error, truncated, streaming, executedSql, pagination, onPageChange, onLimitChange }: DataGridProps) {
+export function DataGrid({ columns: rawColumns, columnTypes, data, loading, error, truncated, streaming, executedSql, pagination, onPageChange, onLimitChange }: DataGridProps) {
   const [sorting, setSorting] = useState<SortingState>([])
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({})
@@ -262,17 +247,20 @@ export function DataGrid({ columns: rawColumns, data, loading, error, truncated,
   // Memoize columns definition
   const columns = useMemo<ColumnDef<Record<string, unknown>>[]>(
     () =>
-      rawColumns.map((col, index) => ({
-        id: `${col}-${index}`,
-        header: col,
-        size: 100,
-        minSize: 70,
-        maxSize: 600,
-        accessorFn: (row) => row[col],
-        cell: (info) => formatCellValue(info.getValue()),
-        meta: { executedSql, field: col },
-      })),
-    [rawColumns, executedSql],
+      rawColumns.map((col, index) => {
+        const oid = columnTypes?.[index]
+        return {
+          id: `${col}-${index}`,
+          header: col,
+          size: 100,
+          minSize: 70,
+          maxSize: 600,
+          accessorFn: (row) => row[col],
+          cell: (info) => <DataGridCell value={info.getValue()} typeOid={oid} />,
+          meta: { executedSql, field: col },
+        }
+      }),
+    [rawColumns, columnTypes, executedSql],
   )
 
   // eslint-disable-next-line react-hooks/incompatible-library
@@ -692,16 +680,79 @@ export function DataGrid({ columns: rawColumns, data, loading, error, truncated,
           </div>
         )}
 
-        <div className="flex-1 overflow-auto relative select-none" onMouseLeave={() => setIsDragging(false)}>
+        <div
+          className="flex-1 overflow-auto relative select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
+          tabIndex={0}
+          aria-label="Results grid (use arrow keys to navigate cells)"
+          onMouseLeave={() => setIsDragging(false)}
+          onKeyDown={(e) => {
+            if (data.length === 0 || rawColumns.length === 0) return
+            const cur = selection?.end ?? selection?.start ?? { r: 0, c: 0 }
+            const maxR = data.length - 1
+            const maxC = rawColumns.length - 1
+            let nr = cur.r
+            let nc = cur.c
+            const extend = e.shiftKey
+            switch (e.key) {
+              case "ArrowDown":
+                nr = Math.min(maxR, cur.r + 1)
+                break
+              case "ArrowUp":
+                nr = Math.max(0, cur.r - 1)
+                break
+              case "ArrowRight":
+                nc = Math.min(maxC, cur.c + 1)
+                break
+              case "ArrowLeft":
+                nc = Math.max(0, cur.c - 1)
+                break
+              case "Home":
+                nc = 0
+                if (e.ctrlKey || e.metaKey) nr = 0
+                break
+              case "End":
+                nc = maxC
+                if (e.ctrlKey || e.metaKey) nr = maxR
+                break
+              case "PageDown":
+                nr = Math.min(maxR, cur.r + 20)
+                break
+              case "PageUp":
+                nr = Math.max(0, cur.r - 20)
+                break
+              case "Escape":
+                if (selection) {
+                  e.preventDefault()
+                  setSelection(null)
+                }
+                return
+              default:
+                return
+            }
+            e.preventDefault()
+            if (extend && selection) {
+              setSelection({ start: selection.start, end: { r: nr, c: nc } })
+            } else {
+              setSelection({ start: { r: nr, c: nc }, end: { r: nr, c: nc } })
+            }
+          }}
+        >
           <table
+            role="grid"
+            aria-label="Query results"
+            aria-rowcount={data.length + 1 /* +1 for header row */}
+            aria-colcount={rawColumns.length + 1 /* +1 for the gutter */}
             className="w-full border-collapse text-sm"
             style={{ width: table.getTotalSize() + 40 }} // Extra width for gutter
           >
             <thead className="sticky top-0 bg-secondary z-20 shadow-sm">
               {table.getHeaderGroups().map((headerGroup) => (
-                <tr key={headerGroup.id}>
+                <tr key={headerGroup.id} role="row" aria-rowindex={1}>
                   {/* Gutter Header: Select All */}
                   <th
+                    role="columnheader"
+                    aria-colindex={1}
+                    aria-label={isAllSelected() ? "Deselect all rows" : "Select all rows"}
                     className={cn(
                       "sticky left-0 z-30 w-10 min-w-[40px] px-0 border-b border-r border-border cursor-pointer transition-colors",
                       // Fix: if all selected, using standard hover might look bad.
@@ -730,9 +781,16 @@ export function DataGrid({ columns: rawColumns, data, loading, error, truncated,
                     </div>
                   </th>
 
-                  {headerGroup.headers.map((header) => (
+                  {headerGroup.headers.map((header) => {
+                    const sortDir = header.column.getIsSorted()
+                    const ariaSort: 'ascending' | 'descending' | 'none' =
+                      sortDir === 'asc' ? 'ascending' : sortDir === 'desc' ? 'descending' : 'none'
+                    return (
                     <th
                       key={header.id}
+                      role="columnheader"
+                      aria-colindex={header.index + 2 /* +2: gutter is 1 */}
+                      aria-sort={ariaSort}
                       colSpan={header.colSpan}
                       style={{ width: header.getSize() }}
                       className="relative px-3 py-2 text-left text-xs font-semibold text-foreground border-b border-r border-border bg-secondary select-none group"
@@ -794,7 +852,8 @@ export function DataGrid({ columns: rawColumns, data, loading, error, truncated,
                         )}
                       />
                     </th>
-                  ))}
+                    )
+                  })}
                 </tr>
               ))}
             </thead>
@@ -802,6 +861,8 @@ export function DataGrid({ columns: rawColumns, data, loading, error, truncated,
               {table.getRowModel().rows.map((row, rowIdx) => (
                 <tr
                   key={row.id}
+                  role="row"
+                  aria-rowindex={rowIdx + 2 /* +2: header is row 1 */}
                   className={cn(
                     "border-b border-border/50 transition-colors",
                     rowIdx % 2 === 0 ? "bg-card" : "bg-muted/30",
@@ -811,6 +872,9 @@ export function DataGrid({ columns: rawColumns, data, loading, error, truncated,
                 >
                   {/* Gutter Cell */}
                   <td
+                    role="rowheader"
+                    aria-colindex={1}
+                    aria-label={`Row ${(offset || 0) + rowIdx + 1}`}
                     className="sticky left-0 z-10 w-10 min-w-[40px] bg-secondary border-r border-border text-center text-[10px] text-muted-foreground cursor-pointer hover:bg-muted user-select-none font-mono"
                     onMouseDown={(e) => handleGutterMouseDown(rowIdx, e)}
                     onMouseEnter={(e) => {
@@ -837,6 +901,9 @@ export function DataGrid({ columns: rawColumns, data, loading, error, truncated,
                     return (
                       <td
                         key={cell.id}
+                        role="gridcell"
+                        aria-colindex={colIdx + 2 /* +2: gutter is 1 */}
+                        aria-selected={isSelected || undefined}
                         style={{
                           width: cell.column.getSize(),
                         }}

@@ -46,6 +46,13 @@ export type NamedQueryInput = {
 
 export type QueryResult = {
     columns: string[]
+    /**
+     * Postgres type OIDs for each column, in the same order as `columns`.
+     * Used by the data grid to pick rich renderers (jsonb tree, array chips,
+     * range formatter, etc.) without re-querying pg_type. Populated from
+     * result.fields[i].dataTypeID.
+     */
+    columnTypes: number[]
     rows: Record<string, unknown>[]
     rowCount: number
     durationMs: number
@@ -98,6 +105,7 @@ export async function runQuery(input: RawQueryInput | NamedQueryInput): Promise<
     let rows: any[] = []
     let totalCount: number | undefined
     let columns: string[] = []
+    let columnTypes: number[] = []
     let status: LogQueryRunInput['status'] = 'ok'
     let errorMessage: string | undefined
 
@@ -112,6 +120,10 @@ export async function runQuery(input: RawQueryInput | NamedQueryInput): Promise<
 
         const result = await pool.query({ text: executableSql, values, rowMode: 'array' })
         const fields = result.fields ?? []
+
+        // Capture pg type OIDs in column order so the renderer can pick rich
+        // formatters (jsonb tree, array chips, …) without re-querying pg_type.
+        columnTypes = fields.map((f) => f.dataTypeID ?? 0)
 
         // Quick path: no duplicate column names
         const baseNames = fields.map((f) => f.name || 'column')
@@ -232,6 +244,7 @@ export async function runQuery(input: RawQueryInput | NamedQueryInput): Promise<
 
     return {
         columns,
+        columnTypes,
         rows: limitedRows,
         rowCount: limitedRows.length,
         durationMs: Date.now() - start,
