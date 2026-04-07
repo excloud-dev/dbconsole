@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+- feat: group sidebar tables by schema and quote qualified identifiers (0ab9f94)
+
 ## v0.6.2 - 2026-01-03
 
 - fix: improve fullscreen datagrid styling with sharp edges, reduced margins, and Escape to exit (97ad0fb)
