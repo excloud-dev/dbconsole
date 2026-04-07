@@ -1,5 +1,7 @@
 import type { CommandDef, CommandId, Runtime } from './types'
 
+
+
 const commands: CommandDef[] = [
   {
     id: 'query.run',
@@ -170,6 +172,16 @@ const commands: CommandDef[] = [
       desktop: ['Ctrl+Shift+Tab'],
     },
   },
+  ...([1, 2, 3, 4, 5, 6, 7, 8, 9] as const).map((n) => ({
+    id: `tabs.jump${n}` as CommandId,
+    title: `Jump to tab ${n}`,
+    category: 'Tabs',
+    allowInInputs: true,
+    defaultBindings: {
+      desktop: [`Mod+${n}`],
+      web: [`Mod+${n}`],
+    },
+  })),
   {
     id: 'ui.toggleSchemaSidebar',
     title: 'Toggle schema sidebar',

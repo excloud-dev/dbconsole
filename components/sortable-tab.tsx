@@ -1,12 +1,25 @@
 "use client"
 
-import { forwardRef } from "react"
+import { forwardRef, useEffect, useRef, useState } from "react"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { X, Bookmark, Sparkles } from "lucide-react"
+import { X, Bookmark, Sparkles, AlertCircle, Loader2, Pin, PinOff } from "lucide-react"
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
+import type { TabGroup } from "@/lib/tab-store"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { Tab } from "./query-tabs"
+import { connectionColor } from "@/lib/color/connection-color"
 
 interface SortableTabProps {
   tab: Tab
@@ -14,11 +27,47 @@ interface SortableTabProps {
   isOnlyTab: boolean
   onTabChange: (id: string) => void
   onTabClose: (id: string) => void
+  /** Persist a manual rename. The tab is marked userRenamed=true so the auto-label deriver won't overwrite it. */
+  onTabRename?: (id: string, newName: string) => void
+  /** Toggle the pin state. Pinned tabs sort to the front and survive ⌘W on the last tab. */
+  onTabPinToggle?: (id: string) => void
+  /** Move a tab into a group, or pass `null` to remove from any group. */
+  onTabAssignGroup?: (id: string, groupId: string | null) => void
+  /** Create a new group, name it, and assign this tab to it. */
+  onCreateGroupForTab?: (id: string) => void
+  /** All groups defined in the workspace. */
+  groups?: TabGroup[]
   width: number | null
 }
 
 export const SortableTab = forwardRef<HTMLDivElement, SortableTabProps>(
-  ({ tab, isActive, isOnlyTab, onTabChange, onTabClose, width }, ref) => {
+  ({ tab, isActive, isOnlyTab, onTabChange, onTabClose, onTabRename, onTabPinToggle, onTabAssignGroup, onCreateGroupForTab, groups, width }, ref) => {
+    const [editing, setEditing] = useState(false)
+    const [draftName, setDraftName] = useState(tab.name)
+    const inputRef = useRef<HTMLInputElement | null>(null)
+
+    useEffect(() => {
+      if (editing && inputRef.current) {
+        inputRef.current.focus()
+        inputRef.current.select()
+      }
+    }, [editing])
+
+    // Reset the draft when the underlying tab name changes from outside
+    // (e.g. auto-label deriver fires while we're not editing).
+    useEffect(() => {
+      if (!editing) setDraftName(tab.name)
+    }, [tab.name, editing])
+
+    const commit = () => {
+      const next = draftName.trim()
+      if (next && next !== tab.name) onTabRename?.(tab.id, next)
+      setEditing(false)
+    }
+    const cancel = () => {
+      setDraftName(tab.name)
+      setEditing(false)
+    }
     const {
       attributes,
       listeners,
@@ -28,15 +77,21 @@ export const SortableTab = forwardRef<HTMLDivElement, SortableTabProps>(
       isDragging,
     } = useSortable({ id: tab.id })
 
+    // Stable per-connection color used as a 2px left border so tabs from
+    // prod / staging / sandbox visually segregate without reading the title.
+    // Falls back to muted/transparent for tabs with no connection bound yet.
+    const stripeColor = tab.connectionId ? connectionColor(tab.connectionId) : 'transparent'
+
     const style = {
       transform: CSS.Transform.toString(transform),
       transition,
       width: width ? `${width}px` : undefined,
       minWidth: width ? `${width}px` : undefined,
       maxWidth: width ? `${width}px` : undefined,
+      borderLeft: tab.connectionId ? `2px solid ${stripeColor}` : undefined,
     }
 
-    return (
+    const tabContent = (
       <Tooltip>
         <TooltipTrigger asChild>
           <div
@@ -56,16 +111,72 @@ export const SortableTab = forwardRef<HTMLDivElement, SortableTabProps>(
                 : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground",
               isDragging && "opacity-50 shadow-lg z-50",
             )}
-            onClick={() => onTabChange(tab.id)}
-            {...attributes}
-            {...listeners}
+            onClick={() => !editing && onTabChange(tab.id)}
+            onDoubleClick={(e) => {
+              e.stopPropagation()
+              if (onTabRename) {
+                setDraftName(tab.name)
+                setEditing(true)
+              }
+            }}
+            {...(editing ? {} : attributes)}
+            {...(editing ? {} : listeners)}
           >
+            {tab.pinned && <Pin className="h-3 w-3 text-muted-foreground flex-shrink-0" aria-label="Pinned" />}
+            {tab.groupId && groups && (() => {
+              const g = groups.find((x) => x.id === tab.groupId)
+              return g ? (
+                <span
+                  className="h-2 w-2 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: g.color }}
+                  aria-label={`Group: ${g.name}`}
+                  title={g.name}
+                />
+              ) : null
+            })()}
             {tab.isGenerator ? (
               <Sparkles className="h-3 w-3 text-emerald-600 flex-shrink-0" />
             ) : (
               tab.isNamedQuery && <Bookmark className="h-3 w-3 text-accent-foreground fill-accent flex-shrink-0" />
             )}
-            <span className="truncate flex-1 min-w-0">{tab.name}</span>
+            {tab.lastRun?.status === "running" && (
+              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground flex-shrink-0" aria-label="Running" />
+            )}
+            {tab.lastRun?.status === "error" && (
+              <AlertCircle className="h-3 w-3 text-destructive flex-shrink-0" aria-label="Failed" />
+            )}
+            {editing ? (
+              <input
+                ref={inputRef}
+                value={draftName}
+                onChange={(e) => setDraftName(e.target.value)}
+                onBlur={commit}
+                onKeyDown={(e) => {
+                  e.stopPropagation()
+                  if (e.key === "Enter") {
+                    e.preventDefault()
+                    commit()
+                  } else if (e.key === "Escape") {
+                    e.preventDefault()
+                    cancel()
+                  }
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+                className="flex-1 min-w-0 bg-transparent border-b border-primary/60 outline-none text-sm"
+                aria-label="Rename tab"
+              />
+            ) : (
+              <span className="truncate flex-1 min-w-0">{tab.name}</span>
+            )}
+            {!editing && tab.lastRun?.status === "ok" && tab.lastRun.rowCount !== undefined && (
+              <span
+                className="text-[9px] tabular-nums text-muted-foreground bg-muted/60 rounded px-1 py-0 flex-shrink-0"
+                title={`${tab.lastRun.rowCount.toLocaleString()} rows · ${tab.lastRun.durationMs ?? 0}ms`}
+              >
+                {tab.lastRun.rowCount > 9999 ? `${(tab.lastRun.rowCount / 1000).toFixed(1)}k` : tab.lastRun.rowCount}
+              </span>
+            )}
             {!isOnlyTab && (
               <button
                 onClick={(e) => {
@@ -84,6 +195,85 @@ export const SortableTab = forwardRef<HTMLDivElement, SortableTabProps>(
           {tab.name}
         </TooltipContent>
       </Tooltip>
+    )
+
+    if (!onTabPinToggle) return tabContent
+
+    return (
+      <ContextMenu>
+        <ContextMenuTrigger asChild>{tabContent}</ContextMenuTrigger>
+        <ContextMenuContent className="w-48">
+          <ContextMenuItem onClick={() => onTabPinToggle(tab.id)}>
+            {tab.pinned ? (
+              <>
+                <PinOff className="h-3.5 w-3.5 mr-2" />
+                Unpin tab
+              </>
+            ) : (
+              <>
+                <Pin className="h-3.5 w-3.5 mr-2" />
+                Pin tab
+              </>
+            )}
+          </ContextMenuItem>
+          {onTabRename && (
+            <ContextMenuItem
+              onClick={() => {
+                setDraftName(tab.name)
+                setEditing(true)
+              }}
+            >
+              Rename…
+            </ContextMenuItem>
+          )}
+          {onTabAssignGroup && (
+            <ContextMenuSub>
+              <ContextMenuSubTrigger>Group…</ContextMenuSubTrigger>
+              <ContextMenuSubContent className="w-48">
+                <ContextMenuLabel className="text-[10px] text-muted-foreground uppercase">
+                  Move to group
+                </ContextMenuLabel>
+                <ContextMenuItem
+                  onClick={() => onTabAssignGroup(tab.id, null)}
+                  className={cn(!tab.groupId && "font-medium")}
+                >
+                  No group
+                </ContextMenuItem>
+                {groups?.map((g) => (
+                  <ContextMenuItem
+                    key={g.id}
+                    onClick={() => onTabAssignGroup(tab.id, g.id)}
+                    className={cn(tab.groupId === g.id && "font-medium")}
+                  >
+                    <span
+                      className="h-2 w-2 rounded-full mr-2 flex-shrink-0"
+                      style={{ backgroundColor: g.color }}
+                    />
+                    {g.name}
+                  </ContextMenuItem>
+                ))}
+                {onCreateGroupForTab && (
+                  <>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem onClick={() => onCreateGroupForTab(tab.id)}>
+                      New group…
+                    </ContextMenuItem>
+                  </>
+                )}
+              </ContextMenuSubContent>
+            </ContextMenuSub>
+          )}
+          <ContextMenuSeparator />
+          <ContextMenuItem
+            disabled={isOnlyTab}
+            onClick={() => onTabClose(tab.id)}
+            className="text-destructive focus:text-destructive"
+          >
+            <X className="h-3.5 w-3.5 mr-2" />
+            Close tab
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
     )
   }
 )

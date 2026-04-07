@@ -5,6 +5,8 @@ import { SchemasSidebar } from "./schemas-sidebar"
 import { SlowQueryPanel } from "./slow-query-panel"
 import { QueryHistoryPanel } from "./query-history-panel"
 import { SchemaGraphView } from "./schema-graph-view"
+import { dropFromMru, loadWorkspace, saveWorkspace, touchMru, type TabGroup } from "@/lib/tab-store"
+import { deriveTabLabel } from "@/lib/sql/derive-label"
 import { QueryTabs, type Tab } from "./query-tabs"
 import { QueryEditor } from "./query-editor"
 import { NamedQueryEditor, type NamedQuery, type NamedQueryParamMeta } from "./named-query-editor"
@@ -204,32 +206,50 @@ export function DbConsole() {
   // Global state for params expanded - applies to all named query tabs, default collapsed
   const [globalParamsExpanded, setGlobalParamsExpanded] = useState(false)
 
-  // Persistence: Restore tabs on mount
+  // Tab groups (Phase 4.7) and MRU order (Phase 5.x ⌃Tab cycling) live in the
+  // same persisted workspace as the tabs themselves. We hold them in plain
+  // React state and sync to localStorage on change via the v2 schema in
+  // lib/tab-store.ts. The v1 keys (db-console-tabs-v1 / -active-tab-v1) get
+  // migrated on first load.
+  const [tabGroups, setTabGroups] = useState<TabGroup[]>([])
+  const [mruOrder, setMruOrder] = useState<string[]>([])
+
+  // Persistence: Restore workspace on mount.
   useEffect(() => {
     try {
-      const savedTabs = localStorage.getItem("db-console-tabs-v1")
-      const savedActive = localStorage.getItem("db-console-active-tab-v1")
-      if (savedTabs) {
-        setTabs(JSON.parse(savedTabs))
-      }
-      if (savedActive) {
-        setActiveTab(savedActive)
+      const ws = loadWorkspace()
+      if (ws) {
+        if (ws.tabs.length > 0) setTabs(ws.tabs)
+        if (ws.groups.length > 0) setTabGroups(ws.groups)
+        if (ws.activeTabId) setActiveTab(ws.activeTabId)
+        if (ws.mruOrder.length > 0) setMruOrder(ws.mruOrder)
       }
     } catch (e) {
       console.error("Failed to restore tabs", e)
     }
   }, [])
 
-  // Persistence: Save tabs and pool mode on change
+  // Persistence: Save workspace + pool mode on change.
   useEffect(() => {
     try {
-      localStorage.setItem("db-console-tabs-v1", JSON.stringify(tabs))
-      localStorage.setItem("db-console-active-tab-v1", activeTab)
+      saveWorkspace({
+        version: 2,
+        tabs,
+        groups: tabGroups,
+        activeTabId: activeTab,
+        mruOrder,
+      })
       localStorage.setItem("db-console-pool-mode", poolMode)
     } catch (e) {
       console.error("Failed to save tabs", e)
     }
-  }, [tabs, activeTab, poolMode])
+  }, [tabs, tabGroups, activeTab, mruOrder, poolMode])
+
+  // Maintain MRU order when activeTab changes.
+  useEffect(() => {
+    if (!activeTab) return
+    setMruOrder((prev) => touchMru(prev, activeTab))
+  }, [activeTab])
 
   const [connections, setConnections] = useState<ConnectionWithStatus[]>([])
   const [activeConnection, setActiveConnection] = useState<string | null>(null)
@@ -569,8 +589,13 @@ export function DbConsole() {
     if (tabs.length === 1) return
     const closingTabIndex = tabs.findIndex((t) => t.id === id)
     const closingTab = closingTabIndex >= 0 ? tabs[closingTabIndex] : undefined
+    // If the only remaining tab is pinned, ⌘W is a no-op (locked decision).
+    if (closingTab?.pinned && tabs.filter((t) => !t.pinned).length === 0 && tabs.length === 1) {
+      return
+    }
     const newTabs = tabs.filter((t) => t.id !== id)
     setTabs(newTabs)
+    setMruOrder((prev) => dropFromMru(prev, id))
     // Tear down any open stream attached to this tab so we don't leak the
     // pg client checked out for the cursor's transaction.
     if (streamsByTab[id]) void closeStreamForTab(id)
@@ -613,6 +638,28 @@ export function DbConsole() {
     const prev = tabs[(idx - 1 + tabs.length) % tabs.length]
     if (prev) setActiveTab(prev.id)
   })
+
+  // ⌘1..⌘9 jump straight to the Nth tab in display order. Display order
+  // matches what the user sees in the bar (pinned first, then unpinned).
+  const jumpToTabIndex = useCallback(
+    (idx0: number) => {
+      const pinned = tabs.filter((t) => t.pinned)
+      const unpinned = tabs.filter((t) => !t.pinned)
+      const ordered = [...pinned, ...unpinned]
+      const target = ordered[idx0]
+      if (target) setActiveTab(target.id)
+    },
+    [tabs],
+  )
+  useCommand("tabs.jump1", () => jumpToTabIndex(0))
+  useCommand("tabs.jump2", () => jumpToTabIndex(1))
+  useCommand("tabs.jump3", () => jumpToTabIndex(2))
+  useCommand("tabs.jump4", () => jumpToTabIndex(3))
+  useCommand("tabs.jump5", () => jumpToTabIndex(4))
+  useCommand("tabs.jump6", () => jumpToTabIndex(5))
+  useCommand("tabs.jump7", () => jumpToTabIndex(6))
+  useCommand("tabs.jump8", () => jumpToTabIndex(7))
+  useCommand("tabs.jump9", () => jumpToTabIndex(8))
 
   useCommand("file.openSql", () => {
     const api = typeof window !== "undefined" ? window.dbconsole?.api?.sqlFile : undefined
@@ -701,7 +748,15 @@ export function DbConsole() {
       } else if (maxIndex < existingParams.length) {
         params = existingParams.slice(0, maxIndex)
       }
-      return { ...t, query, params }
+      // Auto-derive a smart label from the SQL unless the user has manually
+      // renamed this tab. Falls back to the existing name when the deriver
+      // can't find anything useful (empty editor, weird SQL, etc).
+      let nextName = t.name
+      if (!t.userRenamed && !t.isNamedQuery && !t.isGenerator && !t.isSchemaGraph) {
+        const derived = deriveTabLabel(query)
+        if (derived) nextName = derived
+      }
+      return { ...t, name: nextName, query, params }
     }))
   }
 
@@ -1100,6 +1155,8 @@ export function DbConsole() {
     // means the previous stream is no longer interesting, and leaving it
     // open holds a Postgres client checked out indefinitely.
     void closeStreamForTab(targetTabId)
+    // Mark the tab as running so the status pill on the tab bar shows a spinner.
+    setTabs((prev) => prev.map((t) => (t.id === targetTabId ? { ...t, lastRun: { status: "running", at: new Date().toISOString() } } : t)))
 
     try {
       // Clean SQL for wrapping (remove trailing semicolon)
@@ -1132,7 +1189,7 @@ export function DbConsole() {
         description: `${data.rows.length} rows • ${data.durationMs}ms`,
       })
 
-      // Update tab pagination state
+      // Update tab pagination state + status pill
       setTabs(prev => prev.map(t => {
         if (t.id === targetTabId) {
           return {
@@ -1142,7 +1199,13 @@ export function DbConsole() {
               limit,
               offset,
               total: data.totalCount ?? t.pagination?.total ?? data.rows?.length
-            }
+            },
+            lastRun: {
+              status: "ok",
+              rowCount: data.rows.length,
+              durationMs: data.durationMs,
+              at: new Date().toISOString(),
+            },
           }
         }
         return t
@@ -1157,6 +1220,8 @@ export function DbConsole() {
         title: "Query failed",
         description: detail?.error ?? e?.message ?? "Failed to run query",
       })
+      // Mark the tab as failed so the status pill renders the error indicator.
+      setTabs((prev) => prev.map((t) => (t.id === targetTabId ? { ...t, lastRun: { status: "error", at: new Date().toISOString() } } : t)))
     } finally {
       setIsRunning(false)
     }
@@ -1305,7 +1370,11 @@ export function DbConsole() {
     const limit = newLimit === undefined ? fallbackLimit : newLimit === null ? undefined : newLimit
     setIsRunning(true)
     setError(null)
-    if (currentTab) void closeStreamForTab(currentTab.id)
+    if (currentTab) {
+      void closeStreamForTab(currentTab.id)
+      const runningId = currentTab.id
+      setTabs((prev) => prev.map((t) => (t.id === runningId ? { ...t, lastRun: { status: "running", at: new Date().toISOString() } } : t)))
+    }
 
     try {
       const shouldIncludeCount = offset === 0 || targetTab?.pagination?.total === undefined
@@ -1349,7 +1418,13 @@ export function DbConsole() {
                 limit,
                 offset,
                 total: data.totalCount ?? t.pagination?.total ?? data.rows?.length
-              }
+              },
+              lastRun: {
+                status: "ok",
+                rowCount: data.rows.length,
+                durationMs: data.durationMs,
+                at: new Date().toISOString(),
+              },
             }
           }
           return t
@@ -1364,6 +1439,10 @@ export function DbConsole() {
         title: "Query failed",
         description: detail?.error ?? e?.message ?? "Failed to run query",
       })
+      if (currentTab) {
+        const failedId = currentTab.id
+        setTabs((prev) => prev.map((t) => (t.id === failedId ? { ...t, lastRun: { status: "error", at: new Date().toISOString() } } : t)))
+      }
     } finally {
       setIsRunning(false)
     }
@@ -1461,6 +1540,41 @@ export function DbConsole() {
               activeTab={activeTab}
               onTabChange={setActiveTab}
               onTabClose={closeTab}
+              onTabRename={(id, newName) => {
+                setTabs((prev) =>
+                  prev.map((t) => (t.id === id ? { ...t, name: newName, userRenamed: true } : t)),
+                )
+              }}
+              onTabPinToggle={(id) => {
+                setTabs((prev) => prev.map((t) => (t.id === id ? { ...t, pinned: !t.pinned } : t)))
+              }}
+              groups={tabGroups}
+              onTabAssignGroup={(id, groupId) => {
+                setTabs((prev) =>
+                  prev.map((t) => (t.id === id ? { ...t, groupId: groupId ?? undefined } : t)),
+                )
+              }}
+              onCreateGroupForTab={(id) => {
+                const name = window.prompt("Group name")
+                if (!name?.trim()) return
+                // Pick a color from a small palette by hashing the group name.
+                const palette = [
+                  "hsl(0, 70%, 55%)",
+                  "hsl(30, 80%, 55%)",
+                  "hsl(60, 70%, 50%)",
+                  "hsl(140, 60%, 45%)",
+                  "hsl(190, 70%, 45%)",
+                  "hsl(220, 70%, 55%)",
+                  "hsl(280, 60%, 55%)",
+                  "hsl(320, 65%, 55%)",
+                ]
+                let hash = 0
+                for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0
+                const color = palette[hash % palette.length]
+                const groupId = `group-${Date.now()}`
+                setTabGroups((prev) => [...prev, { id: groupId, name: name.trim(), color }])
+                setTabs((prev) => prev.map((t) => (t.id === id ? { ...t, groupId } : t)))
+              }}
               onAddTab={addTab}
               onTabReorder={reorderTabs}
             />
