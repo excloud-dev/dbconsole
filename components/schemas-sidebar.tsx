@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useRef, useCallback } from "react"
-import { ChevronRight, Table2, Search, Bookmark, GitMerge, X, Plus, ChevronDown, Eye, RotateCcw, KeyRound } from "lucide-react"
+import { useState, useRef, useCallback, useMemo } from "react"
+import { ChevronRight, Table2, Search, Bookmark, GitMerge, X, Plus, ChevronDown, Eye, RotateCcw, KeyRound, Database } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -92,6 +92,7 @@ export function SchemasSidebar({
 }: SchemasSidebarProps) {
   const [search, setSearch] = useState("")
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set())
+  const [collapsedSchemas, setCollapsedSchemas] = useState<Set<string>>(new Set())
   const [activeTabState, setActiveTabState] = useState<"tables" | "queries">("tables")
   const [joinDialogOpen, setJoinDialogOpen] = useState(false)
   const [joinBaseTable, setJoinBaseTable] = useState<string>("")
@@ -131,14 +132,24 @@ export function SchemasSidebar({
     }
   }, [])
 
-  const toggleTable = (name: string) => {
+  const toggleTable = (key: string) => {
     const next = new Set(expandedTables)
-    if (next.has(name)) {
-      next.delete(name)
+    if (next.has(key)) {
+      next.delete(key)
     } else {
-      next.add(name)
+      next.add(key)
     }
     setExpandedTables(next)
+  }
+
+  const toggleSchema = (schemaName: string) => {
+    const next = new Set(collapsedSchemas)
+    if (next.has(schemaName)) {
+      next.delete(schemaName)
+    } else {
+      next.add(schemaName)
+    }
+    setCollapsedSchemas(next)
   }
 
   const searchLower = search.toLowerCase()
@@ -183,8 +194,43 @@ export function SchemasSidebar({
     }))
     : []
 
-  const filteredTables = tables.filter((t) => t.name.toLowerCase().includes(searchLower))
+  const filteredTables = tables.filter(
+    (t) =>
+      t.name.toLowerCase().includes(searchLower) ||
+      t.schema.toLowerCase().includes(searchLower),
+  )
   const filteredQueries = namedQueries.filter((q) => q.name.toLowerCase().includes(searchLower))
+
+  // Group filtered tables by schema. Sort schemas with "public" first, then alpha.
+  const groupedTables = useMemo(() => {
+    const groups = new Map<string, TableInfo[]>()
+    for (const t of filteredTables) {
+      const arr = groups.get(t.schema) ?? []
+      arr.push(t)
+      groups.set(t.schema, arr)
+    }
+    return Array.from(groups.entries()).sort(([a], [b]) => {
+      if (a === b) return 0
+      if (a === "public") return -1
+      if (b === "public") return 1
+      return a.localeCompare(b)
+    })
+  }, [filteredTables])
+
+  const hasMultipleSchemas = groupedTables.length > 1
+
+  // While searching, force-expand all schema groups so matches are visible.
+  const isSearching = search.trim().length > 0
+
+  // Flat index across visible items for keyboard navigation
+  const flatTableEntries = useMemo(() => {
+    const out: TableInfo[] = []
+    for (const [schemaName, group] of groupedTables) {
+      if (!isSearching && hasMultipleSchemas && collapsedSchemas.has(schemaName)) continue
+      out.push(...group)
+    }
+    return out
+  }, [groupedTables, collapsedSchemas, isSearching, hasMultipleSchemas])
 
   const activeConn = connections.find((c) => c.id === activeConnection)
 
@@ -378,128 +424,175 @@ export function SchemasSidebar({
             </div>
 
             <div className="mt-1 space-y-1" ref={tableListRef}>
-              {filteredTables.map((table, index) => (
-                <div key={table.qualifiedName}>
-                  <div className="group/row flex items-center gap-1">
-                    <button
-                      data-table-index={index}
-                      onClick={() => toggleTable(table.name)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault()
-                          onViewTable(table.name)
-                          // Focus query editor after viewing
-                          onFocusQuery?.()
-                        } else {
-                          handleListKeyDown(e, "data-table-index", index, filteredTables.length)
-                        }
-                      }}
-                      aria-expanded={expandedTables.has(table.name)}
-                      className={cn(
-                        "flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-left text-sm text-foreground",
-                        "hover:bg-secondary hover:text-foreground",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
-                      )}
-                    >
-                      <ChevronRight
-                        className={cn(
-                          "h-4 w-4 text-muted-foreground transition-transform flex-shrink-0",
-                          expandedTables.has(table.name) && "rotate-90",
-                        )}
-                      />
-                      <span className="truncate">{table.name}</span>
-                    </button>
-
-                    {/* Actions: animate in like DataGrid hide button */}
-                    <div className="flex items-center">
-                      <div
-                        className={cn(
-                          "transition-all duration-300 ease-in-out flex-shrink-0",
-                          showActionsOnHover
-                            ? "w-0 overflow-hidden opacity-0 group-hover/row:w-8 group-hover/row:opacity-100"
-                            : "w-8 opacity-100",
-                        )}
-                      >
+              {(() => {
+                let flatIndex = -1
+                const totalFlat = flatTableEntries.length
+                return groupedTables.map(([schemaName, group]) => {
+                  const collapsed = !isSearching && hasMultipleSchemas && collapsedSchemas.has(schemaName)
+                  return (
+                    <div key={schemaName}>
+                      {hasMultipleSchemas && (
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            onViewTable(table.name)
-                          }}
-                          className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-foreground transition-colors outline-none"
-                          title="View top 100 rows"
+                          onClick={() => toggleSchema(schemaName)}
+                          className={cn(
+                            "group/schema mt-1 flex h-7 w-full items-center gap-1.5 rounded-md px-2 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground",
+                            "hover:bg-secondary hover:text-foreground",
+                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+                          )}
+                          aria-expanded={!collapsed}
+                          title={`Schema: ${schemaName}`}
                         >
-                          <Eye className="h-4 w-4" />
-                        </button>
-                      </div>
-                      <div
-                        className={cn(
-                          "transition-all duration-300 ease-in-out flex-shrink-0",
-                          showActionsOnHover
-                            ? "w-0 overflow-hidden opacity-0 group-hover/row:w-8 group-hover/row:opacity-100"
-                            : "w-8 opacity-100",
-                        )}
-                      >
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            openJoinBuilder(table.qualifiedName)
-                          }}
-                          className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-foreground transition-colors outline-none"
-                          title="Join with..."
-                        >
-                          <GitMerge className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {expandedTables.has(table.name) && (
-                    <div className="ml-4 mt-1 border-l border-border pl-3">
-                      <div className="space-y-0.5 pb-1">
-                        {table.columns.map((col) => (
-                          <div
-                            key={col.name}
+                          <ChevronRight
                             className={cn(
-                              "rounded-md px-2 py-1 text-xs text-foreground",
-                              "hover:bg-secondary/70",
+                              "h-3.5 w-3.5 text-muted-foreground transition-transform flex-shrink-0",
+                              !collapsed && "rotate-90",
                             )}
+                          />
+                          <Database className="h-3 w-3 flex-shrink-0" />
+                          <span className="truncate">{schemaName}</span>
+                          <Badge
+                            variant="secondary"
+                            className="ml-auto h-4 px-1.5 text-[10px] tabular-nums text-muted-foreground bg-background border-border"
                           >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span
-                                className={cn(
-                                  "truncate",
-                                  col.isPk && "text-amber-700 dark:text-amber-400 font-medium",
-                                  col.isFk && "text-blue-700 dark:text-blue-400 font-medium",
+                            {group.length}
+                          </Badge>
+                        </button>
+                      )}
+
+                      {!collapsed && (
+                        <div className={cn(hasMultipleSchemas && "ml-2 border-l border-border pl-2")}>
+                          {group.map((table) => {
+                            flatIndex += 1
+                            const index = flatIndex
+                            const expandKey = table.qualifiedName
+                            const isExpanded = expandedTables.has(expandKey)
+                            return (
+                              <div key={table.qualifiedName}>
+                                <div className="group/row flex items-center gap-1">
+                                  <button
+                                    data-table-index={index}
+                                    onClick={() => toggleTable(expandKey)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        e.preventDefault()
+                                        onViewTable(table.qualifiedName)
+                                        onFocusQuery?.()
+                                      } else {
+                                        handleListKeyDown(e, "data-table-index", index, totalFlat)
+                                      }
+                                    }}
+                                    aria-expanded={isExpanded}
+                                    className={cn(
+                                      "flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-left text-sm text-foreground",
+                                      "hover:bg-secondary hover:text-foreground",
+                                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+                                    )}
+                                  >
+                                    <ChevronRight
+                                      className={cn(
+                                        "h-4 w-4 text-muted-foreground transition-transform flex-shrink-0",
+                                        isExpanded && "rotate-90",
+                                      )}
+                                    />
+                                    <span className="truncate">{table.name}</span>
+                                  </button>
+
+                                  <div className="flex items-center">
+                                    <div
+                                      className={cn(
+                                        "transition-all duration-300 ease-in-out flex-shrink-0",
+                                        showActionsOnHover
+                                          ? "w-0 overflow-hidden opacity-0 group-hover/row:w-8 group-hover/row:opacity-100"
+                                          : "w-8 opacity-100",
+                                      )}
+                                    >
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          onViewTable(table.qualifiedName)
+                                        }}
+                                        className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-foreground transition-colors outline-none"
+                                        title="View top 100 rows"
+                                      >
+                                        <Eye className="h-4 w-4" />
+                                      </button>
+                                    </div>
+                                    <div
+                                      className={cn(
+                                        "transition-all duration-300 ease-in-out flex-shrink-0",
+                                        showActionsOnHover
+                                          ? "w-0 overflow-hidden opacity-0 group-hover/row:w-8 group-hover/row:opacity-100"
+                                          : "w-8 opacity-100",
+                                      )}
+                                    >
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          openJoinBuilder(table.qualifiedName)
+                                        }}
+                                        className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-foreground transition-colors outline-none"
+                                        title="Join with..."
+                                      >
+                                        <GitMerge className="h-4 w-4" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {isExpanded && (
+                                  <div className="ml-4 mt-1 border-l border-border pl-3">
+                                    <div className="space-y-0.5 pb-1">
+                                      {table.columns.map((col) => (
+                                        <div
+                                          key={col.name}
+                                          className={cn(
+                                            "rounded-md px-2 py-1 text-xs text-foreground",
+                                            "hover:bg-secondary/70",
+                                          )}
+                                        >
+                                          <div className="flex items-center gap-2 min-w-0">
+                                            <span
+                                              className={cn(
+                                                "truncate",
+                                                col.isPk && "text-amber-700 dark:text-amber-400 font-medium",
+                                                col.isFk && "text-blue-700 dark:text-blue-400 font-medium",
+                                              )}
+                                            >
+                                              {col.name}
+                                            </span>
+                                            {col.isPk && (
+                                              <Badge className="h-4 rounded-sm px-1 text-[10px] bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-400 border-amber-200 dark:border-amber-800">
+                                                PK
+                                              </Badge>
+                                            )}
+                                            {col.isFk && (
+                                              <Badge className="h-4 rounded-sm px-1 text-[10px] bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-400 border-blue-200 dark:border-blue-800">
+                                                FK
+                                              </Badge>
+                                            )}
+                                            {col.isAuto && (
+                                              <Badge className="h-4 rounded-sm px-1 text-[10px] bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800">
+                                                AUTO
+                                              </Badge>
+                                            )}
+                                          </div>
+                                          <div className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
+                                            {col.type}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
                                 )}
-                              >
-                                {col.name}
-                              </span>
-                              {col.isPk && (
-                                <Badge className="h-4 rounded-sm px-1 text-[10px] bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-400 border-amber-200 dark:border-amber-800">
-                                  PK
-                                </Badge>
-                              )}
-                              {col.isFk && (
-                                <Badge className="h-4 rounded-sm px-1 text-[10px] bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-400 border-blue-200 dark:border-blue-800">
-                                  FK
-                                </Badge>
-                              )}
-                              {col.isAuto && (
-                                <Badge className="h-4 rounded-sm px-1 text-[10px] bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800">
-                                  AUTO
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
-                              {col.type}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              ))}
+                  )
+                })
+              })()}
 
               {filteredTables.length === 0 && search && (
                 <div className="px-2 py-3 text-sm text-muted-foreground text-center">No tables found</div>

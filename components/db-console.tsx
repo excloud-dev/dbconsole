@@ -905,22 +905,32 @@ export function DbConsole() {
     const currentTab = tabs.find((t) => t.id === activeTab)
     const currentQueryEmpty = !currentTab?.query?.trim()
 
-    // Find primary key
+    // tableName may be qualified ("schema.name") or bare ("name").
+    const dotIdx = tableName.indexOf(".")
+    const qualSchema = dotIdx >= 0 ? tableName.slice(0, dotIdx) : undefined
+    const bareName = dotIdx >= 0 ? tableName.slice(dotIdx + 1) : tableName
+
+    // Find primary key — prefer schema-qualified match, fall back to name-only.
     let orderByClause = ""
     if (schema?.primaryKeys) {
-      const pk = schema.primaryKeys.find(pk => pk.table.name === tableName)
+      const pk =
+        (qualSchema
+          ? schema.primaryKeys.find(
+              (pk) => pk.table.schema === qualSchema && pk.table.name === bareName,
+            )
+          : undefined) ?? schema.primaryKeys.find((pk) => pk.table.name === bareName)
       if (pk) {
-        orderByClause = `\nORDER BY ${pk.columnName} DESC`
+        orderByClause = `\nORDER BY ${quoteIdent(pk.columnName)} DESC`
       }
     }
 
-    const query = `SELECT * FROM ${tableName}${orderByClause}`
+    const query = `SELECT * FROM ${quoteIdent(tableName)}${orderByClause}`
     const pagination = { limit: 100, offset: 0 }
 
     if (currentTab && currentQueryEmpty) {
       setTabs((prev) =>
         prev.map((t) =>
-          t.id === currentTab.id ? { ...t, query, pagination, name: `${tableName} (Top 100)` } : t,
+          t.id === currentTab.id ? { ...t, query, pagination, name: `${bareName} (Top 100)` } : t,
         ),
       )
       if (activeConnection) {
@@ -946,7 +956,7 @@ export function DbConsole() {
     }
 
     const newId = `view-${Date.now()}`
-    const newTab = { id: newId, name: `${tableName} (Top 100)`, query, pagination, connectionId: activeConnection ?? undefined }
+    const newTab = { id: newId, name: `${bareName} (Top 100)`, query, pagination, connectionId: activeConnection ?? undefined }
     setTabs([...tabs, newTab])
     setActiveTab(newId)
 
