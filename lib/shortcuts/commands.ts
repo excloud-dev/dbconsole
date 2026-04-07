@@ -51,11 +51,13 @@ const commands: CommandDef[] = [
   {
     id: 'ui.commandPalette',
     title: 'Open command palette',
-    description: 'Search and run commands',
+    description: 'Search and run any command (use Switch Tab for tabs only)',
     category: 'UI',
     allowInInputs: true,
     defaultBindings: {
-      web: ['Mod+K'],
+      // Web: ⌘K is taken by tabs.switch, the command list palette moves to
+      // ⌘⇧K. Desktop: ⌘K is still free since the tab switcher uses ⌘P.
+      web: ['Mod+Shift+K'],
       desktop: ['Mod+K'],
     },
   },
@@ -182,6 +184,33 @@ const commands: CommandDef[] = [
       web: [`Mod+${n}`],
     },
   })),
+  {
+    id: 'tabs.switch',
+    title: 'Switch tab…',
+    description: 'Open the fuzzy tab switcher (search by name, SQL, connection, group)',
+    category: 'Tabs',
+    allowInInputs: true,
+    defaultBindings: {
+      // Desktop: ⌘P. Browsers steal ⌘P for print, so the web build uses ⌘K
+      // and the existing command-list palette moves to ⌘⇧K (overridable in
+      // shortcut settings).
+      desktop: ['Mod+P'],
+      web: ['Mod+K'],
+    },
+  },
+  {
+    id: 'tabs.overview',
+    title: 'Tab overview',
+    description: 'Open a card grid of all open tabs',
+    category: 'Tabs',
+    allowInInputs: true,
+    defaultBindings: {
+      // Browsers don't intercept ⌘⇧P, so we can use the same binding on
+      // both runtimes.
+      desktop: ['Mod+Shift+P'],
+      web: ['Mod+Shift+P'],
+    },
+  },
   {
     id: 'ui.toggleSchemaSidebar',
     title: 'Toggle schema sidebar',

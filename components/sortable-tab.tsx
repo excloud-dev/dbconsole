@@ -37,11 +37,13 @@ interface SortableTabProps {
   onCreateGroupForTab?: (id: string) => void
   /** All groups defined in the workspace. */
   groups?: TabGroup[]
+  /** Lookup map of connectionId → human label, for the hover preview card. */
+  connectionLabels?: Record<string, string>
   width: number | null
 }
 
 export const SortableTab = forwardRef<HTMLDivElement, SortableTabProps>(
-  ({ tab, isActive, isOnlyTab, onTabChange, onTabClose, onTabRename, onTabPinToggle, onTabAssignGroup, onCreateGroupForTab, groups, width }, ref) => {
+  ({ tab, isActive, isOnlyTab, onTabChange, onTabClose, onTabRename, onTabPinToggle, onTabAssignGroup, onCreateGroupForTab, groups, connectionLabels, width }, ref) => {
     const [editing, setEditing] = useState(false)
     const [draftName, setDraftName] = useState(tab.name)
     const inputRef = useRef<HTMLInputElement | null>(null)
@@ -191,8 +193,8 @@ export const SortableTab = forwardRef<HTMLDivElement, SortableTabProps>(
             )}
           </div>
         </TooltipTrigger>
-        <TooltipContent side="bottom">
-          {tab.name}
+        <TooltipContent side="bottom" className="p-0 max-w-[360px] w-[360px]">
+          <TabPreviewCard tab={tab} connectionLabels={connectionLabels} />
         </TooltipContent>
       </Tooltip>
     )
@@ -279,3 +281,97 @@ export const SortableTab = forwardRef<HTMLDivElement, SortableTabProps>(
 )
 
 SortableTab.displayName = "SortableTab"
+
+// ---- Hover preview card ---------------------------------------------------
+
+function TabPreviewCard({
+  tab,
+  connectionLabels,
+}: {
+  tab: Tab
+  connectionLabels?: Record<string, string>
+}) {
+  const connectionLabel =
+    tab.connectionId && connectionLabels?.[tab.connectionId]
+      ? connectionLabels[tab.connectionId]
+      : tab.connectionId
+
+  // Show the first ~6 lines of SQL. Skip leading blank lines so the preview
+  // doesn't waste vertical space when the user has whitespace at the top.
+  const sqlLines = (tab.query || "")
+    .split("\n")
+    .filter((line, idx, arr) => {
+      // Trim leading blank lines
+      const before = arr.slice(0, idx)
+      return !(line.trim() === "" && before.every((l) => l.trim() === ""))
+    })
+    .slice(0, 6)
+  const remainingLines = Math.max(0, (tab.query?.split("\n").length ?? 0) - sqlLines.length)
+
+  const stripeColor = tab.connectionId ? connectionColor(tab.connectionId) : "transparent"
+
+  const lastRunBlurb = (() => {
+    if (!tab.lastRun) return null
+    const date = new Date(tab.lastRun.at)
+    const elapsed = Math.round((Date.now() - date.getTime()) / 1000)
+    const ago =
+      elapsed < 5
+        ? "just now"
+        : elapsed < 60
+          ? `${elapsed}s ago`
+          : elapsed < 3600
+            ? `${Math.round(elapsed / 60)}m ago`
+            : elapsed < 86_400
+              ? `${Math.round(elapsed / 3600)}h ago`
+              : date.toLocaleString()
+    if (tab.lastRun.status === "running") return `Running · ${ago}`
+    if (tab.lastRun.status === "error") return `Failed · ${ago}`
+    if (tab.lastRun.status === "ok") {
+      const rows = tab.lastRun.rowCount?.toLocaleString() ?? "?"
+      const dur = tab.lastRun.durationMs !== undefined ? `${tab.lastRun.durationMs}ms` : ""
+      return `${rows} rows${dur ? ` · ${dur}` : ""} · ${ago}`
+    }
+    return null
+  })()
+
+  return (
+    <div className="text-left">
+      <div
+        className="flex items-center gap-2 px-3 py-2 border-b border-border"
+        style={{
+          borderLeft: tab.connectionId ? `2px solid ${stripeColor}` : undefined,
+        }}
+      >
+        {tab.pinned && <Pin className="h-3 w-3 text-muted-foreground flex-shrink-0" aria-hidden />}
+        <span className="font-medium text-sm truncate flex-1">{tab.name}</span>
+        {connectionLabel && (
+          <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground flex-shrink-0">
+            <span
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ backgroundColor: stripeColor }}
+              aria-hidden
+            />
+            {connectionLabel}
+          </span>
+        )}
+      </div>
+
+      {sqlLines.length > 0 && (
+        <pre className="px-3 py-2 text-[11px] font-mono text-muted-foreground whitespace-pre overflow-hidden">
+          {sqlLines.join("\n")}
+          {remainingLines > 0 && `\n… +${remainingLines} more lines`}
+        </pre>
+      )}
+
+      {!sqlLines.length && tab.isSchemaGraph && (
+        <div className="px-3 py-2 text-[11px] text-muted-foreground italic">Schema graph view</div>
+      )}
+
+      {lastRunBlurb && (
+        <div className="px-3 py-1.5 text-[10px] text-muted-foreground border-t border-border">
+          {lastRunBlurb}
+        </div>
+      )}
+    </div>
+  )
+}

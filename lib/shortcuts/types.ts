@@ -50,6 +50,8 @@ export type CommandId =
   | 'tabs.jump7'
   | 'tabs.jump8'
   | 'tabs.jump9'
+  | 'tabs.switch'
+  | 'tabs.overview'
   | 'ui.toggleSchemaSidebar'
   | 'ui.openConnections'
   | 'file.openSql'

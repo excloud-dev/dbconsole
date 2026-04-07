@@ -85,6 +85,8 @@ interface QueryTabsProps {
   tabs: Tab[]
   activeTab: string
   groups?: TabGroup[]
+  /** Lookup map of connectionId → human label, for the hover preview card. */
+  connectionLabels?: Record<string, string>
   onTabChange: (id: string) => void
   onTabClose: (id: string) => void
   onTabRename?: (id: string, newName: string) => void
@@ -95,7 +97,7 @@ interface QueryTabsProps {
   onTabReorder: (tabs: Tab[]) => void
 }
 
-export function QueryTabs({ tabs, activeTab, groups, onTabChange, onTabClose, onTabRename, onTabPinToggle, onTabAssignGroup, onCreateGroupForTab, onAddTab, onTabReorder }: QueryTabsProps) {
+export function QueryTabs({ tabs, activeTab, groups, connectionLabels, onTabChange, onTabClose, onTabRename, onTabPinToggle, onTabAssignGroup, onCreateGroupForTab, onAddTab, onTabReorder }: QueryTabsProps) {
   // Pinned tabs always sort to the front of the visual list, then tabs with
   // an assigned group are clustered together (so groups visually segregate),
   // then ungrouped tabs in their original order.
@@ -192,6 +194,7 @@ export function QueryTabs({ tabs, activeTab, groups, onTabChange, onTabClose, on
                 onTabAssignGroup={onTabAssignGroup}
                 onCreateGroupForTab={onCreateGroupForTab}
                 groups={groups}
+                connectionLabels={connectionLabels}
                 width={tab.pinned ? 56 : 107}
               />
             ))}

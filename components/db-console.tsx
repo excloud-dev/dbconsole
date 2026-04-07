@@ -5,6 +5,8 @@ import { SchemasSidebar } from "./schemas-sidebar"
 import { SlowQueryPanel } from "./slow-query-panel"
 import { QueryHistoryPanel } from "./query-history-panel"
 import { SchemaGraphView } from "./schema-graph-view"
+import { TabSwitcher } from "./tab-switcher"
+import { TabOverview } from "./tab-overview"
 import { dropFromMru, loadWorkspace, saveWorkspace, touchMru, type TabGroup } from "@/lib/tab-store"
 import { deriveTabLabel } from "@/lib/sql/derive-label"
 import { QueryTabs, type Tab } from "./query-tabs"
@@ -305,6 +307,8 @@ export function DbConsole() {
   }>({})
   const [showSlowQueries, setShowSlowQueries] = useState(false)
   const [showQueryHistory, setShowQueryHistory] = useState(false)
+  const [showTabSwitcher, setShowTabSwitcher] = useState(false)
+  const [showTabOverview, setShowTabOverview] = useState(false)
 
   const openSqlInNewTab = useCallback(
     (sql: string, name?: string) => {
@@ -625,19 +629,62 @@ export function DbConsole() {
     closeTab(activeTab)
   })
 
-  useCommand("tabs.next", () => {
-    if (!tabs.length) return
-    const idx = tabs.findIndex((t) => t.id === activeTab)
-    const next = tabs[(idx + 1) % tabs.length]
-    if (next) setActiveTab(next.id)
-  })
+  // ⌃Tab / ⌃⇧Tab now cycle through tabs in MRU (most-recently-used) order
+  // instead of positional order. The cycle is sticky: while you keep tapping
+  // Tab without releasing Ctrl, we walk the snapshot taken at the start of
+  // the cycle so a second tap doesn't bounce you back. The snapshot resets
+  // when Ctrl is released, when 1.5s elapse without a tab tap, or when any
+  // other shortcut runs.
+  const mruCycleRef = useRef<{ snapshot: string[]; index: number; timer: ReturnType<typeof setTimeout> | null } | null>(null)
 
-  useCommand("tabs.prev", () => {
-    if (!tabs.length) return
-    const idx = tabs.findIndex((t) => t.id === activeTab)
-    const prev = tabs[(idx - 1 + tabs.length) % tabs.length]
-    if (prev) setActiveTab(prev.id)
-  })
+  const resetMruCycle = useCallback(() => {
+    if (mruCycleRef.current?.timer) clearTimeout(mruCycleRef.current.timer)
+    mruCycleRef.current = null
+  }, [])
+
+  // Reset cycle on Ctrl/Meta keyup (browser grants us global keyup events).
+  useEffect(() => {
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === "Control" || e.key === "Meta") resetMruCycle()
+    }
+    window.addEventListener("keyup", onKeyUp)
+    return () => window.removeEventListener("keyup", onKeyUp)
+  }, [resetMruCycle])
+
+  const cycleMru = useCallback(
+    (direction: 1 | -1) => {
+      if (tabs.length < 2) return
+      // Build a fresh snapshot if we don't have one yet. Order: head = most
+      // recently focused, then next-most-recently, then anything in `tabs`
+      // that's not yet in mruOrder (defensive — shouldn't happen post-Phase 4).
+      let cycle = mruCycleRef.current
+      if (!cycle) {
+        const seen = new Set<string>()
+        const snapshot: string[] = []
+        for (const id of mruOrder) {
+          if (tabs.find((t) => t.id === id)) {
+            snapshot.push(id)
+            seen.add(id)
+          }
+        }
+        for (const t of tabs) if (!seen.has(t.id)) snapshot.push(t.id)
+        cycle = { snapshot, index: 0, timer: null }
+        mruCycleRef.current = cycle
+      }
+      cycle.index = (cycle.index + direction + cycle.snapshot.length) % cycle.snapshot.length
+      const target = cycle.snapshot[cycle.index]
+      if (target) setActiveTab(target)
+      // Refresh the inactivity timer.
+      if (cycle.timer) clearTimeout(cycle.timer)
+      cycle.timer = setTimeout(() => resetMruCycle(), 1500)
+    },
+    [tabs, mruOrder, resetMruCycle],
+  )
+
+  useCommand("tabs.next", () => cycleMru(1))
+  useCommand("tabs.prev", () => cycleMru(-1))
+  useCommand("tabs.switch", () => setShowTabSwitcher(true))
+  useCommand("tabs.overview", () => setShowTabOverview(true))
 
   // ⌘1..⌘9 jump straight to the Nth tab in display order. Display order
   // matches what the user sees in the bar (pinned first, then unpinned).
@@ -1549,6 +1596,7 @@ export function DbConsole() {
                 setTabs((prev) => prev.map((t) => (t.id === id ? { ...t, pinned: !t.pinned } : t)))
               }}
               groups={tabGroups}
+              connectionLabels={Object.fromEntries(connections.map((c) => [c.id, c.label]))}
               onTabAssignGroup={(id, groupId) => {
                 setTabs((prev) =>
                   prev.map((t) => (t.id === id ? { ...t, groupId: groupId ?? undefined } : t)),
@@ -1850,6 +1898,25 @@ export function DbConsole() {
           openSqlInNewTab(sql, "From history")
           setShowQueryHistory(false)
         }}
+      />
+
+      <TabSwitcher
+        open={showTabSwitcher}
+        onOpenChange={setShowTabSwitcher}
+        tabs={tabs}
+        groups={tabGroups}
+        connectionLabels={Object.fromEntries(connections.map((c) => [c.id, c.label]))}
+        onPickTab={(id) => setActiveTab(id)}
+      />
+
+      <TabOverview
+        open={showTabOverview}
+        onOpenChange={setShowTabOverview}
+        tabs={tabs}
+        activeTabId={activeTab}
+        groups={tabGroups}
+        connectionLabels={Object.fromEntries(connections.map((c) => [c.id, c.label]))}
+        onPickTab={(id) => setActiveTab(id)}
       />
 
       <ConnectionDialog
