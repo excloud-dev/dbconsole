@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef } from "react"
 import { Plus } from "lucide-react"
-import type { TabGroup } from "@/lib/tab-store"
 import {
   DndContext,
   closestCenter,
@@ -43,8 +42,6 @@ export interface Tab {
   userRenamed?: boolean
   /** Pinned tabs sort to the front and collapse to icon-only width. */
   pinned?: boolean
-  /** Group membership; references TabGroup.id in the workspace. */
-  groupId?: string
   /** Most recent execution status for the status pill on the tab. */
   lastRun?: TabLastRun
   isNamedQuery?: boolean
@@ -84,37 +81,23 @@ export interface Tab {
 interface QueryTabsProps {
   tabs: Tab[]
   activeTab: string
-  groups?: TabGroup[]
   /** Lookup map of connectionId → human label, for the hover preview card. */
   connectionLabels?: Record<string, string>
   onTabChange: (id: string) => void
   onTabClose: (id: string) => void
   onTabRename?: (id: string, newName: string) => void
   onTabPinToggle?: (id: string) => void
-  onTabAssignGroup?: (id: string, groupId: string | null) => void
-  onCreateGroupForTab?: (id: string) => void
   onAddTab: () => void
   onTabReorder: (tabs: Tab[]) => void
 }
 
-export function QueryTabs({ tabs, activeTab, groups, connectionLabels, onTabChange, onTabClose, onTabRename, onTabPinToggle, onTabAssignGroup, onCreateGroupForTab, onAddTab, onTabReorder }: QueryTabsProps) {
-  // Pinned tabs always sort to the front of the visual list, then tabs with
-  // an assigned group are clustered together (so groups visually segregate),
-  // then ungrouped tabs in their original order.
+export function QueryTabs({ tabs, activeTab, connectionLabels, onTabChange, onTabClose, onTabRename, onTabPinToggle, onAddTab, onTabReorder }: QueryTabsProps) {
+  // Pinned tabs sort to the front; everything else keeps its original order.
   const sortedTabs = useMemo(() => {
     const pinned = tabs.filter((t) => t.pinned)
     const unpinned = tabs.filter((t) => !t.pinned)
-    const grouped = unpinned.filter((t) => t.groupId)
-    const ungrouped = unpinned.filter((t) => !t.groupId)
-    // Cluster grouped tabs by groupId order in `groups`.
-    const groupOrder = (groups ?? []).map((g) => g.id)
-    grouped.sort((a, b) => {
-      const ai = groupOrder.indexOf(a.groupId ?? "")
-      const bi = groupOrder.indexOf(b.groupId ?? "")
-      return ai - bi
-    })
-    return [...pinned, ...grouped, ...ungrouped]
-  }, [tabs, groups])
+    return [...pinned, ...unpinned]
+  }, [tabs])
   const tabRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
@@ -191,9 +174,6 @@ export function QueryTabs({ tabs, activeTab, groups, connectionLabels, onTabChan
                 onTabClose={onTabClose}
                 onTabRename={onTabRename}
                 onTabPinToggle={onTabPinToggle}
-                onTabAssignGroup={onTabAssignGroup}
-                onCreateGroupForTab={onCreateGroupForTab}
-                groups={groups}
                 connectionLabels={connectionLabels}
                 width={tab.pinned ? 56 : 107}
               />

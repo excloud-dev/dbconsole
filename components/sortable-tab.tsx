@@ -1,25 +1,20 @@
 "use client"
 
-import { forwardRef, useEffect, useRef, useState } from "react"
+import { forwardRef, useEffect, useMemo, useRef, useState } from "react"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { X, Bookmark, Sparkles, AlertCircle, Loader2, Pin, PinOff } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import { Tab } from "./query-tabs"
+import { connectionColor, connectionHue } from "@/lib/color/connection-color"
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
-  ContextMenuLabel,
   ContextMenuSeparator,
-  ContextMenuSub,
-  ContextMenuSubContent,
-  ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
-import type { TabGroup } from "@/lib/tab-store"
-import { cn } from "@/lib/utils"
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
-import { Tab } from "./query-tabs"
-import { connectionColor } from "@/lib/color/connection-color"
 
 interface SortableTabProps {
   tab: Tab
@@ -31,22 +26,25 @@ interface SortableTabProps {
   onTabRename?: (id: string, newName: string) => void
   /** Toggle the pin state. Pinned tabs sort to the front and survive ⌘W on the last tab. */
   onTabPinToggle?: (id: string) => void
-  /** Move a tab into a group, or pass `null` to remove from any group. */
-  onTabAssignGroup?: (id: string, groupId: string | null) => void
-  /** Create a new group, name it, and assign this tab to it. */
-  onCreateGroupForTab?: (id: string) => void
-  /** All groups defined in the workspace. */
-  groups?: TabGroup[]
   /** Lookup map of connectionId → human label, for the hover preview card. */
   connectionLabels?: Record<string, string>
   width: number | null
 }
 
 export const SortableTab = forwardRef<HTMLDivElement, SortableTabProps>(
-  ({ tab, isActive, isOnlyTab, onTabChange, onTabClose, onTabRename, onTabPinToggle, onTabAssignGroup, onCreateGroupForTab, groups, connectionLabels, width }, ref) => {
+  ({ tab, isActive, isOnlyTab, onTabChange, onTabClose, onTabRename, onTabPinToggle, connectionLabels, width }, ref) => {
     const [editing, setEditing] = useState(false)
     const [draftName, setDraftName] = useState(tab.name)
     const inputRef = useRef<HTMLInputElement | null>(null)
+
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: tab.id })
 
     useEffect(() => {
       if (editing && inputRef.current) {
@@ -55,8 +53,6 @@ export const SortableTab = forwardRef<HTMLDivElement, SortableTabProps>(
       }
     }, [editing])
 
-    // Reset the draft when the underlying tab name changes from outside
-    // (e.g. auto-label deriver fires while we're not editing).
     useEffect(() => {
       if (!editing) setDraftName(tab.name)
     }, [tab.name, editing])
@@ -70,27 +66,44 @@ export const SortableTab = forwardRef<HTMLDivElement, SortableTabProps>(
       setDraftName(tab.name)
       setEditing(false)
     }
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      transform,
-      transition,
-      isDragging,
-    } = useSortable({ id: tab.id })
 
-    // Stable per-connection color used as a 2px left border so tabs from
-    // prod / staging / sandbox visually segregate without reading the title.
-    // Falls back to muted/transparent for tabs with no connection bound yet.
-    const stripeColor = tab.connectionId ? connectionColor(tab.connectionId) : 'transparent'
+    // Connection identity is encoded as a small inline pip + an active-tab
+    // background wash. NO border, NO stripe — the previous "2px left border"
+    // produced janky parens shapes when tabs sat next to each other because
+    // the rounded corners clipped the border into an arc.
+    const pipColor = tab.connectionId ? connectionColor(tab.connectionId) : null
+    const activeBgHue = tab.connectionId ? connectionHue(tab.connectionId) : null
 
-    const style = {
+    // dnd-kit's pointer listeners default to ANY mouse button, which means
+    // a right-click starts a drag and the contextmenu event never fires.
+    // Filter so the drag only engages on the primary (left) button.
+    const safeListeners = useMemo(() => {
+      if (!listeners) return undefined
+      return {
+        ...listeners,
+        onPointerDown: (e: React.PointerEvent) => {
+          if (e.button !== 0) return
+          listeners.onPointerDown?.(e)
+        },
+        onMouseDown: (e: React.MouseEvent) => {
+          if (e.button !== 0) return
+          listeners.onMouseDown?.(e)
+        },
+      } as typeof listeners
+    }, [listeners])
+
+    const style: React.CSSProperties = {
       transform: CSS.Transform.toString(transform),
       transition,
       width: width ? `${width}px` : undefined,
       minWidth: width ? `${width}px` : undefined,
       maxWidth: width ? `${width}px` : undefined,
-      borderLeft: tab.connectionId ? `2px solid ${stripeColor}` : undefined,
+      // Faint hue wash on the active tab. The 4% lightness keeps it readable
+      // on both light and dark themes; on inactive tabs we leave it flat.
+      backgroundColor:
+        isActive && activeBgHue !== null
+          ? `hsl(${activeBgHue}, 60%, 50%, 0.07)`
+          : undefined,
     }
 
     const tabContent = (
@@ -107,11 +120,13 @@ export const SortableTab = forwardRef<HTMLDivElement, SortableTabProps>(
             }}
             style={style}
             className={cn(
-              "group flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm cursor-grab active:cursor-grabbing transition-all duration-150",
+              "group flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm transition-colors duration-100",
               isActive
-                ? "bg-card text-foreground border border-border font-medium"
-                : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground",
+                ? "text-foreground border border-border font-medium"
+                : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground border border-transparent",
               isDragging && "opacity-50 shadow-lg z-50",
+              !editing && "cursor-grab active:cursor-grabbing",
+              editing && "cursor-text",
             )}
             onClick={() => !editing && onTabChange(tab.id)}
             onDoubleClick={(e) => {
@@ -122,20 +137,19 @@ export const SortableTab = forwardRef<HTMLDivElement, SortableTabProps>(
               }
             }}
             {...(editing ? {} : attributes)}
-            {...(editing ? {} : listeners)}
+            {...(editing ? {} : safeListeners)}
           >
+            {/* Connection pip — a tiny solid disc that encodes the connection
+                identity without screaming. Hidden for tabs not bound to a
+                connection (e.g. brand new query tabs). */}
+            {pipColor && (
+              <span
+                aria-hidden
+                className="h-1.5 w-1.5 rounded-full flex-shrink-0"
+                style={{ backgroundColor: pipColor }}
+              />
+            )}
             {tab.pinned && <Pin className="h-3 w-3 text-muted-foreground flex-shrink-0" aria-label="Pinned" />}
-            {tab.groupId && groups && (() => {
-              const g = groups.find((x) => x.id === tab.groupId)
-              return g ? (
-                <span
-                  className="h-2 w-2 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: g.color }}
-                  aria-label={`Group: ${g.name}`}
-                  title={g.name}
-                />
-              ) : null
-            })()}
             {tab.isGenerator ? (
               <Sparkles className="h-3 w-3 text-emerald-600 flex-shrink-0" />
             ) : (
@@ -187,13 +201,14 @@ export const SortableTab = forwardRef<HTMLDivElement, SortableTabProps>(
                 }}
                 className="opacity-0 group-hover:opacity-100 hover:bg-muted rounded p-0.5 transition-opacity flex-shrink-0"
                 onPointerDown={(e) => e.stopPropagation()}
+                aria-label="Close tab"
               >
                 <X className="h-3 w-3" />
               </button>
             )}
           </div>
         </TooltipTrigger>
-        <TooltipContent side="bottom" className="p-0 max-w-[360px] w-[360px]">
+        <TooltipContent side="bottom" className="p-0 max-w-[360px] w-[360px] border-0">
           <TabPreviewCard tab={tab} connectionLabels={connectionLabels} />
         </TooltipContent>
       </Tooltip>
@@ -228,43 +243,6 @@ export const SortableTab = forwardRef<HTMLDivElement, SortableTabProps>(
               Rename…
             </ContextMenuItem>
           )}
-          {onTabAssignGroup && (
-            <ContextMenuSub>
-              <ContextMenuSubTrigger>Group…</ContextMenuSubTrigger>
-              <ContextMenuSubContent className="w-48">
-                <ContextMenuLabel className="text-[10px] text-muted-foreground uppercase">
-                  Move to group
-                </ContextMenuLabel>
-                <ContextMenuItem
-                  onClick={() => onTabAssignGroup(tab.id, null)}
-                  className={cn(!tab.groupId && "font-medium")}
-                >
-                  No group
-                </ContextMenuItem>
-                {groups?.map((g) => (
-                  <ContextMenuItem
-                    key={g.id}
-                    onClick={() => onTabAssignGroup(tab.id, g.id)}
-                    className={cn(tab.groupId === g.id && "font-medium")}
-                  >
-                    <span
-                      className="h-2 w-2 rounded-full mr-2 flex-shrink-0"
-                      style={{ backgroundColor: g.color }}
-                    />
-                    {g.name}
-                  </ContextMenuItem>
-                ))}
-                {onCreateGroupForTab && (
-                  <>
-                    <ContextMenuSeparator />
-                    <ContextMenuItem onClick={() => onCreateGroupForTab(tab.id)}>
-                      New group…
-                    </ContextMenuItem>
-                  </>
-                )}
-              </ContextMenuSubContent>
-            </ContextMenuSub>
-          )}
           <ContextMenuSeparator />
           <ContextMenuItem
             disabled={isOnlyTab}
@@ -283,6 +261,12 @@ export const SortableTab = forwardRef<HTMLDivElement, SortableTabProps>(
 SortableTab.displayName = "SortableTab"
 
 // ---- Hover preview card ---------------------------------------------------
+//
+// The hover preview is the "examine the tab" affordance. It's intentionally
+// dense — connection label as a small uppercase tag in the top-right, the
+// tab name as the heading, the SQL preview in monospace below, and a
+// metadata footer for last-run info. The connection-colored top accent line
+// (1px) ties the floating card visually back to the tab it came from.
 
 function TabPreviewCard({
   tab,
@@ -295,20 +279,18 @@ function TabPreviewCard({
     tab.connectionId && connectionLabels?.[tab.connectionId]
       ? connectionLabels[tab.connectionId]
       : tab.connectionId
+  const stripeColor = tab.connectionId ? connectionColor(tab.connectionId) : null
+  const tintHue = tab.connectionId ? connectionHue(tab.connectionId) : null
 
-  // Show the first ~6 lines of SQL. Skip leading blank lines so the preview
-  // doesn't waste vertical space when the user has whitespace at the top.
+  // Strip leading blank lines so the preview doesn't waste vertical space.
   const sqlLines = (tab.query || "")
     .split("\n")
     .filter((line, idx, arr) => {
-      // Trim leading blank lines
       const before = arr.slice(0, idx)
       return !(line.trim() === "" && before.every((l) => l.trim() === ""))
     })
     .slice(0, 6)
   const remainingLines = Math.max(0, (tab.query?.split("\n").length ?? 0) - sqlLines.length)
-
-  const stripeColor = tab.connectionId ? connectionColor(tab.connectionId) : "transparent"
 
   const lastRunBlurb = (() => {
     if (!tab.lastRun) return null
@@ -324,52 +306,69 @@ function TabPreviewCard({
             : elapsed < 86_400
               ? `${Math.round(elapsed / 3600)}h ago`
               : date.toLocaleString()
-    if (tab.lastRun.status === "running") return `Running · ${ago}`
-    if (tab.lastRun.status === "error") return `Failed · ${ago}`
+    if (tab.lastRun.status === "running") return { ago, body: "running…", tone: "neutral" as const }
+    if (tab.lastRun.status === "error") return { ago, body: "failed", tone: "error" as const }
     if (tab.lastRun.status === "ok") {
       const rows = tab.lastRun.rowCount?.toLocaleString() ?? "?"
       const dur = tab.lastRun.durationMs !== undefined ? `${tab.lastRun.durationMs}ms` : ""
-      return `${rows} rows${dur ? ` · ${dur}` : ""} · ${ago}`
+      return { ago, body: `${rows} rows${dur ? ` · ${dur}` : ""}`, tone: "ok" as const }
     }
     return null
   })()
 
   return (
-    <div className="text-left">
-      <div
-        className="flex items-center gap-2 px-3 py-2 border-b border-border"
-        style={{
-          borderLeft: tab.connectionId ? `2px solid ${stripeColor}` : undefined,
-        }}
-      >
-        {tab.pinned && <Pin className="h-3 w-3 text-muted-foreground flex-shrink-0" aria-hidden />}
-        <span className="font-medium text-sm truncate flex-1">{tab.name}</span>
-        {connectionLabel && (
-          <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground flex-shrink-0">
-            <span
-              className="h-1.5 w-1.5 rounded-full"
-              style={{ backgroundColor: stripeColor }}
-              aria-hidden
-            />
-            {connectionLabel}
-          </span>
-        )}
+    <div
+      className="text-left rounded-md border border-border overflow-hidden bg-popover"
+      style={{
+        // Subtle wash matching the active-tab treatment so the preview reads
+        // as "the same tab, expanded" rather than a generic floating card.
+        backgroundColor:
+          tintHue !== null ? `hsl(${tintHue}, 60%, 50%, 0.04)` : undefined,
+      }}
+    >
+      {/* Top accent line in the connection color. 1px so it's a hint, not a stripe. */}
+      {stripeColor && (
+        <div aria-hidden className="h-px w-full" style={{ backgroundColor: stripeColor }} />
+      )}
+
+      <div className="flex items-start gap-2 px-3 pt-2.5 pb-1.5">
+        <div className="flex-1 min-w-0">
+          {connectionLabel && (
+            <div className="text-[9px] uppercase tracking-[0.08em] text-muted-foreground/80 mb-0.5">
+              {connectionLabel}
+            </div>
+          )}
+          <div className="font-medium text-sm truncate flex items-center gap-1.5">
+            {tab.pinned && <Pin className="h-3 w-3 text-muted-foreground/70 flex-shrink-0" aria-hidden />}
+            {tab.name}
+          </div>
+        </div>
       </div>
 
       {sqlLines.length > 0 && (
-        <pre className="px-3 py-2 text-[11px] font-mono text-muted-foreground whitespace-pre overflow-hidden">
+        <pre className="px-3 pb-2 text-[11px] font-mono text-muted-foreground/90 whitespace-pre overflow-hidden leading-relaxed">
           {sqlLines.join("\n")}
           {remainingLines > 0 && `\n… +${remainingLines} more lines`}
         </pre>
       )}
 
       {!sqlLines.length && tab.isSchemaGraph && (
-        <div className="px-3 py-2 text-[11px] text-muted-foreground italic">Schema graph view</div>
+        <div className="px-3 pb-2 text-[11px] text-muted-foreground italic">Schema graph view</div>
       )}
 
       {lastRunBlurb && (
-        <div className="px-3 py-1.5 text-[10px] text-muted-foreground border-t border-border">
-          {lastRunBlurb}
+        <div className="flex items-center justify-between px-3 py-1.5 text-[10px] border-t border-border/60 bg-background/30">
+          <span
+            className={cn(
+              "tabular-nums font-medium",
+              lastRunBlurb.tone === "ok" && "text-emerald-700 dark:text-emerald-400",
+              lastRunBlurb.tone === "error" && "text-destructive",
+              lastRunBlurb.tone === "neutral" && "text-muted-foreground",
+            )}
+          >
+            {lastRunBlurb.body}
+          </span>
+          <span className="text-muted-foreground">{lastRunBlurb.ago}</span>
         </div>
       )}
     </div>

@@ -7,7 +7,7 @@ import { QueryHistoryPanel } from "./query-history-panel"
 import { SchemaGraphView } from "./schema-graph-view"
 import { TabSwitcher } from "./tab-switcher"
 import { TabOverview } from "./tab-overview"
-import { dropFromMru, loadWorkspace, saveWorkspace, touchMru, type TabGroup } from "@/lib/tab-store"
+import { dropFromMru, loadWorkspace, saveWorkspace, touchMru } from "@/lib/tab-store"
 import { deriveTabLabel } from "@/lib/sql/derive-label"
 import { QueryTabs, type Tab } from "./query-tabs"
 import { QueryEditor } from "./query-editor"
@@ -208,12 +208,9 @@ export function DbConsole() {
   // Global state for params expanded - applies to all named query tabs, default collapsed
   const [globalParamsExpanded, setGlobalParamsExpanded] = useState(false)
 
-  // Tab groups (Phase 4.7) and MRU order (Phase 5.x ⌃Tab cycling) live in the
-  // same persisted workspace as the tabs themselves. We hold them in plain
-  // React state and sync to localStorage on change via the v2 schema in
-  // lib/tab-store.ts. The v1 keys (db-console-tabs-v1 / -active-tab-v1) get
-  // migrated on first load.
-  const [tabGroups, setTabGroups] = useState<TabGroup[]>([])
+  // MRU order powers ⌃Tab cycling and the rest of phase 5 nav. Persisted in
+  // the same workspace blob as the tabs themselves; v1 → v2 migration is
+  // handled inside lib/tab-store.ts.
   const [mruOrder, setMruOrder] = useState<string[]>([])
 
   // Persistence: Restore workspace on mount.
@@ -222,7 +219,6 @@ export function DbConsole() {
       const ws = loadWorkspace()
       if (ws) {
         if (ws.tabs.length > 0) setTabs(ws.tabs)
-        if (ws.groups.length > 0) setTabGroups(ws.groups)
         if (ws.activeTabId) setActiveTab(ws.activeTabId)
         if (ws.mruOrder.length > 0) setMruOrder(ws.mruOrder)
       }
@@ -237,7 +233,7 @@ export function DbConsole() {
       saveWorkspace({
         version: 2,
         tabs,
-        groups: tabGroups,
+        groups: [],
         activeTabId: activeTab,
         mruOrder,
       })
@@ -245,7 +241,7 @@ export function DbConsole() {
     } catch (e) {
       console.error("Failed to save tabs", e)
     }
-  }, [tabs, tabGroups, activeTab, mruOrder, poolMode])
+  }, [tabs, activeTab, mruOrder, poolMode])
 
   // Maintain MRU order when activeTab changes.
   useEffect(() => {
@@ -1595,34 +1591,7 @@ export function DbConsole() {
               onTabPinToggle={(id) => {
                 setTabs((prev) => prev.map((t) => (t.id === id ? { ...t, pinned: !t.pinned } : t)))
               }}
-              groups={tabGroups}
               connectionLabels={Object.fromEntries(connections.map((c) => [c.id, c.label]))}
-              onTabAssignGroup={(id, groupId) => {
-                setTabs((prev) =>
-                  prev.map((t) => (t.id === id ? { ...t, groupId: groupId ?? undefined } : t)),
-                )
-              }}
-              onCreateGroupForTab={(id) => {
-                const name = window.prompt("Group name")
-                if (!name?.trim()) return
-                // Pick a color from a small palette by hashing the group name.
-                const palette = [
-                  "hsl(0, 70%, 55%)",
-                  "hsl(30, 80%, 55%)",
-                  "hsl(60, 70%, 50%)",
-                  "hsl(140, 60%, 45%)",
-                  "hsl(190, 70%, 45%)",
-                  "hsl(220, 70%, 55%)",
-                  "hsl(280, 60%, 55%)",
-                  "hsl(320, 65%, 55%)",
-                ]
-                let hash = 0
-                for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0
-                const color = palette[hash % palette.length]
-                const groupId = `group-${Date.now()}`
-                setTabGroups((prev) => [...prev, { id: groupId, name: name.trim(), color }])
-                setTabs((prev) => prev.map((t) => (t.id === id ? { ...t, groupId } : t)))
-              }}
               onAddTab={addTab}
               onTabReorder={reorderTabs}
             />
@@ -1904,7 +1873,6 @@ export function DbConsole() {
         open={showTabSwitcher}
         onOpenChange={setShowTabSwitcher}
         tabs={tabs}
-        groups={tabGroups}
         connectionLabels={Object.fromEntries(connections.map((c) => [c.id, c.label]))}
         onPickTab={(id) => setActiveTab(id)}
       />
@@ -1914,7 +1882,6 @@ export function DbConsole() {
         onOpenChange={setShowTabOverview}
         tabs={tabs}
         activeTabId={activeTab}
-        groups={tabGroups}
         connectionLabels={Object.fromEntries(connections.map((c) => [c.id, c.label]))}
         onPickTab={(id) => setActiveTab(id)}
       />
