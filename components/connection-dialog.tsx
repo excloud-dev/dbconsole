@@ -274,7 +274,7 @@ export function ConnectionDialog({
           </DialogHeader>
 
           <div className="flex-1 overflow-hidden">
-            <div className="grid h-full grid-cols-[220px_minmax(0,1fr)]">
+            <div className="grid h-full grid-cols-1 md:grid-cols-[220px_minmax(0,1fr)]">
               {/* Connection list */}
               <div className="border-r border-border/70 bg-secondary/30 flex flex-col">
                 <div className="flex items-center justify-between px-4 pt-4 pb-2">
@@ -291,7 +291,7 @@ export function ConnectionDialog({
                 <div className="flex-1 overflow-y-auto px-2 pb-3 space-y-1.5">
                   {drafts.length > 0 && (
                     <div className="pt-1">
-                      <div className="px-1.5 pb-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                      <div className="px-1.5 pb-1 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Drafts
                       </div>
                       <div className="space-y-1">
@@ -308,10 +308,10 @@ export function ConnectionDialog({
                           >
                             <div className="relative flex items-center justify-center">
                               <Database className="h-3.5 w-3.5 text-muted-foreground" />
-                              <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-blue-500 rounded-full ring-1 ring-background" />
+                              <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-info rounded-full ring-1 ring-background" />
                             </div>
                             <span className="truncate flex-1">{draft.label || "New Connection"}</span>
-                            <span className="text-[10px] uppercase tracking-wide text-primary/70">Draft</span>
+                            <span className="text-xs uppercase tracking-wide text-primary/70">Draft</span>
                           </button>
                         ))}
                       </div>
@@ -319,7 +319,7 @@ export function ConnectionDialog({
                   )}
                   {drafts.length > 0 && connections.length > 0 && (
                     <div className="pt-2">
-                      <div className="px-1.5 pb-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                      <div className="px-1.5 pb-1 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Saved
                       </div>
                     </div>
@@ -355,12 +355,12 @@ export function ConnectionDialog({
                           )}
                         />
                         {activeConnection === conn.id && (
-                          <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-emerald-500 rounded-full ring-1 ring-background" />
+                          <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-success rounded-full ring-1 ring-background" />
                         )}
                       </div>
                       <span className="truncate flex-1">{conn.label}</span>
                       {conn.from === "env" && (
-                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Env</span>
+                        <span className="text-xs uppercase tracking-wide text-muted-foreground">Env</span>
                       )}
                     </button>
                   ))}
@@ -490,7 +490,7 @@ export function ConnectionDialog({
                             size="sm"
                             className={cn(
                               "gap-2 h-8",
-                              testStatus === "success" ? "border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900 hover:text-emerald-800 dark:hover:text-emerald-300 hover:border-emerald-300 dark:hover:border-emerald-700" :
+                              testStatus === "success" ? "border-success/30 bg-success/10 text-success hover:bg-success/20" :
                                 testStatus === "error" ? "border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20" : ""
                             )}
                             onClick={handleTestConnection}
@@ -520,7 +520,7 @@ export function ConnectionDialog({
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="text-xs font-medium text-muted-foreground">Connection Usage</div>
-                            <div className="text-[11px] text-muted-foreground">
+                            <div className="text-xs text-muted-foreground">
                               Choose how connections are shared between tabs.
                             </div>
                           </div>
@@ -538,7 +538,7 @@ export function ConnectionDialog({
                               <ToggleGroupItem
                                 key={opt.key}
                                 value={opt.key}
-                                className="text-[10px] h-6 px-2 rounded-full border border-border data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:border-primary hover:bg-secondary hover:text-foreground transition-colors"
+                                className="text-xs h-6 px-2 rounded-full border border-border data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:border-primary hover:bg-secondary hover:text-foreground transition-colors"
                               >
                                 {opt.label}
                               </ToggleGroupItem>
@@ -568,14 +568,14 @@ export function ConnectionDialog({
                               type="button"
                               onClick={() => onPoolModeChange(opt.key as PoolMode)}
                               className={cn(
-                                "rounded-md border px-2 py-1.5 text-left text-[11px] transition-colors",
+                                "rounded-md border px-2 py-1.5 text-left text-xs transition-colors",
                                 poolMode === opt.key
                                   ? "border-primary/60 bg-background text-foreground shadow-xs"
                                   : "border-border/70 bg-background/60 text-muted-foreground hover:text-foreground hover:border-border"
                               )}
                             >
-                              <div className="text-[11px] font-medium">{opt.title}</div>
-                              <div className="text-[10px] text-muted-foreground">{opt.description}</div>
+                              <div className="text-xs font-medium">{opt.title}</div>
+                              <div className="text-xs text-muted-foreground">{opt.description}</div>
                             </button>
                           ))}
                         </div>

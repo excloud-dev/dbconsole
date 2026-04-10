@@ -205,7 +205,7 @@ export function NamedQueryEditor({
               return (
                 <div key={index} className="flex items-center gap-1.5 bg-card border border-border rounded-md px-2 py-1.5 shadow-sm group hover:border-border/80 transition-colors">
                   {/* Parameter Name Chip */}
-                  <div className="flex items-center justify-center h-5 px-2 rounded bg-secondary text-[10px] font-mono font-medium text-muted-foreground border border-border shrink-0" title={param.name}>
+                  <div className="flex items-center justify-center h-5 px-2 rounded bg-secondary text-xs font-mono font-medium text-muted-foreground border border-border shrink-0" title={param.name}>
                     {param.name}
                   </div>
 
@@ -219,8 +219,8 @@ export function NamedQueryEditor({
                       onValueChange={(v) => v && onParamMetaChange?.(param.name, { role: v as "set" | "where" })}
                       className="bg-secondary border border-border rounded-md p-0.5 h-5"
                     >
-                      <ToggleGroupItem value="set" tabIndex={-1} className="text-[10px] px-1.5 h-4 data-[state=on]:bg-muted data-[state=on]:text-foreground">SET</ToggleGroupItem>
-                      <ToggleGroupItem value="where" tabIndex={-1} className="text-[10px] px-1.5 h-4 data-[state=on]:bg-muted data-[state=on]:text-foreground">WHERE</ToggleGroupItem>
+                      <ToggleGroupItem value="set" tabIndex={-1} className="text-xs px-1.5 h-4 data-[state=on]:bg-muted data-[state=on]:text-foreground">SET</ToggleGroupItem>
+                      <ToggleGroupItem value="where" tabIndex={-1} className="text-xs px-1.5 h-4 data-[state=on]:bg-muted data-[state=on]:text-foreground">WHERE</ToggleGroupItem>
                     </ToggleGroup>
                   )}
 
@@ -236,12 +236,12 @@ export function NamedQueryEditor({
                           boolState === "none" ? "true" : boolState === "true" ? "false" : ""
                         updateParamValues({ ...effectiveParamValues, [param.name]: next })
                       }}
-                      className={`h-5 w-6 flex items-center justify-center rounded border text-[10px] font-mono ${inputDisabled
+                      className={`h-5 w-6 flex items-center justify-center rounded border text-xs font-mono ${inputDisabled
                         ? "border-border text-muted-foreground/50 bg-secondary cursor-not-allowed"
                         : boolState === "true"
-                          ? "border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950"
+                          ? "border-success/40 text-success bg-success/10"
                           : boolState === "false"
-                            ? "border-rose-300 dark:border-rose-700 text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950"
+                            ? "border-destructive/40 text-destructive bg-destructive/10"
                             : "border-border text-muted-foreground bg-card hover:bg-secondary"
                         }`}
                       title={boolState === "none" ? "Unset" : boolState === "true" ? "True" : "False"}
@@ -266,13 +266,13 @@ export function NamedQueryEditor({
                   {mode === "generator" && (
                     <div className="flex items-center gap-1 pl-1">
                       {isPk && (
-                        <span className="text-[9px] uppercase text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded px-1 py-0.5">
+                        <span className="text-xs uppercase text-warning bg-warning/10 border border-warning/30 rounded px-1 py-0.5">
                           PK
                         </span>
                       )}
                       {isAuto && role !== "where" && (
                         <button
-                          className={`text-[9px] uppercase rounded px-1 py-0.5 border ${overrideAuto ? "bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800" : "bg-secondary text-muted-foreground border-border"}`}
+                          className={`text-xs uppercase rounded px-1 py-0.5 border ${overrideAuto ? "bg-success/10 text-success border-success/30" : "bg-secondary text-muted-foreground border-border"}`}
                           onClick={() => onParamMetaChange?.(param.name, { overrideAuto: !overrideAuto })}
                           type="button"
                           tabIndex={-1}
@@ -282,7 +282,7 @@ export function NamedQueryEditor({
                         </button>
                       )}
                     <button
-                      className={`text-[9px] uppercase rounded px-1 py-0.5 border ${isNull ? "bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800" : "bg-secondary text-muted-foreground border-border"} ${nullDisabled ? "opacity-40 cursor-not-allowed" : ""}`}
+                      className={`text-xs uppercase rounded px-1 py-0.5 border ${isNull ? "bg-info/10 text-info border-info/30" : "bg-secondary text-muted-foreground border-border"} ${nullDisabled ? "opacity-40 cursor-not-allowed" : ""}`}
                       onClick={() => {
                         if (nullDisabled) return
                         onParamMetaChange?.(param.name, { isNull: !isNull })
@@ -295,7 +295,7 @@ export function NamedQueryEditor({
                       NULL
                     </button>
                       {isNullable === false && (
-                        <span className="text-[9px] text-rose-600 dark:text-rose-400">NOT NULL</span>
+                        <span className="text-xs text-destructive">NOT NULL</span>
                       )}
                     </div>
                   )}
@@ -351,8 +351,8 @@ export function NamedQueryEditor({
               size="sm"
               onClick={handleCopy}
               className={`h-7 text-xs gap-1.5 transition-all duration-300 border ${isCopied
-                ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
-                : "bg-emerald-50/50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900 border-emerald-100 dark:border-emerald-800 hover:border-emerald-200 dark:hover:border-emerald-700"
+                ? "bg-success/15 text-success border-success/30"
+                : "bg-success/5 text-success hover:bg-success/15 border-success/20 hover:border-success/30"
                 }`}
             >
               {isCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}

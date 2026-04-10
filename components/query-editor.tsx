@@ -45,7 +45,7 @@ export function QueryEditor({ query, onChange, onRun, onSaveAsNamed, isNamedQuer
         />
 
         {/* Floating Actions */}
-        <div className="absolute bottom-4 right-4 flex items-center gap-2 transition-opacity opacity-0 group-hover/editor:opacity-100">
+        <div className="absolute bottom-4 right-4 flex items-center gap-2 transition-opacity opacity-60 group-hover/editor:opacity-100">
           {!isNamedQuery && query.trim() && (
             <Button
               size="sm"
@@ -69,13 +69,13 @@ export function QueryEditor({ query, onChange, onRun, onSaveAsNamed, isNamedQuer
           {params.map((param, idx) => (
             <div key={idx} className="flex items-center gap-1.5 bg-card border border-border rounded-md px-2 py-1.5 shadow-sm group hover:border-border/80 transition-colors">
               {/* Index Chip */}
-              <div className="flex items-center justify-center h-5 w-6 rounded bg-secondary text-[10px] font-mono font-medium text-muted-foreground border border-border shrink-0" title={`Parameter $${idx + 1}`}>
+              <div className="flex items-center justify-center h-5 w-6 rounded bg-secondary text-xs font-mono font-medium text-muted-foreground border border-border shrink-0" title={`Parameter $${idx + 1}`}>
                 ${idx + 1}
               </div>
 
               {/* Type Select */}
               <Select value={param.type} onValueChange={(v) => updateParam(idx, { type: v as "string" | "number" | "boolean" })}>
-                <SelectTrigger className="h-5 w-[42px] border-none bg-transparent p-0 text-[10px] text-muted-foreground font-medium hover:text-foreground focus:ring-0 shadow-none data-[placeholder]:text-muted-foreground">
+                <SelectTrigger className="h-5 w-[46px] border-none bg-transparent p-0 text-xs text-muted-foreground font-medium hover:text-foreground focus:ring-0 shadow-none data-[placeholder]:text-muted-foreground">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -95,10 +95,10 @@ export function QueryEditor({ query, onChange, onRun, onSaveAsNamed, isNamedQuer
                     const next = param.value === "" ? "true" : param.value === "true" ? "false" : ""
                     updateParam(idx, { value: next })
                   }}
-                  className={`h-5 w-6 flex items-center justify-center rounded border text-[10px] font-mono ${param.value === "true"
-                    ? "border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950"
+                  className={`h-5 w-6 flex items-center justify-center rounded border text-xs font-mono ${param.value === "true"
+                    ? "border-success/40 text-success bg-success/10"
                     : param.value === "false"
-                      ? "border-rose-300 dark:border-rose-700 text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950"
+                      ? "border-destructive/40 text-destructive bg-destructive/10"
                       : "border-border text-muted-foreground bg-card hover:bg-secondary"
                     }`}
                   title={param.value === "" ? "Unset" : param.value === "true" ? "True" : "False"}
@@ -118,7 +118,7 @@ export function QueryEditor({ query, onChange, onRun, onSaveAsNamed, isNamedQuer
 
               {/* Label Hint (if distinct from value) */}
               {paramLabels[idx] && (
-                <span className="text-[9px] text-muted-foreground truncate max-w-[60px] select-none" title={paramLabels[idx]}>
+                <span className="text-xs text-muted-foreground truncate max-w-[60px] select-none" title={paramLabels[idx]}>
                   {paramLabels[idx]}
                 </span>
               )}

@@ -34,7 +34,7 @@ function highlightJson(json: string) {
 
         if (part.endsWith(':')) {
             // Key
-            elements.push(<span key={index} className="text-blue-600 dark:text-blue-400 font-semibold">{part.slice(0, -1)}</span>);
+            elements.push(<span key={index} className="text-info font-semibold">{part.slice(0, -1)}</span>);
             elements.push(<span key={index + '_c'} className="text-muted-foreground">:</span>);
         } else if (part.startsWith('"')) {
             // String value
@@ -71,8 +71,8 @@ export function CellDetailDialog({ open, onOpenChange, content, columnName }: Ce
         const identifiers = /"[^\"]*"|`[^`]*`/g
 
         const tokens: { regex: RegExp; className: string }[] = [
-            { regex: strings, className: "text-emerald-600 dark:text-emerald-400" },
-            { regex: identifiers, className: "text-blue-600 dark:text-blue-400" },
+            { regex: strings, className: "text-success" },
+            { regex: identifiers, className: "text-info" },
             { regex: keywords, className: "text-purple-700 dark:text-purple-400 font-semibold" },
             { regex: numbers, className: "text-orange-600 dark:text-orange-400" },
         ]
@@ -182,7 +182,7 @@ export function CellDetailDialog({ open, onOpenChange, content, columnName }: Ce
                     <DialogTitle className="flex items-center gap-2 text-base font-medium">
                         <Expand className="h-4 w-4 text-muted-foreground" />
                         {columnName}
-                        {isJson && <span className="text-[10px] bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded font-mono border border-blue-100 dark:border-blue-800 uppercase tracking-wider">JSON</span>}
+                        {isJson && <span className="text-xs bg-info/10 text-info px-1.5 py-0.5 rounded font-mono border border-info/30 uppercase tracking-wider">JSON</span>}
                     </DialogTitle>
                 </DialogHeader>
 
@@ -200,8 +200,8 @@ export function CellDetailDialog({ open, onOpenChange, content, columnName }: Ce
                         size="sm"
                         onClick={handleCopy}
                         className={`h-7 text-xs gap-1.5 transition-all duration-300 border ${isCopied
-                                ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
-                                : "bg-emerald-50/50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900 border-emerald-100 dark:border-emerald-800 hover:border-emerald-200 dark:hover:border-emerald-700"
+                                ? "bg-success/10 text-success border-success/30"
+                                : "bg-success/10 text-success hover:bg-success/15 border-success/30 hover:border-success/40"
                             }`}
                     >
                         {isCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}

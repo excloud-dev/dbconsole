@@ -175,7 +175,6 @@ export function QueryTabs({ tabs, activeTab, connectionLabels, onTabChange, onTa
                 onTabRename={onTabRename}
                 onTabPinToggle={onTabPinToggle}
                 connectionLabels={connectionLabels}
-                width={tab.pinned ? 56 : 107}
               />
             ))}
           </div>

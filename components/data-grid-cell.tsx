@@ -98,7 +98,7 @@ function JsonCell({ value }: { value: unknown }) {
     text = "[unserializable]"
   }
   return (
-    <span className="font-mono text-xs text-emerald-700 dark:text-emerald-400 truncate" title={text}>
+    <span className="font-mono text-xs text-success truncate" title={text}>
       {text}
     </span>
   )
@@ -144,13 +144,13 @@ function ByteaCell({ value }: { value: unknown }) {
         : null
   return (
     <span className="inline-flex items-center gap-1 group/bytea">
-      <span className="font-mono text-[10px] text-muted-foreground">{sizeBytes !== null ? `${sizeBytes}B` : ""}</span>
+      <span className="font-mono text-xs text-muted-foreground">{sizeBytes !== null ? `${sizeBytes}B` : ""}</span>
       <span className="font-mono text-xs truncate" title={text}>
         {text}
       </span>
       <button
         type="button"
-        className="opacity-0 group-hover/bytea:opacity-100 transition-opacity text-muted-foreground hover:text-foreground text-[10px] uppercase font-mono"
+        className="opacity-0 group-hover/bytea:opacity-100 transition-opacity text-muted-foreground hover:text-foreground text-xs uppercase font-mono"
         onClick={(e) => {
           e.stopPropagation()
           setMode((m) => (m === "hex" ? "b64" : "hex"))
@@ -194,7 +194,7 @@ function ArrayCell({ value }: { value: unknown }) {
         <span
           key={i}
           className={cn(
-            "inline-flex items-center rounded-sm bg-muted px-1 py-0 text-[10px] font-mono",
+            "inline-flex items-center rounded-sm bg-muted px-1 py-0 text-xs font-mono",
             "text-foreground border border-border max-w-[120px] truncate",
           )}
           title={item == null ? "NULL" : String(item)}
@@ -203,7 +203,7 @@ function ArrayCell({ value }: { value: unknown }) {
         </span>
       ))}
       {arr.length > shown.length && (
-        <span className="text-[10px] text-muted-foreground">+{arr.length - shown.length}</span>
+        <span className="text-xs text-muted-foreground">+{arr.length - shown.length}</span>
       )}
     </span>
   )

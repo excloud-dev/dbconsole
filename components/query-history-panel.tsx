@@ -35,9 +35,9 @@ type Props = {
 }
 
 const STATUS_META: Record<QueryHistoryStatus, { label: string; icon: typeof CheckCircle2; className: string }> = {
-  ok: { label: "OK", icon: CheckCircle2, className: "text-emerald-600 dark:text-emerald-400" },
+  ok: { label: "OK", icon: CheckCircle2, className: "text-success" },
   error: { label: "Error", icon: AlertCircle, className: "text-destructive" },
-  timeout: { label: "Timeout", icon: Clock, className: "text-amber-600 dark:text-amber-400" },
+  timeout: { label: "Timeout", icon: Clock, className: "text-warning" },
 }
 
 function formatDuration(ms: number | undefined): string {
@@ -228,11 +228,11 @@ export function QueryHistoryPanel({
           aria-label="Query history"
         >
           {error && (
-            <div className="p-4 m-4 border border-destructive/30 bg-destructive/5 rounded-md text-xs">
-              <div className="flex items-center gap-2 font-semibold text-destructive mb-1">
-                <AlertCircle className="h-3.5 w-3.5" /> Failed to load
+            <div className="p-4 m-4 border border-destructive/30 bg-destructive/5 rounded-md">
+              <div className="flex items-center gap-2 font-semibold text-destructive mb-1 text-sm">
+                <AlertCircle className="h-4 w-4" /> Failed to load
               </div>
-              <div className="font-mono break-words">{error}</div>
+              <div className="text-sm break-words text-destructive/80">{error}</div>
             </div>
           )}
 
@@ -265,7 +265,7 @@ export function QueryHistoryPanel({
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <Icon className={cn("h-3.5 w-3.5 shrink-0", meta.className)} aria-hidden />
-                      <span className={cn("font-semibold uppercase tracking-wide text-[10px]", meta.className)}>
+                      <span className={cn("font-semibold uppercase tracking-wide text-xs", meta.className)}>
                         {meta.label}
                       </span>
                       <span className="text-muted-foreground">·</span>
@@ -284,7 +284,7 @@ export function QueryHistoryPanel({
                       {previewSql(row.sql)}
                     </div>
                     {row.status !== "ok" && row.errorMessage && (
-                      <div className="font-mono text-destructive/80 text-[11px] mt-1 break-words line-clamp-2">
+                      <div className="text-destructive/80 text-xs mt-1 break-words line-clamp-2">
                         {row.errorMessage}
                       </div>
                     )}
@@ -296,7 +296,7 @@ export function QueryHistoryPanel({
         </div>
 
         {data && (
-          <div className="border-t border-border px-4 py-1.5 text-[11px] text-muted-foreground flex items-center justify-between">
+          <div className="border-t border-border px-4 py-1.5 text-xs text-muted-foreground flex items-center justify-between">
             <span>
               Showing {data.rows.length} of {data.total.toLocaleString()} entries
               {data.hasMore ? " (more available — narrow filters to see)" : ""}

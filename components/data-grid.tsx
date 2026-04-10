@@ -553,7 +553,7 @@ export function DataGrid({ columns: rawColumns, columnTypes, data, loading, erro
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 text-destructive p-4 text-center">
         <div className="text-sm font-medium">Query Failed</div>
-        <div className="text-xs font-mono bg-destructive/10 p-2 rounded">{error}</div>
+        <div className="text-sm font-mono bg-destructive/10 p-2 rounded">{error}</div>
       </div>
     )
   }
@@ -634,7 +634,7 @@ export function DataGrid({ columns: rawColumns, columnTypes, data, loading, erro
           <div
             role="status"
             aria-live="polite"
-            className="flex items-center gap-2 px-3 py-1.5 text-xs border-b border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+            className="flex items-center gap-2 px-3 py-1.5 text-xs border-b border-warning/30 bg-warning/10 text-warning"
           >
             <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />
             <span className="truncate flex-1">
@@ -647,7 +647,7 @@ export function DataGrid({ columns: rawColumns, columnTypes, data, loading, erro
               <Button
                 size="sm"
                 variant="outline"
-                className="h-6 px-2 text-[11px] border-amber-500/40 hover:bg-amber-500/20"
+                className="h-6 px-2 text-xs border-warning/40 hover:bg-warning/20"
                 onClick={truncated.onSwitchToStream}
               >
                 Stream all rows →
@@ -660,7 +660,7 @@ export function DataGrid({ columns: rawColumns, columnTypes, data, loading, erro
           <div
             role="status"
             aria-live="polite"
-            className="flex items-center gap-2 px-3 py-1.5 text-xs border-b border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300"
+            className="flex items-center gap-2 px-3 py-1.5 text-xs border-b border-info/30 bg-info/10 text-info"
           >
             <Loader2 className={cn("h-3.5 w-3.5 shrink-0", streaming.loading && "animate-spin")} aria-hidden />
             <span className="truncate flex-1">
@@ -671,7 +671,7 @@ export function DataGrid({ columns: rawColumns, columnTypes, data, loading, erro
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-6 px-2 text-[11px] hover:bg-blue-500/20"
+                className="h-6 px-2 text-xs hover:bg-info/20"
                 onClick={streaming.onClose}
               >
                 Close stream
@@ -773,7 +773,7 @@ export function DataGrid({ columns: rawColumns, columnTypes, data, loading, erro
                   >
                     <div
                       className={cn(
-                        "h-full w-full flex items-center justify-center text-[10px] font-mono select-none gap-2",
+                        "h-full w-full flex items-center justify-center text-xs font-mono select-none gap-2",
                         isAllSelected() ? "text-foreground font-bold" : "text-muted-foreground"
                       )}
                     >
@@ -802,7 +802,7 @@ export function DataGrid({ columns: rawColumns, columnTypes, data, loading, erro
                               ? null
                               : flexRender(header.column.columnDef.header, header.getContext())}
                           </span>
-                          <span className="ml-auto text-[10px] text-muted-foreground font-mono select-none flex-shrink-0">
+                          <span className="ml-auto text-xs text-muted-foreground font-mono select-none flex-shrink-0">
                             {header.index + 1}
                           </span>
                         </div>
@@ -875,7 +875,7 @@ export function DataGrid({ columns: rawColumns, columnTypes, data, loading, erro
                     role="rowheader"
                     aria-colindex={1}
                     aria-label={`Row ${(offset || 0) + rowIdx + 1}`}
-                    className="sticky left-0 z-10 w-10 min-w-[40px] bg-secondary border-r border-border text-center text-[10px] text-muted-foreground cursor-pointer hover:bg-muted user-select-none font-mono"
+                    className="sticky left-0 z-10 w-10 min-w-[40px] bg-secondary border-r border-border text-center text-xs text-muted-foreground cursor-pointer hover:bg-muted user-select-none font-mono"
                     onMouseDown={(e) => handleGutterMouseDown(rowIdx, e)}
                     onMouseEnter={(e) => {
                       if (isDragging) {
@@ -946,8 +946,8 @@ export function DataGrid({ columns: rawColumns, columnTypes, data, loading, erro
                 className={cn(
                   "h-7 gap-1.5 transition-all duration-300 border rounded-r-none border-r-0",
                   isCopied
-                    ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
-                    : "bg-card text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-950 border-emerald-100 dark:border-emerald-900 hover:border-emerald-200/50 shadow-sm",
+                    ? "bg-success/15 text-success border-success/30"
+                    : "bg-card text-success hover:bg-success/15 border-success/10 hover:border-success/20 shadow-sm",
                   !selection && "opacity-50 grayscale cursor-not-allowed bg-secondary border-border text-muted-foreground shadow-none"
                 )}
                 onClick={() => handleSmartCopy()}
@@ -964,8 +964,8 @@ export function DataGrid({ columns: rawColumns, columnTypes, data, loading, erro
                     className={cn(
                       "h-7 px-1.5 transition-all duration-300 border rounded-l-none",
                       isCopied
-                        ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
-                        : "bg-card text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-950 border-emerald-100 dark:border-emerald-900 hover:border-emerald-200/50 shadow-sm",
+                        ? "bg-success/15 text-success border-success/30"
+                        : "bg-card text-success hover:bg-success/15 border-success/10 hover:border-success/20 shadow-sm",
                       !selection && "opacity-50 grayscale cursor-not-allowed bg-secondary border-border text-muted-foreground shadow-none"
                     )}
                   >
@@ -1051,7 +1051,7 @@ export function DataGrid({ columns: rawColumns, columnTypes, data, loading, erro
                       <Checkbox
                         checked={column.getIsVisible()}
                         onCheckedChange={(val) => column.toggleVisibility(!!val)}
-                        className="data-[state=checked]:bg-emerald-100 dark:data-[state=checked]:bg-emerald-950 data-[state=checked]:text-emerald-700 dark:data-[state=checked]:text-emerald-400 data-[state=checked]:border-emerald-200 dark:data-[state=checked]:border-emerald-800 border-border"
+                        className="data-[state=checked]:bg-success/15 data-[state=checked]:text-success data-[state=checked]:border-success/30 border-border"
                       />
                       <span className="truncate flex-1">{column.id}</span>
                     </DropdownMenuItem>
@@ -1073,7 +1073,7 @@ export function DataGrid({ columns: rawColumns, columnTypes, data, loading, erro
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-6 px-2 text-[11px]"
+                  className="h-6 px-2 text-xs"
                   disabled={!streaming.hasMore || streaming.loading}
                   onClick={streaming.onLoadMore}
                 >

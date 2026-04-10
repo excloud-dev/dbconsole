@@ -103,7 +103,7 @@ export function SaveNamedQueryDialog({ open, onOpenChange, query: initialQuery, 
                   className="h-full"
                 />
               </div>
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Use <code>:paramName</code> for named parameters.
               </p>
             </div>

@@ -15,12 +15,18 @@
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  --muted-foreground: oklch(0.46 0 0);
   /* Added pastel teal accent color */
   --accent: oklch(0.85 0.08 180);
   --accent-foreground: oklch(0.25 0.05 180);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
+  --success: oklch(0.52 0.14 155);
+  --success-foreground: oklch(0.985 0 0);
+  --warning: oklch(0.65 0.16 75);
+  --warning-foreground: oklch(0.25 0.05 75);
+  --info: oklch(0.55 0.12 250);
+  --info-foreground: oklch(0.985 0 0);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
@@ -39,20 +45,20 @@
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
   /* SQL syntax highlighting */
-  --sql-keyword: #5c6bc0;
-  --sql-string: #43a047;
-  --sql-number: #e65100;
-  --sql-comment: #78909c;
-  --sql-operator: #6d4c41;
-  --sql-property: #00796b;
-  --sql-type: #7b1fa2;
-  --sql-caret: #1c1917;
-  --sql-placeholder: #a8a29e;
-  --sql-tooltip-bg: #fff;
-  --sql-tooltip-border: #e7e5e4;
-  --sql-tooltip-selected-bg: #f5f5f4;
-  --sql-tooltip-selected-text: #1c1917;
-  --sql-completion-detail: #78716c;
+  --sql-keyword: oklch(0.52 0.12 275);
+  --sql-string: oklch(0.52 0.14 155);
+  --sql-number: oklch(0.55 0.18 45);
+  --sql-comment: oklch(0.58 0.03 230);
+  --sql-operator: oklch(0.45 0.06 50);
+  --sql-property: oklch(0.48 0.1 185);
+  --sql-type: oklch(0.45 0.16 310);
+  --sql-caret: oklch(0.15 0 0);
+  --sql-placeholder: oklch(0.68 0.01 60);
+  --sql-tooltip-bg: oklch(1 0 0);
+  --sql-tooltip-border: oklch(0.92 0.005 60);
+  --sql-tooltip-selected-bg: oklch(0.97 0.002 60);
+  --sql-tooltip-selected-text: oklch(0.15 0 0);
+  --sql-completion-detail: oklch(0.52 0.01 60);
 }
 
 .dark {
@@ -72,6 +78,12 @@
   --accent-foreground: oklch(0.95 0.02 180);
   --destructive: oklch(0.5 0.18 25);
   --destructive-foreground: oklch(0.95 0.01 25);
+  --success: oklch(0.68 0.14 155);
+  --success-foreground: oklch(0.15 0.02 155);
+  --warning: oklch(0.75 0.14 75);
+  --warning-foreground: oklch(0.2 0.04 75);
+  --info: oklch(0.7 0.1 250);
+  --info-foreground: oklch(0.15 0.02 250);
   --border: oklch(0.28 0.01 240);
   --input: oklch(0.26 0.01 240);
   --ring: oklch(0.45 0.02 240);
@@ -89,20 +101,20 @@
   --sidebar-border: oklch(0.25 0.01 240);
   --sidebar-ring: oklch(0.4 0.02 240);
   /* SQL syntax highlighting - brighter for dark mode readability */
-  --sql-keyword: #9fa8da;
-  --sql-string: #81c784;
-  --sql-number: #ffb74d;
-  --sql-comment: #90a4ae;
-  --sql-operator: #bcaaa4;
-  --sql-property: #4db6ac;
-  --sql-type: #ce93d8;
-  --sql-caret: #e7e5e4;
-  --sql-placeholder: #78716c;
-  --sql-tooltip-bg: #292524;
-  --sql-tooltip-border: #44403c;
-  --sql-tooltip-selected-bg: #44403c;
-  --sql-tooltip-selected-text: #fafaf9;
-  --sql-completion-detail: #a8a29e;
+  --sql-keyword: oklch(0.75 0.08 275);
+  --sql-string: oklch(0.72 0.1 155);
+  --sql-number: oklch(0.78 0.12 75);
+  --sql-comment: oklch(0.68 0.03 230);
+  --sql-operator: oklch(0.76 0.04 50);
+  --sql-property: oklch(0.7 0.08 185);
+  --sql-type: oklch(0.78 0.1 320);
+  --sql-caret: oklch(0.92 0.005 60);
+  --sql-placeholder: oklch(0.52 0.01 60);
+  --sql-tooltip-bg: oklch(0.2 0.005 40);
+  --sql-tooltip-border: oklch(0.32 0.005 40);
+  --sql-tooltip-selected-bg: oklch(0.32 0.005 40);
+  --sql-tooltip-selected-text: oklch(0.98 0.002 60);
+  --sql-completion-detail: oklch(0.68 0.01 60);
 }
 
 @theme inline {
@@ -124,6 +136,12 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);

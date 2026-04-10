@@ -137,7 +137,7 @@ export function UpdateSettingsDialog({
                             <Key className="h-3.5 w-3.5" />
                             <span>GitHub Authentication</span>
                             {tokenConfigured && (
-                                <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                                <Badge variant="secondary" className="text-xs uppercase tracking-wide">
                                     Token Configured
                                 </Badge>
                             )}
@@ -171,11 +171,11 @@ export function UpdateSettingsDialog({
                                     Required for accessing private repositories. Token should have &apos;repo&apos; permissions.
                                 </p>
                                 {tokenConfigured && (
-                                    <div className="flex items-start gap-3 p-3 rounded-md border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-200 text-sm">
-                                        <Shield className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                                    <div className="flex items-start gap-3 p-3 rounded-md border border-success/30 bg-success/10 text-foreground text-sm">
+                                        <Shield className="h-4 w-4 shrink-0 text-success" />
                                         <div>
                                             <p className="font-medium leading-tight">Token already configured</p>
-                                            <p className="text-xs text-emerald-700 dark:text-emerald-300 leading-tight">
+                                            <p className="text-xs text-success leading-tight">
                                                 DBConsole is already using a saved GitHub token. Leave this field empty to keep it,
                                                 or enter a new token to replace the stored credentials if needed.
                                             </p>
@@ -356,11 +356,11 @@ export function UpdateSettingsDialog({
 
                     {/* Warning for auto-install */}
                     {localSettings.autoInstall && (
-                        <div className="flex items-start gap-2 p-3 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950">
-                            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5" />
+                        <div className="flex items-start gap-2 p-3 rounded-md border border-warning/30 bg-warning/10">
+                            <AlertTriangle className="h-4 w-4 text-warning mt-0.5" />
                             <div className="text-sm">
-                                <p className="font-medium text-amber-800 dark:text-amber-200">Automatic Installation Enabled</p>
-                                <p className="text-amber-700 dark:text-amber-300">
+                                <p className="font-medium text-warning">Automatic Installation Enabled</p>
+                                <p className="text-warning">
                                     Updates will be installed automatically and may restart the application without warning.
                                 </p>
                             </div>

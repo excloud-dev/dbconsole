@@ -191,7 +191,7 @@ export function JoinBuilderDialog({ open, onOpenChange, baseTable, tables, onCre
                   variant={i === 0 ? "default" : "secondary"}
                   className={cn(
                     "font-mono text-xs",
-                    i === 0 ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800" : "bg-card border border-border",
+                    i === 0 ? "bg-success/15 text-success border border-success/30" : "bg-card border border-border",
                   )}
                 >
                   {table}
@@ -206,7 +206,7 @@ export function JoinBuilderDialog({ open, onOpenChange, baseTable, tables, onCre
             <div className="space-y-2">
               <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center justify-between">
                 <span>Available Relationships</span>
-                <span className="text-[10px] text-muted-foreground/60 font-normal normal-case">Click to add</span>
+                <span className="text-xs text-muted-foreground/60 font-normal normal-case">Click to add</span>
               </div>
 
               {/* Conditional search bar - only show when 5+ relationships */}
@@ -220,7 +220,7 @@ export function JoinBuilderDialog({ open, onOpenChange, baseTable, tables, onCre
                     className="h-8 pl-9 text-xs bg-card border-border focus:border-muted-foreground focus:ring-ring/20"
                   />
                   {searchQuery && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground/60">
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground/60">
                       {filteredRelationships.length} of {availableRelationships.length}
                     </div>
                   )}
@@ -236,7 +236,7 @@ export function JoinBuilderDialog({ open, onOpenChange, baseTable, tables, onCre
                   >
                     <div className="flex items-center justify-between w-full">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <div className="h-5 w-5 rounded-full bg-blue-100 dark:bg-blue-950 flex-shrink-0 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                        <div className="h-5 w-5 rounded-full bg-info/15 flex-shrink-0 flex items-center justify-center text-info">
                           <Plus className="h-3 w-3" />
                         </div>
                         <span className="font-semibold text-foreground truncate text-sm" title={rel.toTable}>
@@ -246,16 +246,16 @@ export function JoinBuilderDialog({ open, onOpenChange, baseTable, tables, onCre
                     </div>
 
                     <div className="flex items-center gap-1.5 w-full pl-7 opacity-80 group-hover:opacity-100 transition-opacity">
-                      <code className="text-blue-700 dark:text-blue-400 font-mono font-medium text-[11px] truncate bg-blue-50 dark:bg-blue-950 px-1 py-0.5 rounded border border-blue-100 dark:border-blue-800 max-w-[45%]" title={rel.toCol}>
+                      <code className="text-info font-mono font-medium text-xs truncate bg-info/10 px-1 py-0.5 rounded border border-info/30 max-w-[45%]" title={rel.toCol}>
                         {rel.toCol}
                       </code>
                       <ArrowRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                       <div className="flex items-center gap-0.5 min-w-0 max-w-[45%]">
-                        <code className="text-muted-foreground font-mono text-[11px] truncate" title={rel.fromTable}>
+                        <code className="text-muted-foreground font-mono text-xs truncate" title={rel.fromTable}>
                           {rel.fromTable}
                         </code>
                         <span className="text-muted-foreground/60">.</span>
-                        <code className="text-foreground font-mono text-[11px] truncate" title={rel.fromCol}>
+                        <code className="text-foreground font-mono text-xs truncate" title={rel.fromCol}>
                           {rel.fromCol}
                         </code>
                       </div>
@@ -317,7 +317,7 @@ export function JoinBuilderDialog({ open, onOpenChange, baseTable, tables, onCre
                         {join.leftTable}.{join.leftColumn}
                       </code>
                       <ArrowRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                      <code className="px-1.5 py-0.5 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-400 rounded font-mono border border-blue-100 dark:border-blue-800 truncate" title={`${join.table}.${join.rightColumn}`}>
+                      <code className="px-1.5 py-0.5 bg-info/10 text-info rounded font-mono border border-info/30 truncate" title={`${join.table}.${join.rightColumn}`}>
                         {join.table}.{join.rightColumn}
                       </code>
                     </div>

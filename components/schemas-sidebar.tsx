@@ -280,9 +280,9 @@ export function SchemasSidebar({
   const getStatusColor = (status?: string) => {
     switch (status) {
       case "connected":
-        return "bg-emerald-400"
+        return "bg-success"
       case "connecting":
-        return "bg-amber-400"
+        return "bg-warning"
       default:
         return "bg-muted-foreground/40"
     }
@@ -330,7 +330,7 @@ export function SchemasSidebar({
               </div>
             ) : (
               <>
-                <div className="px-2 pb-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                <div className="px-2 pb-1 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Connections
                 </div>
                 {connections.map((conn) => (
@@ -351,7 +351,7 @@ export function SchemasSidebar({
                     />
                     <span className="truncate font-medium">{conn.label}</span>
                     {activeConnection === conn.id && (
-                      <span className="ml-auto text-[10px] uppercase tracking-wide text-muted-foreground">
+                      <span className="ml-auto text-xs uppercase tracking-wide text-muted-foreground">
                         Active
                       </span>
                     )}
@@ -416,7 +416,7 @@ export function SchemasSidebar({
               <span className="truncate">Tables</span>
               <Badge
                 variant="secondary"
-                className="ml-1 h-4 px-1.5 text-[10px] tabular-nums text-muted-foreground bg-background border-border flex-shrink-0"
+                className="ml-1 h-4 px-1.5 text-xs tabular-nums text-muted-foreground bg-background border-border flex-shrink-0"
               >
                 {filteredTables.length}
               </Badge>
@@ -426,7 +426,7 @@ export function SchemasSidebar({
               <span className="truncate">Saved</span>
               <Badge
                 variant="secondary"
-                className="ml-1 h-4 px-1.5 text-[10px] tabular-nums text-muted-foreground bg-background border-border flex-shrink-0"
+                className="ml-1 h-4 px-1.5 text-xs tabular-nums text-muted-foreground bg-background border-border flex-shrink-0"
               >
                 {filteredQueries.length}
               </Badge>
@@ -443,7 +443,7 @@ export function SchemasSidebar({
               <div className="flex items-center gap-1">
                 <Badge
                   variant="secondary"
-                  className="h-5 px-1.5 text-[11px] tabular-nums text-muted-foreground bg-secondary border-border"
+                  className="h-5 px-1.5 text-xs tabular-nums text-muted-foreground bg-secondary border-border"
                 >
                   {filteredTables.length}
                 </Badge>
@@ -479,7 +479,7 @@ export function SchemasSidebar({
                         <button
                           onClick={() => toggleSchema(schemaName)}
                           className={cn(
-                            "group/schema mt-1 flex h-7 w-full items-center gap-1.5 rounded-md px-2 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground",
+                            "group/schema mt-1 flex h-7 w-full items-center gap-1.5 rounded-md px-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground",
                             "hover:bg-secondary hover:text-foreground",
                             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
                           )}
@@ -496,7 +496,7 @@ export function SchemasSidebar({
                           <span className="truncate">{schemaName}</span>
                           <Badge
                             variant="secondary"
-                            className="ml-auto h-4 px-1.5 text-[10px] tabular-nums text-muted-foreground bg-background border-border"
+                            className="ml-auto h-4 px-1.5 text-xs tabular-nums text-muted-foreground bg-background border-border"
                           >
                             {group.length}
                           </Badge>
@@ -540,12 +540,12 @@ export function SchemasSidebar({
                                     />
                                     <span className="truncate">{table.name}</span>
                                     {table.kind === "view" && (
-                                      <Badge className="h-4 rounded-sm px-1 text-[9px] bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-400 border-purple-200 dark:border-purple-800 shrink-0">
+                                      <Badge className="h-4 rounded-sm px-1 text-xs bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-400 border-purple-200 dark:border-purple-800 shrink-0">
                                         VIEW
                                       </Badge>
                                     )}
                                     {table.kind === "matview" && (
-                                      <Badge className="h-4 rounded-sm px-1 text-[9px] bg-fuchsia-100 dark:bg-fuchsia-950 text-fuchsia-800 dark:text-fuchsia-400 border-fuchsia-200 dark:border-fuchsia-800 shrink-0">
+                                      <Badge className="h-4 rounded-sm px-1 text-xs bg-fuchsia-100 dark:bg-fuchsia-950 text-fuchsia-800 dark:text-fuchsia-400 border-fuchsia-200 dark:border-fuchsia-800 shrink-0">
                                         MV
                                       </Badge>
                                     )}
@@ -596,7 +596,7 @@ export function SchemasSidebar({
                                 {isExpanded && (
                                   <div className="ml-4 mt-1 border-l border-border pl-3">
                                     {(table.indexes.length > 0 || table.triggers.length > 0) && (
-                                      <div className="text-[9px] uppercase tracking-wider text-muted-foreground/70 px-2 pt-1 pb-0.5">
+                                      <div className="text-xs uppercase tracking-wider text-muted-foreground/70 px-2 pt-1 pb-0.5">
                                         Columns
                                       </div>
                                     )}
@@ -613,29 +613,29 @@ export function SchemasSidebar({
                                             <span
                                               className={cn(
                                                 "truncate",
-                                                col.isPk && "text-amber-700 dark:text-amber-400 font-medium",
-                                                col.isFk && "text-blue-700 dark:text-blue-400 font-medium",
+                                                col.isPk && "text-warning font-medium",
+                                                col.isFk && "text-info font-medium",
                                               )}
                                             >
                                               {col.name}
                                             </span>
                                             {col.isPk && (
-                                              <Badge className="h-4 rounded-sm px-1 text-[10px] bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-400 border-amber-200 dark:border-amber-800">
+                                              <Badge className="h-4 rounded-sm px-1 text-xs bg-warning/15 text-warning border-warning/30">
                                                 PK
                                               </Badge>
                                             )}
                                             {col.isFk && (
-                                              <Badge className="h-4 rounded-sm px-1 text-[10px] bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-400 border-blue-200 dark:border-blue-800">
+                                              <Badge className="h-4 rounded-sm px-1 text-xs bg-info/15 text-info border-info/30">
                                                 FK
                                               </Badge>
                                             )}
                                             {col.isAuto && (
-                                              <Badge className="h-4 rounded-sm px-1 text-[10px] bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800">
+                                              <Badge className="h-4 rounded-sm px-1 text-xs bg-success/15 text-success border-success/30">
                                                 AUTO
                                               </Badge>
                                             )}
                                           </div>
-                                          <div className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
+                                          <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
                                             {col.type}
                                           </div>
                                         </div>
@@ -644,7 +644,7 @@ export function SchemasSidebar({
 
                                     {table.indexes.length > 0 && (
                                       <>
-                                        <div className="text-[9px] uppercase tracking-wider text-muted-foreground/70 px-2 pt-1 pb-0.5">
+                                        <div className="text-xs uppercase tracking-wider text-muted-foreground/70 px-2 pt-1 pb-0.5">
                                           Indexes
                                         </div>
                                         <div className="space-y-0.5 pb-1">
@@ -657,13 +657,13 @@ export function SchemasSidebar({
                                               <div className="flex items-center gap-2 min-w-0">
                                                 <span className="truncate">{idx.name}</span>
                                                 {idx.isUnique && (
-                                                  <Badge className="h-4 rounded-sm px-1 text-[9px] bg-sky-100 dark:bg-sky-950 text-sky-800 dark:text-sky-400 border-sky-200 dark:border-sky-800 shrink-0">
+                                                  <Badge className="h-4 rounded-sm px-1 text-xs bg-sky-100 dark:bg-sky-950 text-sky-800 dark:text-sky-400 border-sky-200 dark:border-sky-800 shrink-0">
                                                     UNIQUE
                                                   </Badge>
                                                 )}
                                               </div>
                                               {idx.columns.length > 0 && (
-                                                <div className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
+                                                <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
                                                   ({idx.columns.join(", ")})
                                                 </div>
                                               )}
@@ -675,7 +675,7 @@ export function SchemasSidebar({
 
                                     {table.triggers.length > 0 && (
                                       <>
-                                        <div className="text-[9px] uppercase tracking-wider text-muted-foreground/70 px-2 pt-1 pb-0.5">
+                                        <div className="text-xs uppercase tracking-wider text-muted-foreground/70 px-2 pt-1 pb-0.5">
                                           Triggers
                                         </div>
                                         <div className="space-y-0.5 pb-1">
@@ -688,7 +688,7 @@ export function SchemasSidebar({
                                               <div className="flex items-center gap-2 min-w-0">
                                                 <span className="truncate">{trg.name}</span>
                                               </div>
-                                              <div className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
+                                              <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
                                                 {trg.timing} {trg.events.join(" / ")}
                                               </div>
                                             </div>
@@ -741,7 +741,7 @@ export function SchemasSidebar({
               <div className="flex items-center gap-1">
                 <Badge
                   variant="secondary"
-                  className="h-5 px-1.5 text-[11px] tabular-nums text-muted-foreground bg-secondary border-border"
+                  className="h-5 px-1.5 text-xs tabular-nums text-muted-foreground bg-secondary border-border"
                 >
                   {filteredQueries.length}
                 </Badge>
@@ -899,7 +899,7 @@ function RoutinesSection({
         <span className="truncate">Routines</span>
         <Badge
           variant="secondary"
-          className="ml-auto h-4 px-1.5 text-[10px] tabular-nums text-muted-foreground bg-background border-border"
+          className="ml-auto h-4 px-1.5 text-xs tabular-nums text-muted-foreground bg-background border-border"
         >
           {filtered.length}
         </Badge>
@@ -920,12 +920,12 @@ function RoutinesSection({
               <div className="flex items-center gap-2 min-w-0">
                 <span className="truncate">{r.name}</span>
                 {r.kind !== "function" && (
-                  <Badge className="h-4 rounded-sm px-1 text-[9px] bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 shrink-0 uppercase">
+                  <Badge className="h-4 rounded-sm px-1 text-xs bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 shrink-0 uppercase">
                     {r.kind === "procedure" ? "PROC" : r.kind === "aggregate" ? "AGG" : "WIN"}
                   </Badge>
                 )}
               </div>
-              <div className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
+              <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
                 {r.schema}
                 {r.argsSignature ? ` (${r.argsSignature})` : "()"}
                 {r.returnType ? ` → ${r.returnType}` : ""}

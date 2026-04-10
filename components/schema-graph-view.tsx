@@ -160,7 +160,7 @@ export function SchemaGraphView({ schema, onRefresh, className }: Props) {
           >
             <Minus className="h-3.5 w-3.5" />
           </Button>
-          <span className="text-[11px] text-muted-foreground tabular-nums w-10 text-center">
+          <span className="text-xs text-muted-foreground tabular-nums w-10 text-center">
             {Math.round(transform.scale * 100)}%
           </span>
           <Button
@@ -203,7 +203,7 @@ export function SchemaGraphView({ schema, onRefresh, className }: Props) {
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-destructive p-4 text-center">
             <AlertCircle className="h-4 w-4" />
             <div className="text-sm font-medium">Failed to render schema graph</div>
-            <div className="text-xs font-mono bg-destructive/10 p-2 rounded max-w-md">{error}</div>
+            <div className="text-sm font-mono bg-destructive/10 p-2 rounded max-w-md">{error}</div>
           </div>
         )}
 

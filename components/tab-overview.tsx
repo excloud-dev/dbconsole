@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useMemo } from "react"
-import { AlertCircle, CheckCircle2, FileCode, Loader2, Pin } from "lucide-react"
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { connectionColor, connectionHue } from "@/lib/color/connection-color"
+import { useEffect, useMemo, useRef, useState } from "react"
+import * as DialogPrimitive from "@radix-ui/react-dialog"
+import { Pin, X } from "lucide-react"
+import { connectionColor } from "@/lib/color/connection-color"
 import { cn } from "@/lib/utils"
 import type { Tab } from "./query-tabs"
 
@@ -16,266 +16,327 @@ type Props = {
   onPickTab: (id: string) => void
 }
 
-// ---------------------------------------------------------------------------
-// Concept: the tab overview is the wall above the desk. Not a generic card
-// grid — the layout itself encodes the structure of the workspace by
-// breaking tabs into COLUMNS BY CONNECTION. So if you have 3 prod tabs and
-// 2 staging tabs, you see two columns side by side, not a 5-card grid.
+// ============================================================================
+// LOCKED DESIGN SYSTEM (see sortable-tab.tsx for the source of truth)
+// TYPE: text-base, text-sm, text-xs only.
+// COLOR: text-foreground, text-muted-foreground, text-foreground/40 only.
+// SPACING: 4px multiples — gap-2/3/4/6, p-3/4/6/8.
+// RADIUS: rounded-md.
+// ============================================================================
 //
-// Hero treatment for the active tab (subtle ring + larger title row).
-// Numbered key hints (1-9) so you can press a number to jump straight in.
-// Pinned tabs sort to the top of their column with a pin glyph.
-// ---------------------------------------------------------------------------
-
-const isMac = typeof navigator !== "undefined" && /mac/i.test(navigator.platform)
+// Why a custom overlay instead of <Dialog>: the shadcn DialogContent forces
+// `max-w-[calc(100%-2rem)] sm:max-w-lg` and centers via translate. Our
+// max-w-[960px] override was being clobbered, which made the overview float
+// in a tiny box in the middle of dead space. Rolling our own fixed-position
+// overlay gives us actual fullscreen control.
 
 export function TabOverview({ open, onOpenChange, tabs, activeTabId, connectionLabels, onPickTab }: Props) {
-  // Group tabs by connection. Tabs without a connection get bucketed under
-  // "(no connection)" and pushed to the end.
-  const columns = useMemo(() => {
-    const byConn = new Map<string, Tab[]>()
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  const listRef = useRef<HTMLDivElement | null>(null)
+  // Cursor index for keyboard navigation. Distinct from `activeTabId` —
+  // activeTabId is the user's *current* tab in the workspace; cursor is
+  // where they're hovering inside the overview.
+  const [cursor, setCursor] = useState(0)
+
+  // Sort: pinned first, then everything else.
+  const orderedTabs = useMemo(() => {
+    const pinned = tabs.filter((t) => t.pinned)
+    const unpinned = tabs.filter((t) => !t.pinned)
+    return [...pinned, ...unpinned]
+  }, [tabs])
+
+  const distinctConnections = useMemo(() => {
+    const seen = new Map<string, string>()
     for (const t of tabs) {
-      const key = t.connectionId ?? "__none"
-      const list = byConn.get(key) ?? []
-      list.push(t)
-      byConn.set(key, list)
+      if (!t.connectionId) continue
+      if (!seen.has(t.connectionId)) {
+        seen.set(t.connectionId, connectionLabels?.[t.connectionId] ?? t.connectionId)
+      }
     }
-    // Sort each column: pinned first, then in original order.
-    for (const list of byConn.values()) {
-      list.sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned))
-    }
-    const cols = Array.from(byConn.entries()).map(([connId, list]) => ({
-      connId: connId === "__none" ? null : connId,
-      label: connId === "__none" ? "(no connection)" : connectionLabels?.[connId] ?? connId,
-      tabs: list,
-      color: connId === "__none" ? null : connectionColor(connId),
-      hue: connId === "__none" ? null : connectionHue(connId),
-    }))
-    // The "__none" column always sorts last; everything else by descending
-    // count so the busiest connection lands first.
-    cols.sort((a, b) => {
-      if (a.connId === null) return 1
-      if (b.connId === null) return -1
-      return b.tabs.length - a.tabs.length
-    })
-    return cols
+    return Array.from(seen.entries()).map(([id, label]) => ({ id, label }))
   }, [tabs, connectionLabels])
+  const showInlineConn = distinctConnections.length > 1
 
-  // Compute the ordered tab list as the user sees it (reading order across
-  // columns), so the 1-9 number badges match jumpToTabIndex.
-  const orderedTabIds = useMemo(() => {
-    const ids: string[] = []
-    for (const col of columns) for (const t of col.tabs) ids.push(t.id)
-    return ids
-  }, [columns])
+  // Reset cursor when opening. Default to the currently active tab if it's
+  // in the ordered list, otherwise the top.
+  useEffect(() => {
+    if (!open) return
+    const idx = orderedTabs.findIndex((t) => t.id === activeTabId)
+    setCursor(idx >= 0 ? idx : 0)
+  }, [open, orderedTabs, activeTabId])
 
-  // Number-key shortcuts: 1-9 jumps directly to that tab.
+  // Keyboard nav:
+  //   ↑ ↓        — move cursor
+  //   ↵          — open the row under the cursor
+  //   1-9        — jump directly (skip cursor)
+  //   home/end   — first / last row
+  //   pgup/pgdn  — ±5 rows
+  //   esc        — close
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault()
+        onOpenChange(false)
+        return
+      }
+      if (orderedTabs.length === 0) return
+      if (e.key === "ArrowDown") {
+        e.preventDefault()
+        setCursor((c) => Math.min(c + 1, orderedTabs.length - 1))
+        return
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault()
+        setCursor((c) => Math.max(0, c - 1))
+        return
+      }
+      if (e.key === "Enter") {
+        e.preventDefault()
+        const target = orderedTabs[cursor]
+        if (target) {
+          onPickTab(target.id)
+          onOpenChange(false)
+        }
+        return
+      }
+      if (e.key === "Home") {
+        e.preventDefault()
+        setCursor(0)
+        return
+      }
+      if (e.key === "End") {
+        e.preventDefault()
+        setCursor(orderedTabs.length - 1)
+        return
+      }
+      if (e.key === "PageDown") {
+        e.preventDefault()
+        setCursor((c) => Math.min(c + 5, orderedTabs.length - 1))
+        return
+      }
+      if (e.key === "PageUp") {
+        e.preventDefault()
+        setCursor((c) => Math.max(0, c - 5))
+        return
+      }
       if (e.key >= "1" && e.key <= "9") {
-        const idx = Number(e.key) - 1
-        const id = orderedTabIds[idx]
-        if (id) {
+        const target = orderedTabs[Number(e.key) - 1]
+        if (target) {
           e.preventDefault()
-          onPickTab(id)
+          onPickTab(target.id)
           onOpenChange(false)
         }
       }
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [open, orderedTabIds, onPickTab, onOpenChange])
+  }, [open, orderedTabs, cursor, onPickTab, onOpenChange])
 
-  let runningIndex = 0
+  // Scroll cursor row into view as it moves.
+  useEffect(() => {
+    if (!open || !listRef.current) return
+    const el = listRef.current.querySelector<HTMLElement>(`[data-row-index="${cursor}"]`)
+    if (el) el.scrollIntoView({ block: "nearest" })
+  }, [cursor, open])
+
+  // No manual body-scroll lock — DialogPrimitive handles it.
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className={cn(
-          // Big — the wall takes over. 88vw x 82vh, no rounded ceremony.
-          "max-w-[1280px] w-[88vw] max-h-[82vh] h-[82vh]",
-          "p-0 gap-0 border border-border rounded-md overflow-hidden flex flex-col",
-        )}
-        showCloseButton={false}
-      >
-        <DialogTitle className="sr-only">All tabs</DialogTitle>
+    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-[60] bg-background/95 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <DialogPrimitive.Content
+          aria-label="All tabs"
+          ref={panelRef}
+          className="fixed inset-0 z-[60] flex flex-col w-full max-w-[1100px] mx-auto px-6 py-6 focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+        >
+          <DialogPrimitive.Title className="sr-only">All tabs</DialogPrimitive.Title>
+        {/* Header --------------------------------------------------------- */}
+        <header className="flex items-baseline justify-between mb-4">
+          <div className="flex items-baseline gap-4">
+            <h2 className="text-sm font-semibold text-foreground">All tabs</h2>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="tabular-nums">{tabs.length} open</span>
+              {distinctConnections.length > 0 && (
+                <>
+                  <span className="text-foreground/40">·</span>
+                  <span className="flex items-center gap-2">
+                    {distinctConnections.map((c) => (
+                      <span key={c.id} className="inline-flex items-center gap-1.5">
+                        <span
+                          aria-hidden
+                          className="h-1.5 w-1.5 rounded-full"
+                          style={{ backgroundColor: connectionColor(c.id) }}
+                        />
+                        <span>{c.label}</span>
+                      </span>
+                    ))}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
 
-        {/* Header strip ----------------------------------------------------- */}
-        <div className="flex items-center justify-between px-5 h-11 border-b border-border bg-muted/20">
-          <div className="flex items-baseline gap-3">
-            <span className="text-sm font-medium">All tabs</span>
-            <span className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground/70 tabular-nums">
-              {tabs.length} open · {columns.length} {columns.length === 1 ? "connection" : "connections"}
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="rounded-md p-1 text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors"
+            aria-label="Close overview"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </header>
+
+        {/* Table ----------------------------------------------------------- */}
+        <div ref={listRef} className="flex-1 overflow-y-auto -mx-2">
+          <div role="list" className="flex flex-col">
+            {orderedTabs.map((tab, idx) => {
+              const isActive = tab.id === activeTabId
+              const isCursor = idx === cursor
+              const numberHint = idx < 9 ? idx + 1 : null
+              const dotColor = tab.connectionId ? connectionColor(tab.connectionId) : null
+              const connLabel = tab.connectionId ? connectionLabels?.[tab.connectionId] : null
+
+              const oneLine = (tab.query || "").replace(/\s+/g, " ").trim()
+
+              const statusGlyph =
+                tab.lastRun?.status === "running"
+                  ? "running"
+                  : tab.lastRun?.status === "error"
+                    ? "error"
+                    : tab.lastRun?.status === "ok"
+                      ? "ok"
+                      : tab.isSchemaGraph
+                        ? "graph"
+                        : ""
+
+              const rowsLabel =
+                tab.lastRun?.status === "ok" && tab.lastRun.rowCount !== undefined
+                  ? tab.lastRun.rowCount.toLocaleString()
+                  : ""
+
+              const timeLabel =
+                tab.lastRun?.status === "ok" && tab.lastRun.durationMs !== undefined
+                  ? tab.lastRun.durationMs < 1000
+                    ? `${tab.lastRun.durationMs}ms`
+                    : `${(tab.lastRun.durationMs / 1000).toFixed(1)}s`
+                  : ""
+
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="listitem"
+                  data-row-index={idx}
+                  onClick={() => {
+                    onPickTab(tab.id)
+                    onOpenChange(false)
+                  }}
+                  onMouseEnter={() => setCursor(idx)}
+                  className={cn(
+                    // Flush full-width strip. Cursor (kbd nav) and active
+                    // (current workspace tab) both use bg-muted, so the
+                    // moment you arrow into a row it reads as selected
+                    // without any layout shift or accent decoration.
+                    "grid items-center gap-3 px-4 py-2 text-left transition-colors",
+                    (isCursor || isActive) ? "bg-muted" : "hover:bg-muted/40",
+                  )}
+                  style={{
+                    gridTemplateColumns: showInlineConn
+                      ? "20px minmax(0, 1fr) 120px 72px 64px 56px"
+                      : "20px minmax(0, 1fr) 72px 64px 56px",
+                  }}
+                >
+                  {/* Number — plain mono digit, no badge chrome */}
+                  <span
+                    className={cn(
+                      "text-xs tabular-nums font-mono text-right",
+                      isActive ? "text-foreground" : "text-muted-foreground/60",
+                    )}
+                  >
+                    {numberHint ?? ""}
+                  </span>
+
+                  {/* Title + SQL preview */}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      {tab.pinned && <Pin className="h-3 w-3 text-muted-foreground flex-shrink-0" aria-hidden />}
+                      {dotColor && !showInlineConn && (
+                        <span
+                          aria-hidden
+                          className="h-1.5 w-1.5 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: dotColor }}
+                        />
+                      )}
+                      <span className="text-sm font-medium text-foreground truncate">{tab.name}</span>
+                    </div>
+                    {oneLine && (
+                      <div className="mt-0.5 text-xs font-mono text-muted-foreground truncate">{oneLine}</div>
+                    )}
+                    {!oneLine && tab.isSchemaGraph && (
+                      <div className="mt-0.5 text-xs text-foreground/40 italic">schema graph view</div>
+                    )}
+                  </div>
+
+                  {/* Connection (only if multiple) */}
+                  {showInlineConn && (
+                    <div className="text-xs text-muted-foreground truncate flex items-center gap-1.5">
+                      {dotColor && (
+                        <span
+                          aria-hidden
+                          className="h-1.5 w-1.5 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: dotColor }}
+                        />
+                      )}
+                      {connLabel}
+                    </div>
+                  )}
+
+                  {/* Rows */}
+                  <div className="text-xs tabular-nums text-muted-foreground text-right">{rowsLabel}</div>
+
+                  {/* Time */}
+                  <div className="text-xs tabular-nums text-foreground/40 text-right">{timeLabel}</div>
+
+                  {/* Status */}
+                  <div
+                    className={cn(
+                      "text-xs uppercase tracking-wider text-right",
+                      statusGlyph === "error" && "text-destructive",
+                      statusGlyph === "ok" && "text-success",
+                      statusGlyph === "running" && "text-muted-foreground",
+                      statusGlyph === "graph" && "text-foreground/40",
+                    )}
+                  >
+                    {statusGlyph}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Footer hints --------------------------------------------------- */}
+        <footer className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
+          <div className="flex items-center gap-4">
+            <span>
+              <kbd className="font-mono text-foreground/80">↑↓</kbd> nav
+            </span>
+            <span>
+              <kbd className="font-mono text-foreground/80">↵</kbd> open
+            </span>
+            <span>
+              <kbd className="font-mono text-foreground/80">1</kbd>–
+              <kbd className="font-mono text-foreground/80">9</kbd> jump
             </span>
           </div>
-          <div className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground/70">
-            press <kbd className="font-mono normal-case tracking-normal">1</kbd>–<kbd className="font-mono normal-case tracking-normal">9</kbd> to jump · <kbd className="font-mono normal-case tracking-normal">esc</kbd> to close
-          </div>
-        </div>
-
-        {/* Columns ---------------------------------------------------------- */}
-        <div className="flex-1 overflow-x-auto overflow-y-hidden">
-          <div className="flex h-full divide-x divide-border">
-            {columns.map((col) => (
-              <div key={col.connId ?? "__none"} className="flex-1 min-w-[280px] max-w-[440px] flex flex-col h-full">
-                {/* Column header */}
-                <div className="flex items-center gap-2 px-4 h-10 border-b border-border bg-background/40">
-                  {col.color && (
-                    <span
-                      aria-hidden
-                      className="h-2 w-2 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: col.color }}
-                    />
-                  )}
-                  <span className="text-xs font-medium truncate flex-1">{col.label}</span>
-                  <span className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground/70 tabular-nums">
-                    {col.tabs.length}
-                  </span>
-                </div>
-
-                {/* Cards */}
-                <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
-                  {col.tabs.map((tab) => {
-                    const isActive = tab.id === activeTabId
-                    const numberHint = runningIndex < 9 ? runningIndex + 1 : null
-                    runningIndex++
-
-                    const sqlPreview = (tab.query || "")
-                      .split("\n")
-                      .filter((line, idx, arr) => {
-                        const before = arr.slice(0, idx)
-                        return !(line.trim() === "" && before.every((l) => l.trim() === ""))
-                      })
-                    const previewLines = sqlPreview.slice(0, 8)
-                    const overflowLines = Math.max(0, sqlPreview.length - previewLines.length)
-
-                    const StatusIcon =
-                      tab.lastRun?.status === "running"
-                        ? Loader2
-                        : tab.lastRun?.status === "error"
-                          ? AlertCircle
-                          : tab.lastRun?.status === "ok"
-                            ? CheckCircle2
-                            : tab.isSchemaGraph
-                              ? FileCode
-                              : null
-
-                    return (
-                      <button
-                        key={tab.id}
-                        onClick={() => {
-                          onPickTab(tab.id)
-                          onOpenChange(false)
-                        }}
-                        className={cn(
-                          "group w-full text-left rounded-md border bg-card transition-all overflow-hidden",
-                          isActive
-                            ? "border-primary/50 ring-1 ring-primary/30"
-                            : "border-border hover:border-muted-foreground/40",
-                        )}
-                        style={
-                          isActive && col.hue !== null
-                            ? { backgroundColor: `hsl(${col.hue}, 60%, 50%, 0.06)` }
-                            : undefined
-                        }
-                      >
-                        {/* Top accent line in connection color — 1px hint, not a stripe */}
-                        {col.color && (
-                          <div
-                            aria-hidden
-                            className="h-px w-full"
-                            style={{ backgroundColor: col.color }}
-                          />
-                        )}
-
-                        {/* Title row */}
-                        <div className="flex items-center gap-2 px-3 pt-2 pb-1">
-                          {tab.pinned && (
-                            <Pin className="h-3 w-3 text-muted-foreground flex-shrink-0" aria-hidden />
-                          )}
-                          <span
-                            className={cn(
-                              "truncate flex-1 min-w-0",
-                              isActive ? "text-sm font-medium" : "text-sm",
-                            )}
-                          >
-                            {tab.name}
-                          </span>
-                          {numberHint !== null && (
-                            <span
-                              className={cn(
-                                "inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded text-[9px] font-mono tabular-nums flex-shrink-0",
-                                isActive
-                                  ? "bg-primary/15 text-primary"
-                                  : "bg-muted/60 text-muted-foreground/70",
-                              )}
-                              aria-label={`Press ${numberHint} to jump`}
-                            >
-                              {numberHint}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* SQL preview body */}
-                        {previewLines.length > 0 ? (
-                          <pre className="px-3 pb-2 text-[10.5px] font-mono text-muted-foreground/85 whitespace-pre overflow-hidden leading-relaxed">
-                            {previewLines.join("\n")}
-                            {overflowLines > 0 && (
-                              <span className="text-muted-foreground/40">{`\n… +${overflowLines} more`}</span>
-                            )}
-                          </pre>
-                        ) : tab.isSchemaGraph ? (
-                          <div className="px-3 pb-2 text-[10.5px] text-muted-foreground/60 italic">
-                            schema graph view
-                          </div>
-                        ) : (
-                          <div className="px-3 pb-2 text-[10.5px] text-muted-foreground/40 italic">empty</div>
-                        )}
-
-                        {/* Footer row */}
-                        {(tab.lastRun || tab.isSchemaGraph) && (
-                          <div className="flex items-center gap-2 px-3 py-1.5 text-[10px] border-t border-border/60 bg-background/30">
-                            {StatusIcon && (
-                              <StatusIcon
-                                className={cn(
-                                  "h-3 w-3 flex-shrink-0",
-                                  tab.lastRun?.status === "error" && "text-destructive",
-                                  tab.lastRun?.status === "ok" && "text-emerald-600 dark:text-emerald-400",
-                                  tab.lastRun?.status === "running" && "animate-spin text-muted-foreground",
-                                )}
-                              />
-                            )}
-                            {tab.lastRun?.status === "ok" && tab.lastRun.rowCount !== undefined && (
-                              <span className="tabular-nums text-emerald-700 dark:text-emerald-400/90">
-                                {tab.lastRun.rowCount.toLocaleString()} rows
-                              </span>
-                            )}
-                            {tab.lastRun?.status === "ok" && tab.lastRun.durationMs !== undefined && (
-                              <>
-                                <span className="text-muted-foreground/40">·</span>
-                                <span className="tabular-nums text-muted-foreground">
-                                  {tab.lastRun.durationMs}ms
-                                </span>
-                              </>
-                            )}
-                            {tab.lastRun?.status === "error" && (
-                              <span className="text-destructive">failed</span>
-                            )}
-                            {tab.lastRun?.status === "running" && (
-                              <span className="text-muted-foreground">running…</span>
-                            )}
-                          </div>
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+          <span>
+            <kbd className="font-mono text-foreground/80">esc</kbd> close
+          </span>
+        </footer>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   )
 }

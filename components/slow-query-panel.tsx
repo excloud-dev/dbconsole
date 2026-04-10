@@ -129,7 +129,7 @@ export function SlowQueryPanel({ open, onOpenChange, connectionId, onOpenInTab }
                 extension also requires <code className="font-mono">shared_preload_libraries = 'pg_stat_statements'</code>{" "}
                 in postgresql.conf and a server restart.
               </p>
-              <pre className="bg-muted/40 border border-border rounded p-3 text-[11px] font-mono whitespace-pre-wrap">
+              <pre className="bg-muted/40 border border-border rounded p-3 text-xs font-mono whitespace-pre-wrap">
                 {data.installSnippet}
               </pre>
               <Button

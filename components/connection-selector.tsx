@@ -25,7 +25,7 @@ export function ConnectionSelector({ connections, activeConnection, onSelect, on
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm" className="h-8 gap-2 border-border text-muted-foreground bg-transparent">
-          <Database className={`h-3.5 w-3.5 ${current ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`} />
+          <Database className={`h-3.5 w-3.5 ${current ? "text-success" : "text-muted-foreground"}`} />
           <span className="max-w-32 truncate">{current?.label || "No connection"}</span>
           <ChevronDown className="h-3 w-3" />
         </Button>
@@ -38,7 +38,7 @@ export function ConnectionSelector({ connections, activeConnection, onSelect, on
             className={activeConnection === conn.id ? "bg-secondary" : ""}
           >
             <Database
-              className={`h-3.5 w-3.5 mr-2 ${activeConnection === conn.id ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}
+              className={`h-3.5 w-3.5 mr-2 ${activeConnection === conn.id ? "text-success" : "text-muted-foreground"}`}
             />
             <span className="truncate">{conn.label}</span>
           </DropdownMenuItem>
