@@ -13,6 +13,7 @@
 // pull out the parts of the query that the user is most likely to recognize.
 
 import { stripSqlComments } from '@/lib/sql/safety'
+import { displayTableName } from '@/lib/sql/quote-ident'
 
 const MAX_LABEL_LEN = 40
 
@@ -27,9 +28,13 @@ export function deriveTabLabel(sql: string): string | null {
     const cleaned = stripSqlComments(sql).replace(/\s+/g, ' ').trim()
     if (!cleaned) return null
 
-    // 1. Pull the first FROM <table> we can find.
-    const fromMatch = cleaned.match(/\bfrom\s+([a-zA-Z_"][\w".]*)/i)
-    let head: string | null = fromMatch ? unquote(fromMatch[1]) : null
+    // 1. Pull the first FROM <table> we can find. The identifier regex must
+    //    accept both bare names (`users`, `public.users`) and fully-quoted
+    //    multi-part forms like `"public"."vms"` — the latter contains dots
+    //    and quotes that we need to keep together until we round-trip them
+    //    through displayTableName.
+    const fromMatch = cleaned.match(/\bfrom\s+((?:"[^"]+"|[a-zA-Z_][\w]*)(?:\.(?:"[^"]+"|[a-zA-Z_][\w]*))*)/i)
+    let head: string | null = fromMatch ? displayTableName(fromMatch[1]) : null
 
     // 2. If we have a WHERE clause, append the first equality literal as
     //    "WHERE col = value". Helps disambiguate "users WHERE id=1" from
@@ -38,17 +43,17 @@ export function deriveTabLabel(sql: string): string | null {
     const whereMatch = cleaned.match(/\bwhere\s+([\s\S]+)$/i)
     if (whereMatch) {
         const wherePart = whereMatch[1]
-        const eqMatch = wherePart.match(/([a-zA-Z_"][\w".]*)\s*=\s*([^\s,)]+)/)
+        const eqMatch = wherePart.match(/((?:"[^"]+"|[a-zA-Z_][\w]*)(?:\.(?:"[^"]+"|[a-zA-Z_][\w]*))*)\s*=\s*([^\s,)]+)/)
         if (eqMatch) {
-            tail = `${unquote(eqMatch[1])} = ${stripQuotes(eqMatch[2])}`
+            tail = `${displayTableName(eqMatch[1])} = ${stripQuotes(eqMatch[2])}`
         }
     }
 
     // 3. If we have a JOIN, prefer the joined table over WHERE — it tells
     //    you more about what the query is doing.
-    const joinMatch = cleaned.match(/\bjoin\s+([a-zA-Z_"][\w".]*)/i)
+    const joinMatch = cleaned.match(/\bjoin\s+((?:"[^"]+"|[a-zA-Z_][\w]*)(?:\.(?:"[^"]+"|[a-zA-Z_][\w]*))*)/i)
     if (joinMatch && head) {
-        const joined = unquote(joinMatch[1])
+        const joined = displayTableName(joinMatch[1])
         return truncate(`${head} ⋈ ${joined}`)
     }
 
@@ -61,8 +66,8 @@ export function deriveTabLabel(sql: string): string | null {
 
     // 4. Fallback: starts with WITH (CTE) or VALUES — surface that.
     if (/^with\b/i.test(cleaned)) {
-        const withMatch = cleaned.match(/^with\s+(?:recursive\s+)?([a-zA-Z_"][\w]*)/i)
-        if (withMatch) return truncate(`WITH ${unquote(withMatch[1])}`)
+        const withMatch = cleaned.match(/^with\s+(?:recursive\s+)?("[^"]+"|[a-zA-Z_][\w]*)/i)
+        if (withMatch) return truncate(`WITH ${displayTableName(withMatch[1])}`)
         return 'WITH …'
     }
     if (/^values\b/i.test(cleaned)) return 'VALUES …'
@@ -73,10 +78,6 @@ export function deriveTabLabel(sql: string): string | null {
 function truncate(s: string): string {
     if (s.length <= MAX_LABEL_LEN) return s
     return s.slice(0, MAX_LABEL_LEN - 1) + '…'
-}
-
-function unquote(ident: string): string {
-    return ident.replace(/^"(.*)"$/, '$1').replace(/^public\./, '')
 }
 
 function stripQuotes(literal: string): string {

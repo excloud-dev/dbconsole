@@ -38,7 +38,7 @@ describe("write-query-generator", () => {
     }
 
     const { sql } = generateWriteSql(config)
-    expect(sql).toBe('INSERT INTO "public"."users" ("email")\nVALUES (\'user@example.com\');')
+    expect(sql).toBe("INSERT INTO public.users (email)\nVALUES ('user@example.com');")
   })
 
   it("falls back to default values when no insert inputs provided", () => {
@@ -58,7 +58,7 @@ describe("write-query-generator", () => {
       ],
     }
     const { sql } = generateWriteSql(config)
-    expect(sql).toBe('INSERT INTO "public"."audit_logs" DEFAULT VALUES;')
+    expect(sql).toBe("INSERT INTO public.audit_logs DEFAULT VALUES;")
   })
 
   it("builds update with set + where clauses and null comparisons", () => {
@@ -101,7 +101,7 @@ describe("write-query-generator", () => {
     }
 
     const { sql } = generateWriteSql(config)
-    expect(sql).toBe('UPDATE "public"."users"\nSET "name" = \'Sam\'\nWHERE "deleted_at" IS NULL AND "id" = \'abc\';')
+    expect(sql).toBe("UPDATE public.users\nSET name = 'Sam'\nWHERE deleted_at IS NULL AND id = 'abc';")
   })
 
 })

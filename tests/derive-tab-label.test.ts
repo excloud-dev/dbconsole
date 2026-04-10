@@ -50,4 +50,18 @@ describe('deriveTabLabel', () => {
     it('strips comments before deriving the label', () => {
         expect(deriveTabLabel('-- the bad one\nSELECT * FROM users')).toBe('users')
     })
+
+    it('handles fully-quoted multi-part identifiers', () => {
+        // Regression: previously produced `public"."vms` because the unquote
+        // function only stripped outer quotes from `"public"."vms"`.
+        expect(deriveTabLabel('SELECT * FROM "public"."vms" ORDER BY "id" DESC')).toBe('vms')
+    })
+
+    it('keeps non-public schemas in the label', () => {
+        expect(deriveTabLabel('SELECT * FROM "k8s"."kubeclusters"')).toBe('k8s.kubeclusters')
+    })
+
+    it('handles quoted JOIN targets', () => {
+        expect(deriveTabLabel('SELECT * FROM "public"."orders" JOIN "public"."payments" ON 1=1')).toBe('orders ⋈ payments')
+    })
 })
