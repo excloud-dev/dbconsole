@@ -1230,10 +1230,15 @@ export function DbConsole() {
       const sqlDisplay = renderSqlWithParams(cleanSql, paramValues)
       setResultsByTab((prev) => ({ ...prev, [targetTabId]: { ...data, sqlDisplay } }))
 
-      // Show success toast with metrics
+      // Show success toast with metrics. For write statements without
+      // RETURNING, data.rows is empty but data.rowCount carries the
+      // affected-row count from pg's CommandComplete tag.
+      const isWriteRun = data.rows.length === 0 && data.rowCount > 0
       toast({
-        title: "Query executed",
-        description: `${data.rows.length} rows • ${data.durationMs}ms`,
+        title: isWriteRun ? "Query executed" : "Query executed",
+        description: isWriteRun
+          ? `${data.rowCount} rows affected • ${data.durationMs}ms`
+          : `${data.rows.length} rows • ${data.durationMs}ms`,
       })
 
       // Update tab pagination state + status pill

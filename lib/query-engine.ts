@@ -89,7 +89,8 @@ export async function runQuery(input: RawQueryInput | NamedQueryInput): Promise<
     }
 
     const trimmed = sql.trim()
-    if (conn.readOnly && !isReadOnlySql(trimmed)) {
+    const isWriteSql = !isReadOnlySql(trimmed)
+    if (conn.readOnly && isWriteSql) {
         throw new QueryError({
             error: 'Only read-only SELECT / WITH queries are allowed on this connection',
             classification: 'safety',
@@ -100,17 +101,21 @@ export async function runQuery(input: RawQueryInput | NamedQueryInput): Promise<
 
     const normalized = normalizeSql(trimmed)
     const sourceSql = userSql ?? normalized
-    const executableSql = applyLimitOffset(normalized, input.limit, input.offset)
+    // LIMIT/OFFSET wrapping and the COUNT pre-query only make sense for
+    // SELECT/WITH. Writes are executed as-written; affected-row count comes
+    // back via pg's CommandComplete tag (result.rowCount).
+    const executableSql = isWriteSql ? normalized : applyLimitOffset(normalized, input.limit, input.offset)
 
     let rows: any[] = []
     let totalCount: number | undefined
     let columns: string[] = []
     let columnTypes: number[] = []
+    let affectedRowCount: number | null = null
     let status: LogQueryRunInput['status'] = 'ok'
     let errorMessage: string | undefined
 
     try {
-        if (input.includeCount) {
+        if (input.includeCount && !isWriteSql) {
             const countRes = await pool.query({
                 text: `SELECT COUNT(*) as count FROM (\n${normalized}\n) as q`,
                 values,
@@ -119,6 +124,9 @@ export async function runQuery(input: RawQueryInput | NamedQueryInput): Promise<
         }
 
         const result = await pool.query({ text: executableSql, values, rowMode: 'array' })
+        if (isWriteSql) {
+            affectedRowCount = typeof result.rowCount === 'number' ? result.rowCount : null
+        }
         const fields = result.fields ?? []
 
         // Capture pg type OIDs in column order so the renderer can pick rich
@@ -242,11 +250,16 @@ export async function runQuery(input: RawQueryInput | NamedQueryInput): Promise<
     const truncated = rows.length > maxRows
     const limitedRows = truncated ? rows.slice(0, maxRows) : rows
 
+    // For writes without RETURNING, `limitedRows` is empty but pg reports
+    // how many rows were affected via result.rowCount — surface that so the
+    // UI can display a meaningful "N rows affected".
+    const rowCount = affectedRowCount ?? limitedRows.length
+
     return {
         columns,
         columnTypes,
         rows: limitedRows,
-        rowCount: limitedRows.length,
+        rowCount,
         durationMs: Date.now() - start,
         totalCount,
         truncated,
