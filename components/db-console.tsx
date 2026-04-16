@@ -1182,12 +1182,16 @@ export function DbConsole() {
 
     if (!sqlToRun.trim()) return
 
-    // Strict Read-Only Check
-    if (!isReadOnlySql(sqlToRun)) {
+    // Client-side read-only gate, matched to the target connection. Writable
+    // connections bypass this so INSERT/UPDATE/DELETE/DDL can reach the
+    // server. The server-side gate in query-engine.ts enforces the same rule
+    // authoritatively.
+    const targetConn = connections.find((c) => c.id === targetConnectionId)
+    if (targetConn?.readOnly !== false && !isReadOnlySql(sqlToRun)) {
       toast({
         variant: "destructive",
         title: "Query Rejected",
-        description: "Only read-only queries (SELECT, WITH) are allowed prevention initiated by client console."
+        description: "This connection is read-only. Enable writes in the connection settings to run INSERT / UPDATE / DELETE / DDL.",
       })
       return
     }
