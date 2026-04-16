@@ -1,6 +1,6 @@
 "use client"
 
-import { Database, ChevronDown, Plus } from "lucide-react"
+import { Database, ChevronDown, Plus, PencilLine } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -27,6 +27,9 @@ export function ConnectionSelector({ connections, activeConnection, onSelect, on
         <Button variant="outline" size="sm" className="h-8 gap-2 border-border text-muted-foreground bg-transparent">
           <Database className={`h-3.5 w-3.5 ${current ? "text-success" : "text-muted-foreground"}`} />
           <span className="max-w-32 truncate">{current?.label || "No connection"}</span>
+          {current && !current.readOnly && (
+            <PencilLine className="h-3 w-3 text-warning" aria-label="Writes allowed" />
+          )}
           <ChevronDown className="h-3 w-3" />
         </Button>
       </DropdownMenuTrigger>
@@ -40,7 +43,15 @@ export function ConnectionSelector({ connections, activeConnection, onSelect, on
             <Database
               className={`h-3.5 w-3.5 mr-2 ${activeConnection === conn.id ? "text-success" : "text-muted-foreground"}`}
             />
-            <span className="truncate">{conn.label}</span>
+            <span className="truncate flex-1">{conn.label}</span>
+            {!conn.readOnly && (
+              <span
+                className="ml-2 text-[10px] font-medium uppercase tracking-wide text-warning border border-warning/40 bg-warning/10 rounded px-1 leading-4"
+                title="Writes allowed"
+              >
+                RW
+              </span>
+            )}
           </DropdownMenuItem>
         ))}
         {connections.length > 0 && <DropdownMenuSeparator />}

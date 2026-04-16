@@ -80,19 +80,19 @@ export async function runQuery(input: RawQueryInput | NamedQueryInput): Promise<
     const kind: LogQueryRunInput['kind'] = prep.kind
     const namedQueryId = prep.namedQueryId
 
-    const trimmed = sql.trim()
-    if (!isReadOnlySql(trimmed)) {
-        throw new QueryError({
-            error: 'Only read-only SELECT / WITH queries are allowed',
-            classification: 'safety',
-        })
-    }
-
     const conn = getConnectionById(connectionId)
     if (!conn) {
         throw new QueryError({
             error: 'Connection not found',
             classification: 'not_found',
+        })
+    }
+
+    const trimmed = sql.trim()
+    if (conn.readOnly && !isReadOnlySql(trimmed)) {
+        throw new QueryError({
+            error: 'Only read-only SELECT / WITH queries are allowed on this connection',
+            classification: 'safety',
         })
     }
 

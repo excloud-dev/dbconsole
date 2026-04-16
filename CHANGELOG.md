@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+- feat: per-connection read-only toggle — opt a connection into writes via a Switch in the connection dialog; SQL safety gate now gated on `conn.readOnly`; writable connections marked with an "RW" chip in the connection list and selector
 - feat: group sidebar tables by schema and quote qualified identifiers (0ab9f94)
 
 ## v0.6.2 - 2026-01-03

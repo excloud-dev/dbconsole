@@ -26,7 +26,8 @@
 // client released.
 //
 // Safety: the same `isReadOnlySql` guard the bounded path uses applies here
-// too — write SQL never reaches DECLARE.
+// too, gated on the connection's `readOnly` flag. Write SQL is only allowed
+// when the resolved connection is explicitly writable.
 
 import type { PoolClient } from 'pg'
 import { randomUUID } from 'node:crypto'
@@ -155,17 +156,17 @@ export async function openStream(
         throw toQueryError(err)
     }
 
-    const trimmed = prep.sql.trim()
-    if (!isReadOnlySql(trimmed)) {
-        throw new QueryError({
-            error: 'Only read-only SELECT / WITH queries are allowed',
-            classification: 'safety',
-        })
-    }
-
     const conn = getConnectionById(prep.connectionId)
     if (!conn) {
         throw new QueryError({ error: 'Connection not found', classification: 'not_found' })
+    }
+
+    const trimmed = prep.sql.trim()
+    if (conn.readOnly && !isReadOnlySql(trimmed)) {
+        throw new QueryError({
+            error: 'Only read-only SELECT / WITH queries are allowed on this connection',
+            classification: 'safety',
+        })
     }
 
     // Streams use the existing pool but check out a dedicated client and

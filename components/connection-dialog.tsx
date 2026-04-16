@@ -15,8 +15,9 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Database, Plus, Trash2, TestTube, Check, X } from "lucide-react"
+import { Database, Plus, Trash2, TestTube, Check, X, PencilLine, ShieldCheck, AlertTriangle } from "lucide-react"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 import type { ClientConnectionMeta } from "@/lib/connections"
 import { useToast } from "@/hooks/use-toast"
@@ -359,6 +360,14 @@ export function ConnectionDialog({
                         )}
                       </div>
                       <span className="truncate flex-1">{conn.label}</span>
+                      {!conn.readOnly && (
+                        <span
+                          className="text-[10px] font-medium uppercase tracking-wide text-warning border border-warning/40 bg-warning/10 rounded px-1 leading-4"
+                          title="Writes allowed"
+                        >
+                          RW
+                        </span>
+                      )}
                       {conn.from === "env" && (
                         <span className="text-xs uppercase tracking-wide text-muted-foreground">Env</span>
                       )}
@@ -475,6 +484,47 @@ export function ConnectionDialog({
                             />
                           </div>
                         </div>
+                      </div>
+
+                      <div
+                        className={cn(
+                          "rounded-md border px-3 py-2 transition-colors",
+                          !editingConnection.readOnly
+                            ? "border-warning/40 bg-warning/10"
+                            : "border-border/70 bg-secondary/30",
+                        )}
+                      >
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+                              {editingConnection.readOnly ? (
+                                <ShieldCheck className="h-3.5 w-3.5 text-success" />
+                              ) : (
+                                <PencilLine className="h-3.5 w-3.5 text-warning" />
+                              )}
+                              {editingConnection.readOnly ? "Read-only" : "Writes allowed"}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {editingConnection.readOnly
+                                ? "Only SELECT / WITH queries run against this connection."
+                                : "INSERT, UPDATE, DELETE, and DDL will execute against the database."}
+                            </div>
+                          </div>
+                          <Switch
+                            checked={!editingConnection.readOnly}
+                            onCheckedChange={(checked) => handleUpdateConnection({ readOnly: !checked })}
+                            disabled={editingConnection.from === "env"}
+                            aria-label="Allow writes on this connection"
+                          />
+                        </div>
+                        {!editingConnection.readOnly && (
+                          <div className="mt-2 flex items-start gap-1.5 text-xs text-warning">
+                            <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                            <span>
+                              Writes bypass the read-only safety net. Double-check before running destructive SQL.
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       <div className="rounded-md border border-border/70 bg-secondary/30 px-3 py-2">
